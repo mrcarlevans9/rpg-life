@@ -3,9 +3,12 @@
   import Router from 'svelte-spa-router';
   import { wrap } from 'svelte-spa-router/wrap';
   import Layout from './components/layout/Layout.svelte';
+  import Auth from './routes/Auth.svelte';
   import { initializeDB } from './lib/db/index.js';
   import { settingsData, applyTheme } from './lib/stores/settings.js';
   import { checkAchievements } from './lib/stores/achievements.js';
+  import { initAuth, isAuthenticated, authLoading } from './lib/stores/auth.js';
+  import { fullSync } from './lib/supabase/sync.js';
   import './styles/global.css';
 
   // Route definitions
@@ -22,8 +25,8 @@
     '/projects/:id': wrap({
       asyncComponent: () => import('./routes/ProjectBoard.svelte')
     }),
-    '/walk': wrap({
-      asyncComponent: () => import('./routes/WalkTimer.svelte')
+    '/expedition': wrap({
+      asyncComponent: () => import('./routes/ExpeditionTimer.svelte')
     }),
     '/analytics': wrap({
       asyncComponent: () => import('./routes/Analytics.svelte')
@@ -42,18 +45,22 @@
     })
   };
 
-  let loading = true;
+  let dbLoading = true;
 
   onMount(async () => {
     try {
+      // Initialize auth first
+      await initAuth();
+
+      // Initialize local DB (for offline support)
       await initializeDB();
-      loading = false;
+      dbLoading = false;
 
       // Check achievements on app load
       await checkAchievements();
     } catch (error) {
-      console.error('Failed to initialize database:', error);
-      loading = false;
+      console.error('Failed to initialize:', error);
+      dbLoading = false;
     }
   });
 
@@ -61,6 +68,14 @@
   $: if ($settingsData?.theme) {
     applyTheme($settingsData.theme);
   }
+
+  // Sync data when user becomes authenticated
+  $: if ($isAuthenticated && !dbLoading) {
+    fullSync();
+  }
+
+  // Combined loading state
+  $: loading = dbLoading || $authLoading;
 </script>
 
 {#if loading}
@@ -71,6 +86,8 @@
       <p>Loading your adventure...</p>
     </div>
   </div>
+{:else if !$isAuthenticated}
+  <Auth />
 {:else}
   <Layout>
     <Router {routes} />

@@ -10,9 +10,9 @@ const BASE_XP = {
 // Subtask completion XP
 const SUBTASK_XP = 5;
 
-// Walk XP
-const WALK_XP_PER_MINUTE = 1;
-const WALK_GOAL_BONUS = 50;
+// Expedition XP
+const EXPEDITION_XP_PER_MINUTE = 1;
+const EXPEDITION_GOAL_BONUS = 50;
 
 // Get streak multiplier based on current streak
 export function getStreakMultiplier(streak) {
@@ -36,11 +36,11 @@ export function calculateSubtaskXP(streak = 0) {
   return Math.round(SUBTASK_XP * multiplier);
 }
 
-// Calculate XP for a walk
-export function calculateWalkXP(durationMinutes, hitDailyGoal = false) {
-  let xp = Math.round(durationMinutes * WALK_XP_PER_MINUTE);
+// Calculate XP for an expedition
+export function calculateExpeditionXP(durationMinutes, hitDailyGoal = false) {
+  let xp = Math.round(durationMinutes * EXPEDITION_XP_PER_MINUTE);
   if (hitDailyGoal) {
-    xp += WALK_GOAL_BONUS;
+    xp += EXPEDITION_GOAL_BONUS;
   }
   return xp;
 }
@@ -113,7 +113,7 @@ export async function addXP(amount, source) {
       date: today,
       xpEarned: amount,
       tasksCompleted: 0,
-      walkMinutes: 0
+      expeditionMinutes: 0
     });
   }
 

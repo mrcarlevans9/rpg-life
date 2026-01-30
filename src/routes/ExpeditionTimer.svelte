@@ -3,86 +3,86 @@
   import Button from '../components/common/Button.svelte';
   import ProgressBar from '../components/common/ProgressBar.svelte';
   import {
-    walkTimer,
-    startWalk,
-    pauseWalk,
-    resumeWalk,
-    endWalk,
-    cancelWalk,
+    expeditionTimer,
+    startExpedition,
+    pauseExpedition,
+    resumeExpedition,
+    endExpedition,
+    cancelExpedition,
     formatDuration,
-    walkGoalProgress,
-    walksData
-  } from '../lib/stores/walks.js';
+    expeditionGoalProgress,
+    expeditionsData
+  } from '../lib/stores/expeditions.js';
   import { settingsData } from '../lib/stores/settings.js';
   import { showSuccess } from '../lib/stores/notifications.js';
 
-  let lastWalkResult = null;
+  let lastExpeditionResult = null;
 
-  async function handleEndWalk() {
-    lastWalkResult = await endWalk();
-    if (lastWalkResult) {
-      showSuccess(`Earned ${lastWalkResult.xpEarned} XP from your walk!`, 'Walk Complete');
+  async function handleEndExpedition() {
+    lastExpeditionResult = await endExpedition();
+    if (lastExpeditionResult) {
+      showSuccess(`Earned ${lastExpeditionResult.xpEarned} XP from your expedition!`, 'Expedition Complete');
     }
   }
 
-  function handleCancelWalk() {
-    if (confirm('Cancel this walk? Progress will be lost.')) {
-      cancelWalk();
+  function handleCancelExpedition() {
+    if (confirm('Cancel this expedition? Progress will be lost.')) {
+      cancelExpedition();
     }
   }
 
-  function getRecentWalks(walks) {
-    if (!walks) return [];
-    return walks.slice(0, 7);
+  function getRecentExpeditions(expeditions) {
+    if (!expeditions) return [];
+    return expeditions.slice(0, 7);
   }
 </script>
 
-<div class="walk-page">
+<div class="expedition-page">
   <header class="page-header">
-    <h1>Walk Timer</h1>
-    <p class="subtitle">Go for a walk to earn XP!</p>
+    <h1>Expedition</h1>
+    <p class="subtitle">Embark on an adventure to earn XP!</p>
   </header>
 
   <section class="timer-section">
     <Card>
       <div class="timer-card">
         <div class="timer-display">
-          <span class="timer-icon">{$walkTimer.isRunning ? '🚶' : '⏱️'}</span>
-          <span class="timer-time">{formatDuration($walkTimer.elapsedSeconds)}</span>
-          {#if $walkTimer.isPaused}
+          <span class="timer-icon">{$expeditionTimer.isRunning ? '🗺️' : '⏱️'}</span>
+          <span class="timer-time">{formatDuration($expeditionTimer.elapsedSeconds)}</span>
+          {#if $expeditionTimer.isPaused}
             <span class="timer-status">PAUSED</span>
           {/if}
         </div>
 
         <div class="timer-info">
-          <p>1 XP per minute + {$settingsData?.dailyWalkGoal || 20} min goal bonus (50 XP)</p>
+          <p>1 XP per minute + {$settingsData?.dailyExpeditionGoal || 20} min goal bonus (50 XP)</p>
         </div>
 
         <div class="timer-controls">
-          {#if !$walkTimer.isRunning}
-            <Button size="lg" on:click={startWalk}>
-              Start Walk
+          {#if !$expeditionTimer.isRunning}
+            <Button size="lg" on:click={startExpedition}>
+              Begin Expedition
             </Button>
-          {:else if $walkTimer.isPaused}
-            <Button size="lg" on:click={resumeWalk}>
+          {:else if $expeditionTimer.isPaused}
+            <Button size="lg" on:click={resumeExpedition}>
               Resume
             </Button>
-            <Button size="lg" variant="secondary" on:click={handleEndWalk}>
-              End Walk
+            <Button size="lg" variant="secondary" on:click={handleEndExpedition}>
+              End Expedition
             </Button>
           {:else}
-            <Button size="lg" variant="secondary" on:click={pauseWalk}>
+            <Button size="lg" variant="secondary" on:click={pauseExpedition}>
               Pause
             </Button>
-            <Button size="lg" on:click={handleEndWalk}>
-              End Walk
+            <Button size="lg" on:click={handleEndExpedition}>
+              End Expedition
             </Button>
           {/if}
         </div>
 
-        {#if $walkTimer.isRunning}
-          <button class="cancel-link" on:click={handleCancelWalk}>
-            Cancel walk
+        {#if $expeditionTimer.isRunning}
+          <button class="cancel-link" on:click={handleCancelExpedition}>
+            Abandon expedition
           </button>
         {/if}
       </div>
@@ -94,45 +94,45 @@
       <div class="goal-card">
         <div class="goal-header">
           <h3>Daily Goal Progress</h3>
-          <span class="goal-status" class:completed={$walkGoalProgress?.completed}>
-            {$walkGoalProgress?.completed ? '✓ Completed!' : `${$walkGoalProgress?.current || 0}/${$walkGoalProgress?.goal || 20} min`}
+          <span class="goal-status" class:completed={$expeditionGoalProgress?.completed}>
+            {$expeditionGoalProgress?.completed ? '✓ Completed!' : `${$expeditionGoalProgress?.current || 0}/${$expeditionGoalProgress?.goal || 20} min`}
           </span>
         </div>
 
         <ProgressBar
-          value={$walkGoalProgress?.current || 0}
-          max={$walkGoalProgress?.goal || 20}
+          value={$expeditionGoalProgress?.current || 0}
+          max={$expeditionGoalProgress?.goal || 20}
           size="lg"
-          color={$walkGoalProgress?.completed ? 'success' : 'accent'}
-          animated={$walkTimer.isRunning}
+          color={$expeditionGoalProgress?.completed ? 'success' : 'accent'}
+          animated={$expeditionTimer.isRunning}
         />
 
         <p class="goal-bonus">
-          {#if $walkGoalProgress?.completed}
-            🎉 You've earned your daily walk bonus!
+          {#if $expeditionGoalProgress?.completed}
+            🎉 You've earned your daily expedition bonus!
           {:else}
-            Walk {($walkGoalProgress?.goal || 20) - ($walkGoalProgress?.current || 0)} more minutes to earn a 50 XP bonus!
+            Explore for {($expeditionGoalProgress?.goal || 20) - ($expeditionGoalProgress?.current || 0)} more minutes to earn a 50 XP bonus!
           {/if}
         </p>
       </div>
     </Card>
   </section>
 
-  {#if lastWalkResult}
+  {#if lastExpeditionResult}
     <section class="result-section">
       <Card>
         <div class="result-card">
-          <h3>Last Walk</h3>
+          <h3>Last Expedition</h3>
           <div class="result-stats">
             <div class="result-stat">
-              <span class="stat-value">{lastWalkResult.duration}</span>
+              <span class="stat-value">{lastExpeditionResult.duration}</span>
               <span class="stat-label">minutes</span>
             </div>
             <div class="result-stat">
-              <span class="stat-value xp">+{lastWalkResult.xpEarned}</span>
+              <span class="stat-value xp">+{lastExpeditionResult.xpEarned}</span>
               <span class="stat-label">XP earned</span>
             </div>
-            {#if lastWalkResult.hitGoal}
+            {#if lastExpeditionResult.hitGoal}
               <div class="result-stat">
                 <span class="stat-value bonus">+50</span>
                 <span class="stat-label">goal bonus</span>
@@ -145,32 +145,32 @@
   {/if}
 
   <section class="history-section">
-    <h2>Recent Walks</h2>
+    <h2>Recent Expeditions</h2>
 
-    {#if $walksData && $walksData.length > 0}
+    {#if $expeditionsData && $expeditionsData.length > 0}
       <div class="history-list">
-        {#each getRecentWalks($walksData) as walk}
+        {#each getRecentExpeditions($expeditionsData) as expedition}
           <Card>
             <div class="history-item">
               <div class="history-date">
-                {new Date(walk.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                {new Date(expedition.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
               </div>
-              <div class="history-duration">{walk.duration} min</div>
-              <div class="history-xp">+{walk.xpEarned} XP</div>
+              <div class="history-duration">{expedition.duration} min</div>
+              <div class="history-xp">+{expedition.xpEarned} XP</div>
             </div>
           </Card>
         {/each}
       </div>
     {:else}
       <div class="empty-history">
-        <p>No walks recorded yet. Start your first walk!</p>
+        <p>No expeditions recorded yet. Begin your first adventure!</p>
       </div>
     {/if}
   </section>
 </div>
 
 <style>
-  .walk-page {
+  .expedition-page {
     max-width: 600px;
     margin: 0 auto;
   }

@@ -2,7 +2,7 @@ import Dexie from 'dexie';
 
 export const db = new Dexie('RPGLifeDB');
 
-db.version(1).stores({
+db.version(2).stores({
   // Player profile - single row (id: 1)
   player: '++id',
 
@@ -21,8 +21,8 @@ db.version(1).stores({
   // Daily quests
   dailyQuests: '++id, &date',
 
-  // Walk sessions
-  walks: '++id, date',
+  // Expedition sessions (renamed from walks)
+  expeditions: '++id, date',
 
   // Achievements
   achievements: '++id, &key',
@@ -42,18 +42,18 @@ db.version(1).stores({
 
 // Achievement definitions
 export const ACHIEVEMENTS = [
-  { key: 'first_steps', name: 'First Steps', description: 'Complete your first walk', icon: '🚶', xpReward: 50, type: 'walk' },
+  { key: 'first_expedition', name: 'First Expedition', description: 'Complete your first expedition', icon: '🗺️', xpReward: 50, type: 'expedition' },
   { key: 'getting_started', name: 'Getting Started', description: 'Complete your first task', icon: '✅', xpReward: 50, type: 'task' },
   { key: 'week_warrior', name: 'Week Warrior', description: '7-day streak', icon: '🔥', xpReward: 200, type: 'streak', target: 7 },
   { key: 'fortnight_fighter', name: 'Fortnight Fighter', description: '14-day streak', icon: '⚔️', xpReward: 500, type: 'streak', target: 14 },
   { key: 'monthly_master', name: 'Monthly Master', description: '30-day streak', icon: '👑', xpReward: 1000, type: 'streak', target: 30 },
   { key: 'century_club', name: 'Century Club', description: 'Complete 100 tasks', icon: '💯', xpReward: 500, type: 'task_count', target: 100 },
   { key: 'thousand_tasks', name: 'Thousand Tasks', description: 'Complete 1000 tasks', icon: '🏆', xpReward: 2000, type: 'task_count', target: 1000 },
-  { key: 'marathon_month', name: 'Marathon Month', description: 'Walk 30 days in a row', icon: '🏃', xpReward: 1000, type: 'walk_streak', target: 30 },
+  { key: 'expedition_streak', name: 'Expedition Streak', description: 'Go on expeditions 30 days in a row', icon: '🏃', xpReward: 1000, type: 'expedition_streak', target: 30 },
   { key: 'early_bird', name: 'Early Bird', description: 'Complete a task before 6am', icon: '🌅', xpReward: 100, type: 'time' },
   { key: 'night_owl', name: 'Night Owl', description: 'Complete a task after midnight', icon: '🦉', xpReward: 100, type: 'time' },
   { key: 'overachiever', name: 'Overachiever', description: 'Complete 10 tasks in one day', icon: '⭐', xpReward: 200, type: 'daily_tasks', target: 10 },
-  { key: 'walking_wonder', name: 'Walking Wonder', description: 'Accumulate 10 hours of walks', icon: '🌟', xpReward: 500, type: 'walk_time', target: 600 },
+  { key: 'seasoned_explorer', name: 'Seasoned Explorer', description: 'Accumulate 10 hours of expeditions', icon: '🌟', xpReward: 500, type: 'expedition_time', target: 600 },
   { key: 'level_10', name: 'Level 10', description: 'Reach level 10', icon: '🎖️', xpReward: 300, type: 'level', target: 10 },
   { key: 'level_25', name: 'Level 25', description: 'Reach level 25', icon: '🎗️', xpReward: 750, type: 'level', target: 25 },
   { key: 'level_50', name: 'Level 50', description: 'Reach level 50', icon: '🏅', xpReward: 1500, type: 'level', target: 50 }
@@ -115,7 +115,8 @@ export const TITLES = [
   { key: 'streak_master', name: 'Streak Master', requirement: '30-day streak', achievement: 'monthly_master' },
   { key: 'centurion', name: 'Centurion', requirement: 'Complete 100 tasks', achievement: 'century_club' },
   { key: 'night_owl', name: 'Night Owl', requirement: 'Complete task after midnight', achievement: 'night_owl' },
-  { key: 'early_bird', name: 'Early Bird', requirement: 'Complete task before 6am', achievement: 'early_bird' }
+  { key: 'early_bird', name: 'Early Bird', requirement: 'Complete task before 6am', achievement: 'early_bird' },
+  { key: 'explorer', name: 'Explorer', requirement: '10 hours of expeditions', achievement: 'seasoned_explorer' }
 ];
 
 export default db;

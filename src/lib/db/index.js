@@ -12,7 +12,7 @@ export async function initializeDB() {
       longestStreak: 0,
       lastActiveDate: null,
       totalTasksCompleted: 0,
-      totalWalkMinutes: 0,
+      totalExpeditionMinutes: 0,
       createdAt: new Date().toISOString()
     });
 
@@ -31,7 +31,7 @@ export async function initializeDB() {
       theme: 'dark',
       accentColor: '#6366f1',
       navMode: 'sidebar',
-      dailyWalkGoal: 20,
+      dailyExpeditionGoal: 20,
       soundEnabled: false
     });
 

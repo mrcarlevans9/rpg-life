@@ -18,10 +18,10 @@
     '#3b82f6'  // Blue
   ];
 
-  async function handleWalkGoalChange(e) {
+  async function handleExpeditionGoalChange(e) {
     const value = parseInt(e.target.value);
     if (value > 0) {
-      await updateSetting('dailyWalkGoal', value);
+      await updateSetting('dailyExpeditionGoal', value);
     }
   }
 
@@ -180,21 +180,21 @@
   </section>
 
   <section class="settings-section">
-    <h2>Walk Settings</h2>
+    <h2>Expedition Settings</h2>
 
     <Card>
       <div class="setting-item">
         <div class="setting-info">
-          <h3>Daily Walk Goal</h3>
-          <p>Set your daily walk goal in minutes</p>
+          <h3>Daily Expedition Goal</h3>
+          <p>Set your daily expedition goal in minutes</p>
         </div>
         <div class="goal-input">
           <input
             type="number"
             min="5"
             max="120"
-            value={$settingsData?.dailyWalkGoal || 20}
-            on:change={handleWalkGoalChange}
+            value={$settingsData?.dailyExpeditionGoal || 20}
+            on:change={handleExpeditionGoalChange}
           />
           <span>minutes</span>
         </div>

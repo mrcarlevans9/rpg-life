@@ -102,11 +102,11 @@ export async function checkAchievements() {
         }
         break;
 
-      case 'walk':
-        // First walk - checked when completing a walk
+      case 'expedition':
+        // First expedition - checked when completing an expedition
         if (achievement.key === 'first_steps') {
-          const walkCount = await db.walks.count();
-          if (walkCount >= 1) shouldUnlock = true;
+          const expeditionCount = await db.expeditions.count();
+          if (expeditionCount >= 1) shouldUnlock = true;
         }
         break;
 
@@ -120,14 +120,14 @@ export async function checkAchievements() {
         if (progress >= achievement.target) shouldUnlock = true;
         break;
 
-      case 'walk_streak':
-        // Check consecutive walk days
-        progress = await getWalkStreak();
+      case 'expedition_streak':
+        // Check consecutive expedition days
+        progress = await getExpeditionStreak();
         if (progress >= achievement.target) shouldUnlock = true;
         break;
 
-      case 'walk_time':
-        progress = player.totalWalkMinutes;
+      case 'expedition_time':
+        progress = player.totalExpeditionMinutes;
         if (progress >= achievement.target) shouldUnlock = true;
         break;
 
@@ -194,12 +194,12 @@ export async function checkLevelAchievements(level) {
   if (level >= 50) await unlockAchievement('level_50');
 }
 
-// Helper: Get consecutive walk days
-async function getWalkStreak() {
-  const walks = await db.walks.orderBy('date').reverse().toArray();
-  if (walks.length === 0) return 0;
+// Helper: Get consecutive expedition days
+async function getExpeditionStreak() {
+  const expeditions = await db.expeditions.orderBy('date').reverse().toArray();
+  if (expeditions.length === 0) return 0;
 
-  const dates = [...new Set(walks.map(w => w.date))];
+  const dates = [...new Set(expeditions.map(e => e.date))];
   let streak = 1;
 
   for (let i = 0; i < dates.length - 1; i++) {

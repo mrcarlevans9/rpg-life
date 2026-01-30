@@ -32,7 +32,7 @@
       dayName: new Date(date).toLocaleDateString('en-US', { weekday: 'short' }),
       xpEarned: statsMap[date]?.xpEarned || 0,
       tasksCompleted: statsMap[date]?.tasksCompleted || 0,
-      walkMinutes: statsMap[date]?.walkMinutes || 0
+      expeditionMinutes: statsMap[date]?.expeditionMinutes || 0
     }));
 
     loading = false;
@@ -44,11 +44,11 @@
 
   $: maxXP = getMaxValue('xpEarned');
   $: maxTasks = getMaxValue('tasksCompleted');
-  $: maxWalk = getMaxValue('walkMinutes');
+  $: maxExpedition = getMaxValue('expeditionMinutes');
 
   $: totalWeeklyXP = weeklyStats.reduce((sum, s) => sum + s.xpEarned, 0);
   $: totalWeeklyTasks = weeklyStats.reduce((sum, s) => sum + s.tasksCompleted, 0);
-  $: totalWeeklyWalk = weeklyStats.reduce((sum, s) => sum + s.walkMinutes, 0);
+  $: totalWeeklyExpedition = weeklyStats.reduce((sum, s) => sum + s.expeditionMinutes, 0);
 </script>
 
 <div class="analytics-page">
@@ -90,10 +90,10 @@
 
       <Card>
         <div class="stat-card">
-          <span class="stat-icon">🚶</span>
+          <span class="stat-icon">🗺️</span>
           <div class="stat-info">
-            <span class="stat-value">{$playerData?.totalWalkMinutes || 0}</span>
-            <span class="stat-label">Walk Minutes</span>
+            <span class="stat-value">{$playerData?.totalExpeditionMinutes || 0}</span>
+            <span class="stat-label">Expedition Minutes</span>
           </div>
         </div>
       </Card>
@@ -129,7 +129,7 @@
       <div class="weekly-summary">
         <span>{totalWeeklyXP} XP</span>
         <span>{totalWeeklyTasks} tasks</span>
-        <span>{totalWeeklyWalk} min walked</span>
+        <span>{totalWeeklyExpedition} min explored</span>
       </div>
 
       <div class="charts-grid">
@@ -171,14 +171,14 @@
 
         <Card>
           <div class="chart-card">
-            <h3>Walk Minutes</h3>
+            <h3>Expedition Minutes</h3>
             <div class="bar-chart">
               {#each weeklyStats as day}
                 <div class="bar-container">
                   <div
-                    class="bar walk"
-                    style="height: {(day.walkMinutes / maxWalk) * 100}%"
-                    title="{day.walkMinutes} min"
+                    class="bar expedition"
+                    style="height: {(day.expeditionMinutes / maxExpedition) * 100}%"
+                    title="{day.expeditionMinutes} min"
                   ></div>
                   <span class="bar-label">{day.dayName}</span>
                 </div>
@@ -299,7 +299,7 @@
     background-color: var(--success);
   }
 
-  .bar.walk {
+  .bar.expedition {
     background-color: var(--accent);
   }
 

@@ -5,7 +5,7 @@
   import ProgressBar from '../components/common/ProgressBar.svelte';
   import { db } from '../lib/db/index.js';
   import { completeTask } from '../lib/stores/tasks.js';
-  import { walkGoalProgress } from '../lib/stores/walks.js';
+  import { expeditionGoalProgress } from '../lib/stores/expeditions.js';
   import { playerData, xpProgress } from '../lib/stores/player.js';
   import { showXPGain } from '../lib/stores/notifications.js';
 
@@ -94,16 +94,16 @@
 
         <div class="progress-item">
           <div class="progress-header">
-            <span class="progress-icon">🚶</span>
-            <span class="progress-label">Walk Goal</span>
+            <span class="progress-icon">🗺️</span>
+            <span class="progress-label">Expedition Goal</span>
           </div>
           <ProgressBar
-            value={$walkGoalProgress?.current || 0}
-            max={$walkGoalProgress?.goal || 20}
+            value={$expeditionGoalProgress?.current || 0}
+            max={$expeditionGoalProgress?.goal || 20}
             size="sm"
-            color={$walkGoalProgress?.completed ? 'success' : 'accent'}
+            color={$expeditionGoalProgress?.completed ? 'success' : 'accent'}
           />
-          <span class="progress-value">{$walkGoalProgress?.current || 0}/{$walkGoalProgress?.goal || 20} min</span>
+          <span class="progress-value">{$expeditionGoalProgress?.current || 0}/{$expeditionGoalProgress?.goal || 20} min</span>
         </div>
 
         <div class="progress-item">
@@ -180,11 +180,11 @@
     <h2>Bonus Objectives</h2>
     <div class="bonus-grid">
       <Card>
-        <div class="bonus-card" class:completed={$walkGoalProgress?.completed}>
-          <span class="bonus-icon">{$walkGoalProgress?.completed ? '✅' : '🚶'}</span>
+        <div class="bonus-card" class:completed={$expeditionGoalProgress?.completed}>
+          <span class="bonus-icon">{$expeditionGoalProgress?.completed ? '✅' : '🗺️'}</span>
           <div class="bonus-info">
-            <span class="bonus-name">Daily Walk</span>
-            <span class="bonus-desc">Walk {$walkGoalProgress?.goal || 20} minutes</span>
+            <span class="bonus-name">Daily Expedition</span>
+            <span class="bonus-desc">Explore for {$expeditionGoalProgress?.goal || 20} minutes</span>
           </div>
           <span class="bonus-reward">+50 XP</span>
         </div>

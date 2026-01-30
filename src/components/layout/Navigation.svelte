@@ -5,7 +5,7 @@
     { path: '/', label: 'Dashboard', icon: '🏠' },
     { path: '/quests', label: 'Daily Quests', icon: '⚔️' },
     { path: '/projects', label: 'Projects', icon: '📋' },
-    { path: '/walk', label: 'Walk Timer', icon: '🚶' },
+    { path: '/expedition', label: 'Expedition', icon: '🗺️' },
     { path: '/analytics', label: 'Analytics', icon: '📊' },
     { path: '/achievements', label: 'Achievements', icon: '🏆' },
     { path: '/avatar', label: 'Avatar', icon: '👤' },

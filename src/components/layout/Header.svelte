@@ -3,6 +3,7 @@
   import XPBar from '../player/XPBar.svelte';
   import StreakCounter from '../player/StreakCounter.svelte';
   import { settingsData, toggleTheme } from '../../lib/stores/settings.js';
+  import { signOut, authUser } from '../../lib/stores/auth.js';
 
   export let showNav = true;
 
@@ -10,6 +11,15 @@
 
   function toggleMenu() {
     menuOpen = !menuOpen;
+  }
+
+  function closeMenu() {
+    menuOpen = false;
+  }
+
+  async function handleSignOut() {
+    closeMenu();
+    await signOut();
   }
 </script>
 
@@ -42,9 +52,31 @@
       {/if}
     </button>
 
-    <a href="#/avatar" class="avatar-link">
-      <AvatarDisplay size="sm" />
-    </a>
+    <div class="avatar-menu">
+      <button class="avatar-btn" on:click={toggleMenu}>
+        <AvatarDisplay size="sm" />
+      </button>
+
+      {#if menuOpen}
+        <div class="menu-overlay" on:click={closeMenu}></div>
+        <div class="dropdown-menu">
+          <a href="#/avatar" class="menu-item" on:click={closeMenu}>
+            <span class="menu-icon">👤</span>
+            Avatar
+          </a>
+          <a href="#/settings" class="menu-item" on:click={closeMenu}>
+            <span class="menu-icon">⚙️</span>
+            Settings
+          </a>
+          <div class="menu-divider"></div>
+          <div class="menu-email">{$authUser?.email}</div>
+          <button class="menu-item danger" on:click={handleSignOut}>
+            <span class="menu-icon">🚪</span>
+            Sign Out
+          </button>
+        </div>
+      {/if}
+    </div>
   </div>
 </header>
 
@@ -109,8 +141,82 @@
     background-color: var(--bg-tertiary);
   }
 
-  .avatar-link {
+  .avatar-menu {
+    position: relative;
+  }
+
+  .avatar-btn {
     display: flex;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    border-radius: var(--radius-full);
+    transition: transform var(--transition-fast);
+  }
+
+  .avatar-btn:hover {
+    transform: scale(1.05);
+  }
+
+  .menu-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 99;
+  }
+
+  .dropdown-menu {
+    position: absolute;
+    top: calc(100% + var(--spacing-sm));
+    right: 0;
+    min-width: 200px;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    z-index: 100;
+    overflow: hidden;
+  }
+
+  .menu-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    transition: background-color var(--transition-fast);
+    text-decoration: none;
+  }
+
+  .menu-item:hover {
+    background-color: var(--bg-tertiary);
+  }
+
+  .menu-item.danger {
+    color: var(--error);
+  }
+
+  .menu-icon {
+    font-size: 1rem;
+  }
+
+  .menu-divider {
+    height: 1px;
+    background-color: var(--border);
+    margin: var(--spacing-xs) 0;
+  }
+
+  .menu-email {
+    padding: var(--spacing-xs) var(--spacing-md);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .desktop-only {

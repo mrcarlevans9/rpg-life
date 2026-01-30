@@ -5,7 +5,7 @@
     { path: '/', label: 'Home', icon: '🏠' },
     { path: '/quests', label: 'Quests', icon: '⚔️' },
     { path: '/projects', label: 'Projects', icon: '📋' },
-    { path: '/walk', label: 'Walk', icon: '🚶' },
+    { path: '/expedition', label: 'Expedition', icon: '🗺️' },
     { path: '/analytics', label: 'Stats', icon: '📊' }
   ];
 

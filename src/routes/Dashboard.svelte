@@ -6,7 +6,7 @@
   import Button from '../components/common/Button.svelte';
   import { playerData, xpProgress, currentLevel } from '../lib/stores/player.js';
   import { todaysTasks } from '../lib/stores/tasks.js';
-  import { walkGoalProgress } from '../lib/stores/walks.js';
+  import { expeditionGoalProgress } from '../lib/stores/expeditions.js';
   import { avatarData } from '../lib/stores/avatar.js';
   import { TITLES } from '../lib/db/schema.js';
 
@@ -44,10 +44,10 @@
 
     <Card>
       <div class="stat-card">
-        <span class="stat-icon">🚶</span>
+        <span class="stat-icon">🗺️</span>
         <div class="stat-info">
-          <span class="stat-value">{$walkGoalProgress?.current || 0}/{$walkGoalProgress?.goal || 20}</span>
-          <span class="stat-label">Walk Minutes</span>
+          <span class="stat-value">{$expeditionGoalProgress?.current || 0}/{$expeditionGoalProgress?.goal || 20}</span>
+          <span class="stat-label">Expedition Minutes</span>
         </div>
       </div>
     </Card>
@@ -71,9 +71,9 @@
         <span class="action-label">View Today's Quests</span>
       </a>
 
-      <a href="#/walk" class="action-card">
-        <span class="action-icon">🚶</span>
-        <span class="action-label">Start Walk</span>
+      <a href="#/expedition" class="action-card">
+        <span class="action-icon">🗺️</span>
+        <span class="action-label">Start Expedition</span>
       </a>
 
       <a href="#/projects" class="action-card">

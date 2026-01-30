@@ -1,7 +1,7 @@
 import { writable, derived } from 'svelte/store';
 import { liveQuery } from 'dexie';
 import { db } from '../db/index.js';
-import { addXP, calculateWalkXP } from '../services/xpService.js';
+import { addXP, calculateExpeditionXP } from '../services/xpService.js';
 import { xpGainNotification, updateStreak } from './player.js';
 import { settingsData } from './settings.js';
 import { get } from 'svelte/store';
@@ -28,14 +28,14 @@ function createLiveQueryStore(queryFn, defaultValue = null) {
   return store;
 }
 
-// Walk history from DB
-export const walksData = createLiveQueryStore(
-  () => db.walks.orderBy('date').reverse().toArray(),
+// Expedition history from DB
+export const expeditionsData = createLiveQueryStore(
+  () => db.expeditions.orderBy('date').reverse().toArray(),
   []
 );
 
-// Current walk timer state (not persisted)
-export const walkTimer = writable({
+// Current expedition timer state (not persisted)
+export const expeditionTimer = writable({
   isRunning: false,
   isPaused: false,
   startTime: null,
@@ -43,21 +43,21 @@ export const walkTimer = writable({
   elapsedSeconds: 0
 });
 
-// Today's walk minutes
-export const todaysWalkMinutes = createLiveQueryStore(() => {
+// Today's expedition minutes
+export const todaysExpeditionMinutes = createLiveQueryStore(() => {
   const today = new Date().toISOString().split('T')[0];
-  return db.walks
+  return db.expeditions
     .where('date')
     .equals(today)
     .toArray()
-    .then(walks => walks.reduce((total, walk) => total + walk.duration, 0));
+    .then(expeditions => expeditions.reduce((total, exp) => total + exp.duration, 0));
 }, 0);
 
-// Walk goal progress
-export const walkGoalProgress = derived(
-  [todaysWalkMinutes, settingsData],
+// Expedition goal progress
+export const expeditionGoalProgress = derived(
+  [todaysExpeditionMinutes, settingsData],
   ([$minutes, $settings]) => {
-    const goal = $settings?.dailyWalkGoal || 20;
+    const goal = $settings?.dailyExpeditionGoal || 20;
     const percentage = Math.min(100, Math.round(($minutes / goal) * 100));
     return {
       current: $minutes,
@@ -71,11 +71,11 @@ export const walkGoalProgress = derived(
 // Timer update interval
 let timerInterval = null;
 
-// Start the walk timer
-export function startWalk() {
+// Start the expedition timer
+export function startExpedition() {
   const now = Date.now();
 
-  walkTimer.update(state => ({
+  expeditionTimer.update(state => ({
     isRunning: true,
     isPaused: false,
     startTime: now,
@@ -85,7 +85,7 @@ export function startWalk() {
 
   // Update elapsed time every second
   timerInterval = setInterval(() => {
-    walkTimer.update(state => {
+    expeditionTimer.update(state => {
       if (!state.isRunning || state.isPaused) return state;
       const elapsed = Math.floor((Date.now() - state.startTime) / 1000);
       return { ...state, elapsedSeconds: elapsed };
@@ -93,18 +93,18 @@ export function startWalk() {
   }, 1000);
 }
 
-// Pause the walk timer
-export function pauseWalk() {
-  walkTimer.update(state => ({
+// Pause the expedition timer
+export function pauseExpedition() {
+  expeditionTimer.update(state => ({
     ...state,
     isPaused: true,
     pausedTime: Date.now()
   }));
 }
 
-// Resume the walk timer
-export function resumeWalk() {
-  walkTimer.update(state => {
+// Resume the expedition timer
+export function resumeExpedition() {
+  expeditionTimer.update(state => {
     if (!state.pausedTime) return state;
 
     const pauseDuration = Date.now() - state.pausedTime;
@@ -117,9 +117,9 @@ export function resumeWalk() {
   });
 }
 
-// End the walk and log it
-export async function endWalk() {
-  const state = get(walkTimer);
+// End the expedition and log it
+export async function endExpedition() {
+  const state = get(expeditionTimer);
 
   if (!state.isRunning) return null;
 
@@ -133,7 +133,7 @@ export async function endWalk() {
   const durationMinutes = Math.floor(durationSeconds / 60);
 
   // Reset timer state
-  walkTimer.set({
+  expeditionTimer.set({
     isRunning: false,
     isPaused: false,
     startTime: null,
@@ -141,25 +141,25 @@ export async function endWalk() {
     elapsedSeconds: 0
   });
 
-  // Don't log walks shorter than 1 minute
+  // Don't log expeditions shorter than 1 minute
   if (durationMinutes < 1) return null;
 
   const today = new Date().toISOString().split('T')[0];
   const settings = await db.settings.get(1);
-  const goal = settings?.dailyWalkGoal || 20;
+  const goal = settings?.dailyExpeditionGoal || 20;
 
-  // Get today's total walk minutes before this walk
-  const todayWalks = await db.walks.where('date').equals(today).toArray();
-  const previousMinutes = todayWalks.reduce((total, w) => total + w.duration, 0);
+  // Get today's total expedition minutes before this one
+  const todayExpeditions = await db.expeditions.where('date').equals(today).toArray();
+  const previousMinutes = todayExpeditions.reduce((total, e) => total + e.duration, 0);
 
-  // Check if this walk completes the daily goal
+  // Check if this expedition completes the daily goal
   const hitGoal = previousMinutes < goal && (previousMinutes + durationMinutes) >= goal;
 
   // Calculate XP
-  const xpEarned = calculateWalkXP(durationMinutes, hitGoal);
+  const xpEarned = calculateExpeditionXP(durationMinutes, hitGoal);
 
-  // Log the walk
-  await db.walks.add({
+  // Log the expedition
+  await db.expeditions.add({
     date: today,
     duration: durationMinutes,
     xpEarned,
@@ -168,10 +168,10 @@ export async function endWalk() {
     createdAt: new Date().toISOString()
   });
 
-  // Update player total walk minutes
+  // Update player total expedition minutes
   const player = await db.player.get(1);
   await db.player.update(1, {
-    totalWalkMinutes: (player?.totalWalkMinutes || 0) + durationMinutes
+    totalExpeditionMinutes: (player?.totalExpeditionMinutes || 0) + durationMinutes
   });
 
   // Update daily stats
@@ -179,14 +179,14 @@ export async function endWalk() {
 
   if (dailyStat) {
     await db.dailyStats.update(dailyStat.id, {
-      walkMinutes: (dailyStat.walkMinutes || 0) + durationMinutes
+      expeditionMinutes: (dailyStat.expeditionMinutes || 0) + durationMinutes
     });
   } else {
     await db.dailyStats.add({
       date: today,
       tasksCompleted: 0,
       xpEarned: 0,
-      walkMinutes: durationMinutes
+      expeditionMinutes: durationMinutes
     });
   }
 
@@ -194,12 +194,12 @@ export async function endWalk() {
   await updateStreak();
 
   // Add XP
-  const xpResult = await addXP(xpEarned, 'walk');
+  const xpResult = await addXP(xpEarned, 'expedition');
 
   // Trigger notification
   xpGainNotification.set({
     amount: xpEarned,
-    source: 'walk',
+    source: 'expedition',
     hitGoal,
     leveledUp: xpResult?.leveledUp
   });
@@ -212,14 +212,14 @@ export async function endWalk() {
   };
 }
 
-// Cancel the walk without logging
-export function cancelWalk() {
+// Cancel the expedition without logging
+export function cancelExpedition() {
   if (timerInterval) {
     clearInterval(timerInterval);
     timerInterval = null;
   }
 
-  walkTimer.set({
+  expeditionTimer.set({
     isRunning: false,
     isPaused: false,
     startTime: null,
@@ -240,15 +240,15 @@ export function formatDuration(seconds) {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-// Get walk stats for a date range
-export async function getWalkStats(startDate, endDate) {
-  const walks = await db.walks
+// Get expedition stats for a date range
+export async function getExpeditionStats(startDate, endDate) {
+  const expeditions = await db.expeditions
     .where('date')
     .between(startDate, endDate)
     .toArray();
 
-  return walks.reduce((acc, walk) => {
-    acc[walk.date] = (acc[walk.date] || 0) + walk.duration;
+  return expeditions.reduce((acc, exp) => {
+    acc[exp.date] = (acc[exp.date] || 0) + exp.duration;
     return acc;
   }, {});
 }
