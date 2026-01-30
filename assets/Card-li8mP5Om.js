@@ -1,1 +1,0 @@
-import{Y as l,a9 as i,t as v,c as f,n,f as c,v as p}from"./index-MgFKLO_i.js";/* empty css                                           */var h=n("<div><!></div>");function b(d,a){let s=l(a,"padding",8,!0),r=l(a,"hoverable",8,!1);var e=h();let t;var o=c(e);i(o,a,"default",{}),v(()=>t=p(e,1,"card svelte-xtxwfc",null,t,{"with-padding":s(),hoverable:r()})),f(d,e)}export{b as C};
