@@ -521,6 +521,48 @@ export async function syncDungeon() {
       return localDungeon;
     }
 
+    // Check if local looks like fresh defaults (just reset)
+    const localIsDefault = !localDungeon || (
+      (localDungeon.gold || 0) === 0 &&
+      (localDungeon.totalGoldEarned || 0) === 0 &&
+      (localDungeon.totalRuns || 0) <= 1 &&
+      (!localDungeon.customSpells || localDungeon.customSpells.length === 0 || !localDungeon.customSpells[0])
+    );
+
+    // Check if remote has real data
+    const remoteHasData = remoteDungeon && (
+      (remoteDungeon.gold || 0) > 0 ||
+      (remoteDungeon.total_gold_earned || 0) > 0 ||
+      (remoteDungeon.total_runs || 0) > 0 ||
+      (remoteDungeon.custom_spells && remoteDungeon.custom_spells.length > 0 && remoteDungeon.custom_spells[0])
+    );
+
+    // If local is default/fresh and remote has data, restore from remote
+    if (remoteDungeon && localIsDefault && remoteHasData) {
+      console.log('Local is fresh, restoring from cloud backup...');
+      const restored = {
+        healthPotions: remoteDungeon.health_potions || 3,
+        gold: remoteDungeon.gold || 0,
+        totalGoldEarned: remoteDungeon.total_gold_earned || 0,
+        highestFloor: remoteDungeon.highest_floor || 0,
+        totalRuns: remoteDungeon.total_runs || 0,
+        totalKills: remoteDungeon.total_kills || 0,
+        bossesDefeated: remoteDungeon.bosses_defeated || 0,
+        upgrades: remoteDungeon.upgrades || [],
+        maxHpBonus: remoteDungeon.max_hp_bonus || 0,
+        bonusDamage: remoteDungeon.bonus_damage || 0,
+        potionBonus: remoteDungeon.potion_bonus || 0,
+        critBonus: remoteDungeon.crit_bonus || 0,
+        defenseBonus: remoteDungeon.defense_bonus || 0,
+        maxMpBonus: remoteDungeon.max_mp_bonus || 0,
+        customSpells: remoteDungeon.custom_spells || [],
+        purchasedSpellSlot: remoteDungeon.purchased_spell_slot || false
+      };
+      await db.dungeon.update(1, restored);
+      console.log('Dungeon data restored from cloud!', restored);
+      return restored;
+    }
+
     // If remote exists, merge (take higher/better values)
     if (remoteDungeon) {
       const merged = {
@@ -531,14 +573,18 @@ export async function syncDungeon() {
         totalRuns: Math.max(localDungeon?.totalRuns || 0, remoteDungeon.total_runs || 0),
         totalKills: Math.max(localDungeon?.totalKills || 0, remoteDungeon.total_kills || 0),
         bossesDefeated: Math.max(localDungeon?.bossesDefeated || 0, remoteDungeon.bosses_defeated || 0),
-        upgrades: remoteDungeon.upgrades || localDungeon?.upgrades || [],
+        upgrades: (remoteDungeon.upgrades?.length > (localDungeon?.upgrades?.length || 0))
+          ? remoteDungeon.upgrades
+          : (localDungeon?.upgrades || []),
         maxHpBonus: Math.max(localDungeon?.maxHpBonus || 0, remoteDungeon.max_hp_bonus || 0),
         bonusDamage: Math.max(localDungeon?.bonusDamage || 0, remoteDungeon.bonus_damage || 0),
         potionBonus: Math.max(localDungeon?.potionBonus || 0, remoteDungeon.potion_bonus || 0),
         critBonus: Math.max(localDungeon?.critBonus || 0, remoteDungeon.crit_bonus || 0),
         defenseBonus: Math.max(localDungeon?.defenseBonus || 0, remoteDungeon.defense_bonus || 0),
         maxMpBonus: Math.max(localDungeon?.maxMpBonus || 0, remoteDungeon.max_mp_bonus || 0),
-        customSpells: remoteDungeon.custom_spells || localDungeon?.customSpells || [],
+        customSpells: (remoteDungeon.custom_spells?.[0])
+          ? remoteDungeon.custom_spells
+          : (localDungeon?.customSpells || []),
         purchasedSpellSlot: remoteDungeon.purchased_spell_slot || localDungeon?.purchasedSpellSlot || false
       };
 
