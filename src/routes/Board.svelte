@@ -35,13 +35,6 @@
 
   const flipDurationMs = 200;
 
-  onMount(async () => {
-    await loadBoard();
-  });
-
-  onDestroy(() => {
-    stopAutoScroll();
-  });
 
   async function loadBoard() {
     loading = true;
@@ -85,7 +78,6 @@
   async function handleDndFinalize(columnId, e) {
     const newItems = e.detail.items;
     isDragging = false;
-    stopAutoScroll();
 
     // Update database
     for (let i = 0; i < newItems.length; i++) {
@@ -96,51 +88,33 @@
     await loadBoard();
   }
 
-  // Auto-scroll during drag - track pointer position
-  let lastPointerX = 0;
-  let scrollInterval = null;
+  // Manual scroll controls for mobile
+  let canScrollLeft = false;
+  let canScrollRight = false;
 
-  function handlePointerMove(e) {
-    // Track position from mouse, touch, or pointer events
-    if (e.clientX !== undefined) {
-      lastPointerX = e.clientX;
-    } else if (e.touches && e.touches[0]) {
-      lastPointerX = e.touches[0].clientX;
-    }
+  function updateScrollState() {
+    if (!boardContainer) return;
+    canScrollLeft = boardContainer.scrollLeft > 0;
+    canScrollRight = boardContainer.scrollLeft < boardContainer.scrollWidth - boardContainer.clientWidth - 1;
   }
 
-  // Start polling for scroll when drag begins
-  function startDragScrolling() {
-    if (scrollInterval) return;
-
-    scrollInterval = setInterval(() => {
-      if (!isDragging || !boardContainer) return;
-
-      const rect = boardContainer.getBoundingClientRect();
-      const threshold = 60;
-      const scrollSpeed = 8;
-
-      if (lastPointerX > 0 && lastPointerX - rect.left < threshold) {
-        boardContainer.scrollLeft -= scrollSpeed;
-      } else if (lastPointerX > 0 && rect.right - lastPointerX < threshold) {
-        boardContainer.scrollLeft += scrollSpeed;
-      }
-    }, 16);
+  function scrollBoard(direction) {
+    if (!boardContainer) return;
+    const scrollAmount = 320; // roughly one column width
+    boardContainer.scrollBy({ left: direction * scrollAmount, behavior: 'smooth' });
+    setTimeout(updateScrollState, 300);
   }
 
-  function stopAutoScroll() {
-    if (scrollInterval) {
-      clearInterval(scrollInterval);
-      scrollInterval = null;
-    }
-  }
+  // Update scroll state on mount and resize
+  onMount(async () => {
+    await loadBoard();
+    setTimeout(updateScrollState, 100);
+    window.addEventListener('resize', updateScrollState);
+  });
 
-  // Watch isDragging to start/stop scroll polling
-  $: if (isDragging) {
-    startDragScrolling();
-  } else {
-    stopAutoScroll();
-  }
+  onDestroy(() => {
+    window.removeEventListener('resize', updateScrollState);
+  });
 
   function openTaskModal(columnId = 'todo', task = null) {
     editingTask = task;
@@ -260,12 +234,6 @@
   }
 </script>
 
-<svelte:window
-  on:pointermove={handlePointerMove}
-  on:pointerup={stopAutoScroll}
-  on:touchmove={handlePointerMove}
-  on:touchend={stopAutoScroll}
-/>
 
 <div class="board-page">
   {#if loading}
@@ -283,7 +251,14 @@
       </Button>
     </header>
 
-    <div class="kanban-board" bind:this={boardContainer}>
+    <div class="board-wrapper">
+      {#if canScrollLeft}
+        <button class="scroll-btn scroll-left" on:click={() => scrollBoard(-1)} aria-label="Scroll left">
+          &lsaquo;
+        </button>
+      {/if}
+
+      <div class="kanban-board" bind:this={boardContainer} on:scroll={updateScrollState}>
       {#each board.columns as column}
         <div class="kanban-column">
           <div class="column-header">
@@ -309,7 +284,9 @@
             use:dndzone={{
               items: getColumnTasks(column.id),
               flipDurationMs,
-              dropTargetStyle: { outline: '2px dashed var(--accent)' }
+              dropTargetStyle: { outline: '2px dashed var(--accent)' },
+              type: 'tasks',
+              centreDraggedOnCursor: true
             }}
             on:consider={(e) => handleDndConsider(column.id, e)}
             on:finalize={(e) => handleDndFinalize(column.id, e)}
@@ -360,6 +337,13 @@
           </button>
         </div>
       {/each}
+    </div>
+
+      {#if canScrollRight}
+        <button class="scroll-btn scroll-right" on:click={() => scrollBoard(1)} aria-label="Scroll right">
+          &rsaquo;
+        </button>
+      {/if}
     </div>
 
     {#if getCompletedTasks().length > 0}
@@ -479,6 +463,47 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: var(--spacing-lg);
+  }
+
+  .board-wrapper {
+    position: relative;
+  }
+
+  .scroll-btn {
+    display: none;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 40px;
+    height: 40px;
+    background-color: var(--accent);
+    color: white;
+    border-radius: var(--radius-full);
+    font-size: 1.5rem;
+    font-weight: bold;
+    z-index: 10;
+    box-shadow: var(--shadow-md);
+    opacity: 0.9;
+  }
+
+  .scroll-btn:hover {
+    opacity: 1;
+  }
+
+  .scroll-left {
+    left: 8px;
+  }
+
+  .scroll-right {
+    right: 8px;
+  }
+
+  @media (max-width: 768px) {
+    .scroll-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
   }
 
   .kanban-board {
