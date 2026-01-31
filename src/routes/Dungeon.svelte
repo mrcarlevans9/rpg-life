@@ -26,7 +26,8 @@
     purchaseMerchantItem,
     leaveMerchant,
     leaveFloorMerchant,
-    purchaseFloorMerchantItem
+    purchaseFloorMerchantItem,
+    chooseLootChestItem
   } from '../lib/stores/dungeon.js';
   import { DUNGEON_UPGRADES } from '../lib/db/index.js';
   import { playerData } from '../lib/stores/player.js';
@@ -50,7 +51,7 @@
   }
 
   // Lock body scroll during dungeon run (active phases + any current run)
-  $: inCombat = ['exploring', 'merchant', 'floor_merchant'].includes($gamePhase) || $currentRun !== null;
+  $: inCombat = ['exploring', 'merchant', 'floor_merchant', 'loot_chest'].includes($gamePhase) || $currentRun !== null;
   $: if (typeof document !== 'undefined') {
     if (inCombat) {
       document.body.classList.add('no-scroll');
@@ -293,17 +294,17 @@
           <span class="floor-number">F{$currentRun?.currentFloor}</span>
           <div class="room-enemies">
             {#each $currentRun?.floor?.rooms || [] as room, i}
-              {#if room.type === 'combat' || room.type === 'boss' || room.type === 'merchant'}
+              {#if room.type === 'combat' || room.type === 'boss' || room.type === 'merchant' || room.type === 'loot_chest'}
                 <span
                   class="enemy-marker"
                   class:active={i === $currentRun?.floor?.currentRoom}
                   class:defeated={room.completed}
                 >
                   {#if room.completed}
-                    <span class="defeated-x">✕</span>
+                    <span class="defeated-x">🚫</span>
                   {/if}
                   <span class="enemy-icon" class:faded={room.completed}>
-                    {#if room.type === 'boss'}👑{:else if room.type === 'merchant'}💰{:else}☠️{/if}
+                    {#if room.type === 'boss'}👑{:else if room.type === 'merchant'}💰{:else if room.type === 'loot_chest'}🎁{:else}☠️{/if}
                   </span>
                 </span>
               {/if}
@@ -560,6 +561,50 @@
         <Button variant="secondary" on:click={leaveMerchant}>
           Continue Journey
         </Button>
+      </div>
+
+      <!-- Show temp buffs if any -->
+      {#if $currentRun?.tempBuffs && ($currentRun.tempBuffs.bonusDamage > 0 || $currentRun.tempBuffs.defenseBonus > 0 || $currentRun.tempBuffs.goldBonus > 0)}
+        <div class="active-buffs">
+          <span class="buffs-label">Active Buffs:</span>
+          {#if $currentRun.tempBuffs.bonusDamage > 0}
+            <span class="buff">💪 +{$currentRun.tempBuffs.bonusDamage} DMG</span>
+          {/if}
+          {#if $currentRun.tempBuffs.defenseBonus > 0}
+            <span class="buff">🛡️ +{$currentRun.tempBuffs.defenseBonus} DEF</span>
+          {/if}
+          {#if $currentRun.tempBuffs.goldBonus > 0}
+            <span class="buff">🍀 +{$currentRun.tempBuffs.goldBonus} Gold/kill</span>
+          {/if}
+        </div>
+      {/if}
+    </div>
+  {/if}
+
+  <!-- Loot Chest Encounter -->
+  {#if $gamePhase === 'loot_chest'}
+    {@const room = $currentRun?.floor?.rooms[$currentRun?.floor?.currentRoom]}
+    <div class="loot-chest-screen">
+      <div class="chest-header">
+        <span class="chest-emoji">🎁</span>
+        <h2>Mysterious Chest!</h2>
+        <p class="chest-subtitle">Choose one reward</p>
+      </div>
+
+      <div class="chest-items">
+        {#each room?.items || [] as item}
+          <button
+            class="chest-item"
+            on:click={() => chooseLootChestItem(item.key)}
+          >
+            <div class="chest-item-icon">{item.emoji}</div>
+            <div class="chest-item-info">
+              <span class="chest-item-name">{item.name}</span>
+              <span class="chest-item-desc">{item.description}</span>
+            </div>
+            <span class="chest-item-free">FREE</span>
+          </button>
+        {/each}
       </div>
 
       <!-- Show temp buffs if any -->
@@ -1085,11 +1130,9 @@
 
   .defeated-x {
     position: absolute;
-    color: var(--danger);
-    font-size: 1.4rem;
-    font-weight: 900;
+    font-size: 1.3rem;
     z-index: 1;
-    text-shadow: 0 0 2px rgba(0,0,0,0.8);
+    filter: drop-shadow(0 0 2px rgba(0,0,0,0.8));
   }
 
   @keyframes enemyPulse {
@@ -2300,5 +2343,105 @@
   @keyframes badgePulse {
     0%, 100% { transform: scale(1); box-shadow: 0 0 0 rgba(34, 197, 94, 0); }
     50% { transform: scale(1.05); box-shadow: 0 0 20px rgba(34, 197, 94, 0.5); }
+  }
+
+  /* ========== LOOT CHEST ENCOUNTER ========== */
+  .loot-chest-screen {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+    padding: var(--spacing-lg);
+    background: linear-gradient(180deg, #3d2b1a 0%, #2d1b0e 50%, #1a1a2e 100%);
+    border-radius: var(--radius-md);
+    min-height: 400px;
+  }
+
+  .chest-header {
+    text-align: center;
+    padding: var(--spacing-md);
+  }
+
+  .chest-emoji {
+    font-size: 5rem;
+    display: block;
+    animation: chestGlow 1.5s ease-in-out infinite alternate;
+  }
+
+  @keyframes chestGlow {
+    0% { filter: drop-shadow(0 0 10px rgba(251, 191, 36, 0.3)); transform: scale(1); }
+    100% { filter: drop-shadow(0 0 25px rgba(251, 191, 36, 0.8)); transform: scale(1.05); }
+  }
+
+  .chest-header h2 {
+    color: #fbbf24;
+    margin: var(--spacing-sm) 0;
+    font-size: 1.5rem;
+  }
+
+  .chest-subtitle {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+
+  .chest-items {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    flex: 1;
+  }
+
+  .chest-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-lg);
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.1), rgba(251, 191, 36, 0.05));
+    border: 2px solid rgba(251, 191, 36, 0.3);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+  }
+
+  .chest-item:hover {
+    border-color: #fbbf24;
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(251, 191, 36, 0.1));
+    transform: translateX(5px);
+    box-shadow: 0 4px 15px rgba(251, 191, 36, 0.3);
+  }
+
+  .chest-item-icon {
+    font-size: 2.5rem;
+    min-width: 50px;
+    text-align: center;
+  }
+
+  .chest-item-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .chest-item-name {
+    font-weight: 700;
+    color: var(--text-primary);
+    font-size: 1.1rem;
+  }
+
+  .chest-item-desc {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  .chest-item-free {
+    padding: 6px 12px;
+    background: linear-gradient(135deg, #22c55e, #16a34a);
+    color: white;
+    font-weight: 700;
+    font-size: 0.8rem;
+    border-radius: var(--radius-md);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
   }
 </style>

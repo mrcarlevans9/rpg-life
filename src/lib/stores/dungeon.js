@@ -240,6 +240,12 @@ function generateMerchantItems() {
   return shuffled.slice(0, itemCount);
 }
 
+function generateLootChestItems() {
+  // Select exactly 3 random items for the chest choice
+  const shuffled = [...MERCHANT_ITEMS].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, 3);
+}
+
 function generateFloor(floorNumber) {
   const isBossFloor = floorNumber === 10;
 
@@ -285,20 +291,28 @@ function generateFloor(floorNumber) {
       continue;
     }
 
-    // 15% chance for treasure room, 10% chance for rest shrine (not first room)
+    // Special room chances (not first room):
+    // 12% treasure, 10% shrine, 8% loot chest
     const roll = Math.random();
-    if (roll < 0.15 && i > 0) {
+    if (roll < 0.12 && i > 0) {
       // Treasure room (bonus gold)
       rooms.push({
         type: 'treasure',
         goldBonus: 5 + Math.floor(Math.random() * 10) + floorNumber * 2,
         completed: false
       });
-    } else if (roll < 0.25 && i > 0) {
+    } else if (roll < 0.22 && i > 0) {
       // Rest shrine (heal some HP)
       rooms.push({
         type: 'shrine',
         healAmount: 10 + Math.floor(Math.random() * 10),
+        completed: false
+      });
+    } else if (roll < 0.30 && i > 0) {
+      // Loot chest (choose 1 of 3 items)
+      rooms.push({
+        type: 'loot_chest',
+        items: generateLootChestItems(),
         completed: false
       });
     } else {
@@ -715,6 +729,10 @@ function advanceRoom(run) {
       addLog('info', `${MERCHANT.greeting}`);
       gamePhase.set('merchant');
       // Don't auto-advance - player can browse and leave
+    } else if (nextRoom.type === 'loot_chest') {
+      addLog('treasure', `You found a mysterious chest! Choose your reward...`);
+      gamePhase.set('loot_chest');
+      // Don't auto-advance - player must choose an item
     } else {
       addLog('info', `A ${nextRoom.monster.displayName} appears!`);
       resetCombatState(); // Reset combat state for new monster
@@ -1170,6 +1188,63 @@ export async function purchaseFloorMerchantItem(itemKey) {
   run.floorMerchant.items.splice(itemIndex, 1);
 
   currentRun.set(run);
+
+  return { success: true, item };
+}
+
+// ============ Loot Chest Functions ============
+
+export function chooseLootChestItem(itemKey) {
+  const run = get(currentRun);
+  if (!run) return { success: false, error: 'No active run' };
+
+  const room = run.floor.rooms[run.floor.currentRoom];
+  if (room.type !== 'loot_chest') {
+    return { success: false, error: 'Not at loot chest' };
+  }
+
+  // Find the item
+  const item = room.items.find(i => i.key === itemKey);
+  if (!item) {
+    return { success: false, error: 'Item not available' };
+  }
+
+  // Apply effect (free - no gold cost!)
+  const effect = item.effect;
+
+  if (effect.heal) {
+    const oldHp = run.playerHp;
+    run.playerHp = Math.min(run.maxHp, run.playerHp + effect.heal);
+    const actualHeal = run.playerHp - oldHp;
+    addLog('heal', `${item.name} restored ${actualHeal} HP!`);
+  }
+
+  if (effect.mana) {
+    const oldMp = run.playerMp;
+    run.playerMp = Math.min(run.maxMp, run.playerMp + effect.mana);
+    const actualMana = run.playerMp - oldMp;
+    addLog('spell', `${item.name} restored ${actualMana} MP!`);
+  }
+
+  if (effect.bonusDamage) {
+    run.tempBuffs.bonusDamage += effect.bonusDamage;
+    addLog('info', `${item.name} grants +${effect.bonusDamage} damage for this run!`);
+  }
+
+  if (effect.defenseBonus) {
+    run.tempBuffs.defenseBonus += effect.defenseBonus;
+    addLog('info', `${item.name} grants +${effect.defenseBonus} defense for this run!`);
+  }
+
+  if (effect.goldBonus) {
+    run.tempBuffs.goldBonus += effect.goldBonus;
+    addLog('info', `${item.name} grants +${effect.goldBonus} gold per kill!`);
+  }
+
+  // Mark room as completed and advance
+  room.completed = true;
+  gamePhase.set('exploring');
+  advanceRoom(run);
 
   return { success: true, item };
 }
