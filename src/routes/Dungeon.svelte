@@ -177,7 +177,7 @@
   }
 </script>
 
-<div class="dungeon-page">
+<div class="dungeon-page" class:in-combat={$gamePhase !== 'idle'}>
   {#if $gamePhase === 'idle'}
     <div class="page-header">
       <h1>Dungeon</h1>
@@ -674,16 +674,19 @@
     max-width: 600px;
     margin: 0 auto;
     padding: 0 var(--spacing-xs);
-    /* Fill available height during combat to prevent scroll */
-    height: calc(100vh - var(--header-height) - var(--mobile-nav-height) - var(--spacing-lg) * 2);
-    max-height: calc(100vh - var(--header-height) - var(--mobile-nav-height) - var(--spacing-lg) * 2);
     display: flex;
     flex-direction: column;
+  }
+
+  /* Only lock height/scroll during active combat */
+  .dungeon-page.in-combat {
+    height: calc(100vh - var(--header-height) - var(--mobile-nav-height) - var(--spacing-lg) * 2);
+    max-height: calc(100vh - var(--header-height) - var(--mobile-nav-height) - var(--spacing-lg) * 2);
     overflow: hidden;
   }
 
   @media (min-width: 1024px) {
-    .dungeon-page {
+    .dungeon-page.in-combat {
       height: calc(100vh - var(--header-height) - var(--spacing-lg) * 2);
       max-height: calc(100vh - var(--header-height) - var(--spacing-lg) * 2);
     }
