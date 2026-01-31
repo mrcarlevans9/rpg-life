@@ -25,6 +25,7 @@
     getSpellSlots,
     getMaxSpellDamage,
     getSpellEditCost,
+    getSpellDeleteCost,
     purchaseMerchantItem,
     leaveMerchant,
     leaveFloorMerchant,
@@ -126,8 +127,9 @@
   $: playerLevel = $playerData?.level || 1;
   $: maxSpellDamage = getMaxSpellDamage(playerLevel);
 
-  // Track edit cost - set when editor opens
+  // Track edit/delete costs - set when editor opens
   let currentSpellEditCost = 0;
+  let currentSpellDeleteCost = 0;
   let isEditingExistingSpell = false;
 
   // Close spell menu when combat state changes
@@ -138,9 +140,10 @@
     editingSlotIndex = slotIndex;
     const existing = customSpells[slotIndex];
 
-    // Calculate if this is an existing spell and what the edit cost would be
+    // Calculate if this is an existing spell and what the costs would be
     isEditingExistingSpell = existing !== null && existing !== undefined && typeof existing === 'object';
     currentSpellEditCost = getSpellEditCost(slotIndex, isEditingExistingSpell);
+    currentSpellDeleteCost = isEditingExistingSpell ? getSpellDeleteCost(slotIndex) : 0;
 
     if (existing) {
       spellName = existing.name;
@@ -186,8 +189,13 @@
 
   // Delete the spell from the current slot
   async function handleDeleteSpell() {
-    await deleteCustomSpell(editingSlotIndex);
-    showSpellEditor = false;
+    const result = await deleteCustomSpell(editingSlotIndex);
+    if (result.success) {
+      showSpellEditor = false;
+      spellError = '';
+    } else {
+      spellError = result.error;
+    }
   }
 
   function canRetreat() {
@@ -959,11 +967,23 @@
             Higher damage requires more mana. You start each run with 50 MP and regenerate 5 MP after each fight.
           </p>
 
-          {#if currentSpellEditCost > 0}
-            <div class="edit-cost-notice">
-              <span class="cost-icon">💰</span>
-              <span>Modifying this spell costs <strong>{currentSpellEditCost} gold</strong></span>
-              <span class="current-gold">(You have: {$dungeonData?.gold || 0})</span>
+          {#if isEditingExistingSpell}
+            <div class="spell-cost-box">
+              <div class="cost-header">
+                <span class="cost-icon">⚙️</span>
+                <span>Spell Modification Costs</span>
+                <span class="gold-amount">You have: <strong>{$dungeonData?.gold || 0}g</strong></span>
+              </div>
+              <div class="cost-items">
+                <div class="cost-item" class:affordable={($dungeonData?.gold || 0) >= currentSpellEditCost}>
+                  <span>Edit:</span>
+                  <span class="cost-value">{currentSpellEditCost}g</span>
+                </div>
+                <div class="cost-item" class:affordable={($dungeonData?.gold || 0) >= currentSpellDeleteCost}>
+                  <span>Delete:</span>
+                  <span class="cost-value">{currentSpellDeleteCost}g</span>
+                </div>
+              </div>
             </div>
           {/if}
 
@@ -984,8 +1004,12 @@
               {/if}
             </Button>
             {#if customSpells[editingSlotIndex]}
-              <Button variant="secondary" on:click={handleDeleteSpell}>
-                Delete Spell
+              <Button
+                variant="danger"
+                on:click={handleDeleteSpell}
+                disabled={($dungeonData?.gold || 0) < currentSpellDeleteCost}
+              >
+                Delete ({currentSpellDeleteCost}g)
               </Button>
             {/if}
           </div>
@@ -2276,27 +2300,65 @@
     font-style: italic;
   }
 
-  .edit-cost-notice {
+  /* Spell Cost Box */
+  .spell-cost-box {
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.1), rgba(245, 158, 11, 0.05));
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    margin-bottom: var(--spacing-md);
+  }
+
+  .spell-cost-box .cost-header {
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
     padding: var(--spacing-sm) var(--spacing-md);
     background: rgba(251, 191, 36, 0.15);
-    border: 1px solid rgba(251, 191, 36, 0.3);
-    border-radius: var(--radius-sm);
-    font-size: 0.85rem;
+    font-size: 0.8rem;
+    font-weight: 600;
     color: #fbbf24;
-    margin-bottom: var(--spacing-sm);
   }
 
-  .edit-cost-notice .cost-icon {
-    font-size: 1rem;
+  .spell-cost-box .cost-icon {
+    font-size: 0.9rem;
   }
 
-  .edit-cost-notice .current-gold {
+  .spell-cost-box .gold-amount {
+    margin-left: auto;
     font-size: 0.75rem;
     color: var(--text-muted);
-    margin-left: auto;
+  }
+
+  .spell-cost-box .gold-amount strong {
+    color: #fbbf24;
+  }
+
+  .spell-cost-box .cost-items {
+    display: flex;
+    gap: var(--spacing-lg);
+    padding: var(--spacing-sm) var(--spacing-md);
+  }
+
+  .spell-cost-box .cost-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  .spell-cost-box .cost-item.affordable {
+    color: var(--text-primary);
+  }
+
+  .spell-cost-box .cost-item .cost-value {
+    font-weight: 600;
+    color: #ef4444;
+  }
+
+  .spell-cost-box .cost-item.affordable .cost-value {
+    color: #22c55e;
   }
 
   .spell-preview {
