@@ -346,16 +346,24 @@
 
         <!-- Enemy HP -->
         {#if $currentMonster}
-          <div class="hud-box enemy-hud">
+          <div class="hud-box enemy-hud" class:boss-hud={$currentMonster.isBoss}>
             <div class="hud-label">
               {$currentMonster.displayName}
-              {#if $currentMonster.isBoss}
-                <span class="boss-tag">BOSS</span>
+              {#if $currentMonster.isMajorBoss}
+                <span class="boss-tag major">BOSS</span>
+              {:else if $currentMonster.isBoss}
+                <span class="boss-tag">ELITE</span>
               {/if}
             </div>
+            {#if $currentMonster.isBoss && $currentMonster.specialDesc}
+              <div class="boss-ability-hint">
+                <span class="ability-icon">⚡</span> {$currentMonster.specialDesc}
+              </div>
+            {/if}
             <div class="hud-hp-bar" class:hp-flash={$combatState.lastDamageToEnemy}>
               <div
                 class="hud-hp-fill enemy-hp"
+                class:boss-hp={$currentMonster.isBoss}
                 style="width: {($currentMonster.currentHp / $currentMonster.maxHp) * 100}%"
               ></div>
             </div>
@@ -377,11 +385,16 @@
         {#if $currentMonster}
           <div
             class="monster-display"
+            class:is-boss={$currentMonster.isBoss}
+            class:is-major-boss={$currentMonster.isMajorBoss}
             class:sprite-hit={$combatState.lastDamageToEnemy}
             class:sprite-attack={$combatState.enemyAction === 'attack'}
             class:sprite-defeated={$combatState.monsterDefeated}
           >
             <span class="monster-emoji">{$currentMonster.emoji}</span>
+            {#if $currentMonster.isBoss && $currentMonster.special}
+              <span class="boss-special-badge">{$currentMonster.special}</span>
+            {/if}
             {#key $combatState.lastDamageToEnemy}
               {#if $combatState.lastDamageToEnemy}
                 <div class="floating-damage">-{$combatState.lastDamageToEnemy}</div>
@@ -1199,12 +1212,44 @@
   }
 
   .boss-tag {
-    background: linear-gradient(135deg, #fbbf24, #f59e0b);
-    color: #1a1a1a;
+    background: linear-gradient(135deg, #f97316, #ea580c);
+    color: white;
     font-size: 0.5rem;
-    padding: 1px 4px;
+    padding: 1px 6px;
     border-radius: var(--radius-sm);
     font-weight: 700;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  }
+
+  .boss-tag.major {
+    background: linear-gradient(135deg, #dc2626, #991b1b);
+    animation: bossPulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes bossPulse {
+    0%, 100% { box-shadow: 0 0 4px rgba(220, 38, 38, 0.5); }
+    50% { box-shadow: 0 0 12px rgba(220, 38, 38, 0.8); }
+  }
+
+  .boss-hud {
+    border-color: rgba(239, 68, 68, 0.5);
+  }
+
+  .boss-ability-hint {
+    font-size: 0.6rem;
+    color: #fbbf24;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .ability-icon {
+    font-size: 0.7rem;
+  }
+
+  .hud-hp-fill.boss-hp {
+    background: linear-gradient(90deg, #ef4444, #dc2626);
   }
 
   .hud-hp-bar {
@@ -1362,6 +1407,7 @@
   .monster-display {
     position: relative;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
   }
@@ -1371,6 +1417,55 @@
     display: block;
     filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.5));
     animation: monsterIdle 2s ease-in-out infinite;
+  }
+
+  /* Boss styling - larger and more imposing */
+  .monster-display.is-boss .monster-emoji {
+    font-size: 7rem;
+    filter: drop-shadow(0 8px 20px rgba(255, 100, 100, 0.5));
+    animation: bossIdle 2s ease-in-out infinite;
+  }
+
+  .monster-display.is-major-boss .monster-emoji {
+    font-size: 8rem;
+    filter: drop-shadow(0 10px 30px rgba(255, 50, 50, 0.6));
+    animation: majorBossIdle 1.5s ease-in-out infinite;
+  }
+
+  @keyframes bossIdle {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-10px) scale(1.05); }
+  }
+
+  @keyframes majorBossIdle {
+    0%, 100% { transform: translateY(0) scale(1) rotate(-1deg); }
+    25% { transform: translateY(-8px) scale(1.03) rotate(1deg); }
+    50% { transform: translateY(-12px) scale(1.06) rotate(-1deg); }
+    75% { transform: translateY(-8px) scale(1.03) rotate(1deg); }
+  }
+
+  .boss-special-badge {
+    position: absolute;
+    bottom: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 2px 10px;
+    background: linear-gradient(135deg, #ff4444, #cc0000);
+    border: 2px solid #ff6666;
+    border-radius: 12px;
+    color: white;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(255, 0, 0, 0.4);
+  }
+
+  .monster-display.is-major-boss .boss-special-badge {
+    background: linear-gradient(135deg, #9b59b6, #6c3483);
+    border-color: #bb8fce;
+    box-shadow: 0 2px 12px rgba(155, 89, 182, 0.5);
   }
 
   @keyframes monsterIdle {

@@ -240,19 +240,29 @@ function generateMonster(floor) {
   };
 }
 
-function generateBoss() {
-  const baseBoss = BOSSES[Math.floor(Math.random() * BOSSES.length)];
+function generateBoss(floorNumber, isMajor = false) {
+  // Pick from major bosses for floor 10, 20, etc. or mini-bosses otherwise
+  const bossPool = isMajor ? BOSSES.major : BOSSES.mini;
+  const baseBoss = bossPool[Math.floor(Math.random() * bossPool.length)];
+
+  // Scale boss stats with floor number
+  const floorScale = 1 + (floorNumber - 1) * 0.08; // 8% increase per floor
+  const hp = Math.floor(baseBoss.baseHp * floorScale);
+  const damage = Math.floor(baseBoss.baseDamage * floorScale);
+
   const [minGold, maxGold] = baseBoss.goldDrop;
-  const goldReward = minGold + Math.floor(Math.random() * (maxGold - minGold));
+  const goldReward = Math.floor((minGold + Math.random() * (maxGold - minGold)) * floorScale);
 
   return {
     ...baseBoss,
     displayName: baseBoss.name,
-    maxHp: baseBoss.baseHp,
-    currentHp: baseBoss.baseHp,
-    damage: baseBoss.baseDamage,
+    maxHp: hp,
+    currentHp: hp,
+    damage,
     goldReward,
-    isBoss: true
+    isBoss: true,
+    isMiniBoss: !isMajor,
+    isMajorBoss: isMajor
   };
 }
 
@@ -272,14 +282,16 @@ function generateLootChestItems() {
 }
 
 function generateFloor(floorNumber) {
-  const isBossFloor = floorNumber === 10;
+  // Major boss floors: every 10 floors (10, 20, 30, etc.)
+  const isMajorBossFloor = floorNumber % 10 === 0;
 
-  if (isBossFloor) {
+  if (isMajorBossFloor) {
     return {
       floorNumber,
-      rooms: [{ type: 'boss', monster: generateBoss(), completed: false }],
+      rooms: [{ type: 'boss', monster: generateBoss(floorNumber, true), completed: false }],
       currentRoom: 0,
-      isBossFloor: true
+      isBossFloor: true,
+      isMajorBossFloor: true
     };
   }
 
@@ -311,7 +323,24 @@ function generateFloor(floorNumber) {
     }
   }
 
+  // Determine if this floor has a mini-boss at the end
+  // Mini-boss appears if: chest/merchant on floor, every 3rd floor, or 25% random chance
+  const hasSpecialRoom = lootChestRoomIndex !== -1 || merchantRoomIndex !== -1;
+  const isMiniBossFloor = hasSpecialRoom || (floorNumber % 3 === 0) || Math.random() < 0.25;
+
   for (let i = 0; i < roomCount; i++) {
+    const isLastRoom = i === roomCount - 1;
+
+    // Last room is mini-boss if this is a mini-boss floor
+    if (isLastRoom && isMiniBossFloor) {
+      rooms.push({
+        type: 'boss',
+        monster: generateBoss(floorNumber, false),
+        completed: false
+      });
+      continue;
+    }
+
     // Loot chest room
     if (i === lootChestRoomIndex) {
       // Determine if chest is a mimic (20% chance) or boss mimic (3% chance)
@@ -331,7 +360,7 @@ function generateFloor(floorNumber) {
         items: generateLootChestItems(),
         isMimic,
         isBossMimic,
-        mimicMonster: isMimic ? (isBossMimic ? generateBoss() : generateMonster(floorNumber)) : null,
+        mimicMonster: isMimic ? (isBossMimic ? generateBoss(floorNumber, false) : generateMonster(floorNumber)) : null,
         opened: false,
         completed: false
       });
@@ -351,17 +380,17 @@ function generateFloor(floorNumber) {
       continue;
     }
 
-    // Special room chances (not first room):
+    // Special room chances (not first room, not last room):
     // 12% treasure, 10% shrine
     const roll = Math.random();
-    if (roll < 0.12 && i > 0) {
+    if (roll < 0.12 && i > 0 && !isLastRoom) {
       // Treasure room (bonus gold)
       rooms.push({
         type: 'treasure',
         goldBonus: 5 + Math.floor(Math.random() * 10) + floorNumber * 2,
         completed: false
       });
-    } else if (roll < 0.22 && i > 0) {
+    } else if (roll < 0.22 && i > 0 && !isLastRoom) {
       // Rest shrine (heal some HP)
       rooms.push({
         type: 'shrine',
@@ -382,8 +411,9 @@ function generateFloor(floorNumber) {
     floorNumber,
     rooms,
     currentRoom: 0,
-    isBossFloor: false,
-    hasMidFloorMerchant: merchantRoomIndex !== -1 // Track if merchant appeared mid-floor
+    isBossFloor: isMiniBossFloor,
+    isMiniBossFloor,
+    hasMidFloorMerchant: merchantRoomIndex !== -1
   };
 }
 
