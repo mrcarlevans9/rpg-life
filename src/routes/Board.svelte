@@ -32,7 +32,6 @@
   // Drag scrolling
   let boardContainer;
   let isDragging = false;
-  let scrollInterval = null;
 
   const flipDurationMs = 200;
 
@@ -41,9 +40,7 @@
   });
 
   onDestroy(() => {
-    if (scrollInterval) {
-      clearInterval(scrollInterval);
-    }
+    stopAutoScroll();
   });
 
   async function loadBoard() {
@@ -99,36 +96,48 @@
     await loadBoard();
   }
 
-  // Auto-scroll during drag
-  function handleDragOver(e) {
+  // Auto-scroll during drag - track mouse position
+  let lastPointerX = 0;
+  let scrollDirection = 0;
+  let animationFrame = null;
+
+  function handlePointerMove(e) {
+    lastPointerX = e.clientX || (e.touches && e.touches[0]?.clientX) || lastPointerX;
+
     if (!isDragging || !boardContainer) return;
 
     const rect = boardContainer.getBoundingClientRect();
-    const threshold = 100;
-    const scrollSpeed = 8;
+    const threshold = 80;
 
-    if (e.clientX - rect.left < threshold) {
-      startAutoScroll(-scrollSpeed);
-    } else if (rect.right - e.clientX < threshold) {
-      startAutoScroll(scrollSpeed);
+    if (lastPointerX - rect.left < threshold) {
+      scrollDirection = -1;
+      startAutoScroll();
+    } else if (rect.right - lastPointerX < threshold) {
+      scrollDirection = 1;
+      startAutoScroll();
     } else {
+      scrollDirection = 0;
       stopAutoScroll();
     }
   }
 
-  function startAutoScroll(speed) {
-    if (scrollInterval) return;
-    scrollInterval = setInterval(() => {
-      if (boardContainer) {
-        boardContainer.scrollLeft += speed;
+  function startAutoScroll() {
+    if (animationFrame) return;
+
+    function scroll() {
+      if (boardContainer && scrollDirection !== 0) {
+        boardContainer.scrollLeft += scrollDirection * 12;
+        animationFrame = requestAnimationFrame(scroll);
       }
-    }, 16);
+    }
+    animationFrame = requestAnimationFrame(scroll);
   }
 
   function stopAutoScroll() {
-    if (scrollInterval) {
-      clearInterval(scrollInterval);
-      scrollInterval = null;
+    scrollDirection = 0;
+    if (animationFrame) {
+      cancelAnimationFrame(animationFrame);
+      animationFrame = null;
     }
   }
 
@@ -250,7 +259,12 @@
   }
 </script>
 
-<svelte:window on:mousemove={handleDragOver} on:mouseup={stopAutoScroll} />
+<svelte:window
+  on:pointermove={handlePointerMove}
+  on:pointerup={stopAutoScroll}
+  on:touchmove={handlePointerMove}
+  on:touchend={stopAutoScroll}
+/>
 
 <div class="board-page">
   {#if loading}
