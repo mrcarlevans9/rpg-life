@@ -1,7 +1,7 @@
 import Dexie from 'dexie';
 
 // Database reset version - increment to force reset on all clients
-const DB_RESET_VERSION = 2;
+const DB_RESET_VERSION = 3;
 const resetKey = 'rpglife_db_reset_v';
 
 // Synchronously check and mark for reset
@@ -17,18 +17,18 @@ if (needsReset) {
 
 export const db = new Dexie('RPGLifeDB');
 
-db.version(3).stores({
+db.version(4).stores({
   // Player profile - single row (id: 1)
   player: '++id',
 
   // Avatar customization
   avatar: '++id',
 
-  // Global kanban board - single row (id: 1)
+  // Bounty board settings - single row (id: 1)
   board: '++id',
 
-  // Tasks (no longer tied to projects)
-  tasks: '++id, columnId, priority, dueDate, completed, order',
+  // Tasks/Bounties
+  tasks: '++id, status, priority, dueDate, completed, order',
 
   // Tags
   tags: '++id, name',

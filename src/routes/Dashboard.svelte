@@ -78,7 +78,7 @@
 
       <a href="#/board" class="action-card">
         <span class="action-icon">📋</span>
-        <span class="action-label">Task Board</span>
+        <span class="action-label">Bounty Board</span>
       </a>
 
       <a href="#/achievements" class="action-card">

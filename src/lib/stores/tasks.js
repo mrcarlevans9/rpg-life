@@ -33,7 +33,14 @@ export const tasksData = createLiveQueryStore(() => db.tasks.toArray(), []);
 // Tags from DB
 export const tagsData = createLiveQueryStore(() => db.tags.toArray(), []);
 
-// Get all tasks for the global board
+// Active task timer store (client-side only)
+export const activeTaskTimer = writable({
+  taskId: null,
+  startTime: null,
+  elapsed: 0
+});
+
+// Get all tasks for the bounty board
 export function getAllTasks() {
   return createLiveQueryStore(
     () => db.tasks.orderBy('order').toArray(),
@@ -61,12 +68,12 @@ export const overdueTasks = createLiveQueryStore(() => {
     .toArray();
 }, []);
 
-// Create a new task
+// Create a new task/bounty
 export async function createTask(taskData) {
   const count = await db.tasks.count();
 
   const id = await db.tasks.add({
-    columnId: taskData.columnId || 'todo',
+    status: taskData.status || 'todo',
     title: taskData.title,
     description: taskData.description || '',
     subtasks: taskData.subtasks || [],
@@ -76,7 +83,8 @@ export async function createTask(taskData) {
     recurring: taskData.recurring || null,
     completed: false,
     completedAt: null,
-    previousColumnId: null,
+    timeSpent: 0, // Total time spent in minutes
+    activeStartTime: null, // When the task was set to active
     order: count,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
@@ -93,28 +101,73 @@ export async function updateTask(id, updates) {
   });
 }
 
-// Move task to a column
-export async function moveTaskToColumn(taskId, newColumnId, newOrder = null) {
+// Change task status
+export async function setTaskStatus(taskId, newStatus) {
   const task = await db.tasks.get(taskId);
   if (!task) return;
 
   const updates = {
-    columnId: newColumnId,
-    previousColumnId: task.columnId,
+    status: newStatus,
     updatedAt: new Date().toISOString()
   };
 
-  if (newOrder !== null) {
-    updates.order = newOrder;
+  // If setting to active, start the timer
+  if (newStatus === 'active') {
+    updates.activeStartTime = new Date().toISOString();
+
+    // Update the client-side timer store
+    activeTaskTimer.set({
+      taskId,
+      startTime: Date.now(),
+      elapsed: task.timeSpent || 0
+    });
+  }
+
+  // If leaving active status, calculate time spent
+  if (task.status === 'active' && newStatus !== 'active' && task.activeStartTime) {
+    const startTime = new Date(task.activeStartTime).getTime();
+    const elapsed = Math.floor((Date.now() - startTime) / 60000); // minutes
+    updates.timeSpent = (task.timeSpent || 0) + elapsed;
+    updates.activeStartTime = null;
+
+    // Clear the client-side timer
+    activeTaskTimer.set({ taskId: null, startTime: null, elapsed: 0 });
   }
 
   await db.tasks.update(taskId, updates);
+}
+
+// Start working on a task (set to active)
+export async function startTask(taskId) {
+  // First, pause any currently active task
+  const tasks = await db.tasks.where('status').equals('active').toArray();
+  for (const activeTask of tasks) {
+    if (activeTask.id !== taskId) {
+      await setTaskStatus(activeTask.id, 'todo');
+    }
+  }
+
+  // Now start the new task
+  await setTaskStatus(taskId, 'active');
+}
+
+// Pause a task (set back to todo)
+export async function pauseTask(taskId) {
+  await setTaskStatus(taskId, 'todo');
 }
 
 // Complete a task and award XP
 export async function completeTask(taskId) {
   const task = await db.tasks.get(taskId);
   if (!task || task.completed) return null;
+
+  // Calculate time spent if task was active
+  let finalTimeSpent = task.timeSpent || 0;
+  if (task.status === 'active' && task.activeStartTime) {
+    const startTime = new Date(task.activeStartTime).getTime();
+    const elapsed = Math.floor((Date.now() - startTime) / 60000);
+    finalTimeSpent += elapsed;
+  }
 
   const player = await db.player.get(1);
   const xpEarned = calculateTaskXP(task, player?.currentStreak || 0);
@@ -123,9 +176,17 @@ export async function completeTask(taskId) {
   await db.tasks.update(taskId, {
     completed: true,
     completedAt: new Date().toISOString(),
-    columnId: 'done',
+    status: 'done',
+    timeSpent: finalTimeSpent,
+    activeStartTime: null,
     updatedAt: new Date().toISOString()
   });
+
+  // Clear the client-side timer if this was the active task
+  const timer = get(activeTaskTimer);
+  if (timer.taskId === taskId) {
+    activeTaskTimer.set({ taskId: null, startTime: null, elapsed: 0 });
+  }
 
   // Update player stats
   await db.player.update(1, {
@@ -167,7 +228,7 @@ export async function completeTask(taskId) {
     await createRecurringTask(task);
   }
 
-  return xpResult;
+  return { ...xpResult, timeSpent: finalTimeSpent };
 }
 
 // Complete a subtask
@@ -211,7 +272,7 @@ export async function uncompleteSubtask(taskId, subtaskId) {
   await db.tasks.update(taskId, { subtasks, updatedAt: new Date().toISOString() });
 }
 
-// Undo task completion (move back to previous column)
+// Undo task completion (move back to todo)
 export async function undoCompleteTask(taskId) {
   const task = await db.tasks.get(taskId);
   if (!task || !task.completed) return;
@@ -219,13 +280,19 @@ export async function undoCompleteTask(taskId) {
   await db.tasks.update(taskId, {
     completed: false,
     completedAt: null,
-    columnId: task.previousColumnId || 'todo',
+    status: 'todo',
     updatedAt: new Date().toISOString()
   });
 }
 
 // Delete a task
 export async function deleteTask(taskId) {
+  // Clear timer if deleting active task
+  const timer = get(activeTaskTimer);
+  if (timer.taskId === taskId) {
+    activeTaskTimer.set({ taskId: null, startTime: null, elapsed: 0 });
+  }
+
   await db.tasks.delete(taskId);
 }
 
@@ -248,7 +315,7 @@ async function createRecurringTask(originalTask) {
   }
 
   await createTask({
-    columnId: 'todo',
+    status: 'todo',
     title: originalTask.title,
     description: originalTask.description,
     priority: originalTask.priority,
@@ -258,8 +325,8 @@ async function createRecurringTask(originalTask) {
   });
 }
 
-// Reorder tasks within a column
-export async function reorderTasks(columnId, taskIds) {
+// Reorder tasks
+export async function reorderTasks(taskIds) {
   for (let i = 0; i < taskIds.length; i++) {
     await db.tasks.update(taskIds[i], { order: i });
   }
@@ -278,4 +345,17 @@ export async function updateTag(id, updates) {
 // Delete a tag
 export async function deleteTag(id) {
   await db.tags.delete(id);
+}
+
+// Format time spent as string
+export function formatTimeSpent(minutes) {
+  if (!minutes || minutes < 1) return '0m';
+
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+
+  if (hours > 0) {
+    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+  }
+  return `${mins}m`;
 }

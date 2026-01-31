@@ -4,7 +4,7 @@
   const navItems = [
     { path: '/', label: 'Dashboard', icon: '🏠' },
     { path: '/quests', label: 'Daily Quests', icon: '⚔️' },
-    { path: '/board', label: 'Board', icon: '📋' },
+    { path: '/board', label: 'Bounty Board', icon: '📋' },
     { path: '/expedition', label: 'Expedition', icon: '🗺️' },
     { path: '/analytics', label: 'Analytics', icon: '📊' },
     { path: '/achievements', label: 'Achievements', icon: '🏆' },

@@ -1,17 +1,23 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
-  import { dndzone } from 'svelte-dnd-action';
-  import Card from '../components/common/Card.svelte';
   import Button from '../components/common/Button.svelte';
   import Modal from '../components/common/Modal.svelte';
   import { db } from '../lib/db/index.js';
-  import { boardData, getBoard, addColumn, updateColumn, deleteColumn } from '../lib/stores/board.js';
-  import { createTask, updateTask, completeTask, deleteTask, moveTaskToColumn } from '../lib/stores/tasks.js';
+  import {
+    createTask,
+    updateTask,
+    deleteTask,
+    startTask,
+    pauseTask,
+    completeTask,
+    activeTaskTimer,
+    formatTimeSpent
+  } from '../lib/stores/tasks.js';
   import { showXPGain } from '../lib/stores/notifications.js';
 
-  let board = null;
   let tasks = [];
   let loading = true;
+  let filter = 'all'; // 'all', 'todo', 'active', 'done'
 
   // Task form
   let showTaskModal = false;
@@ -20,151 +26,82 @@
     title: '',
     description: '',
     priority: 'medium',
-    dueDate: '',
-    columnId: 'todo'
+    dueDate: ''
   };
 
-  // Column management
-  let showColumnModal = false;
-  let newColumnName = '';
-  let editingColumn = null;
-
-  // Drag scrolling
-  let boardContainer;
-  let isDragging = false;
-
-  const flipDurationMs = 200;
-
-
-  async function loadBoard() {
-    loading = true;
-    board = await getBoard();
-    if (board) {
-      tasks = await db.tasks.toArray();
-    }
-    loading = false;
-  }
-
-  // Subscribe to board changes
-  $: if ($boardData) {
-    board = $boardData;
-  }
-
-  function getColumnTasks(columnId) {
-    return tasks
-      .filter(t => t.columnId === columnId && !t.completed)
-      .sort((a, b) => a.order - b.order)
-      .map(t => ({ ...t, id: t.id }));
-  }
-
-  function getCompletedTasks() {
-    return tasks.filter(t => t.completed).sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt));
-  }
-
-  function handleDndConsider(columnId, e) {
-    const newItems = e.detail.items;
-    isDragging = true;
-
-    // Update local state temporarily
-    tasks = tasks.map(t => {
-      const found = newItems.find(item => item.id === t.id);
-      if (found) {
-        return { ...t, columnId };
-      }
-      return t;
-    });
-  }
-
-  async function handleDndFinalize(columnId, e) {
-    const newItems = e.detail.items;
-    isDragging = false;
-
-    // Update database
-    for (let i = 0; i < newItems.length; i++) {
-      const item = newItems[i];
-      await moveTaskToColumn(item.id, columnId, i);
-    }
-
-    await loadBoard();
-  }
-
-  // Auto-scroll during drag
-  let lastTouchX = 0;
-  let scrollAnimationId = null;
-
-  function handleTouchMove(e) {
-    if (e.touches && e.touches[0]) {
-      lastTouchX = e.touches[0].clientX;
-    }
-  }
-
-  function handlePointerMove(e) {
-    if (e.clientX !== undefined) {
-      lastTouchX = e.clientX;
-    }
-  }
-
-  function autoScrollDuringDrag() {
-    if (!isDragging || !boardContainer) {
-      scrollAnimationId = null;
-      return;
-    }
-
-    const rect = boardContainer.getBoundingClientRect();
-    const threshold = 50;
-    const scrollSpeed = 6;
-
-    if (lastTouchX > 0) {
-      if (lastTouchX - rect.left < threshold && boardContainer.scrollLeft > 0) {
-        boardContainer.scrollLeft -= scrollSpeed;
-      } else if (rect.right - lastTouchX < threshold &&
-                 boardContainer.scrollLeft < boardContainer.scrollWidth - boardContainer.clientWidth) {
-        boardContainer.scrollLeft += scrollSpeed;
-      }
-    }
-
-    scrollAnimationId = requestAnimationFrame(autoScrollDuringDrag);
-  }
-
-  // Start/stop auto-scroll based on drag state
-  $: if (isDragging) {
-    if (!scrollAnimationId) {
-      scrollAnimationId = requestAnimationFrame(autoScrollDuringDrag);
-    }
-  } else {
-    if (scrollAnimationId) {
-      cancelAnimationFrame(scrollAnimationId);
-      scrollAnimationId = null;
-    }
-  }
+  // Timer
+  let timerInterval = null;
+  let currentTime = 0;
 
   onMount(async () => {
-    await loadBoard();
+    await loadTasks();
+    startTimerInterval();
   });
 
   onDestroy(() => {
-    if (scrollAnimationId) {
-      cancelAnimationFrame(scrollAnimationId);
+    if (timerInterval) {
+      clearInterval(timerInterval);
     }
   });
 
-  function openTaskModal(columnId = 'todo', task = null) {
+  function startTimerInterval() {
+    timerInterval = setInterval(() => {
+      const timer = $activeTaskTimer;
+      if (timer.taskId && timer.startTime) {
+        currentTime = Math.floor((Date.now() - timer.startTime) / 1000);
+      } else {
+        currentTime = 0;
+      }
+    }, 1000);
+  }
+
+  async function loadTasks() {
+    loading = true;
+    tasks = await db.tasks.orderBy('order').toArray();
+    loading = false;
+  }
+
+  // Reactive subscription to db changes
+  $: {
+    const subscription = db.tasks.hook('changes', () => {
+      loadTasks();
+    });
+  }
+
+  function getFilteredTasks() {
+    if (!tasks) return [];
+
+    let filtered = tasks.filter(t => !t.completed || filter === 'done');
+
+    switch (filter) {
+      case 'todo':
+        return filtered.filter(t => t.status === 'todo');
+      case 'active':
+        return filtered.filter(t => t.status === 'active');
+      case 'done':
+        return tasks.filter(t => t.completed).sort((a, b) =>
+          new Date(b.completedAt) - new Date(a.completedAt)
+        );
+      default:
+        return filtered.filter(t => !t.completed);
+    }
+  }
+
+  function openTaskModal(task = null) {
     editingTask = task;
     if (task) {
       taskForm = {
         title: task.title,
         description: task.description || '',
         priority: task.priority,
-        dueDate: task.dueDate || '',
-        columnId: task.columnId
+        dueDate: task.dueDate || ''
       };
     } else {
       taskForm = {
         title: '',
         description: '',
         priority: 'medium',
-        dueDate: '',
-        columnId
+        dueDate: ''
       };
     }
     showTaskModal = true;
@@ -182,7 +119,7 @@
       });
     } else {
       await createTask({
-        columnId: taskForm.columnId,
+        status: 'todo',
         title: taskForm.title,
         description: taskForm.description,
         priority: taskForm.priority,
@@ -192,7 +129,17 @@
 
     showTaskModal = false;
     editingTask = null;
-    await loadBoard();
+    await loadTasks();
+  }
+
+  async function handleStartTask(task) {
+    await startTask(task.id);
+    await loadTasks();
+  }
+
+  async function handlePauseTask(task) {
+    await pauseTask(task.id);
+    await loadTasks();
   }
 
   async function handleCompleteTask(task) {
@@ -200,57 +147,32 @@
     if (result) {
       showXPGain(result.amount, 'task');
     }
-    await loadBoard();
+    await loadTasks();
   }
 
   async function handleDeleteTask(task) {
-    if (confirm('Delete this task?')) {
+    if (confirm('Delete this bounty?')) {
       await deleteTask(task.id);
-      await loadBoard();
+      await loadTasks();
     }
   }
 
-  // Column management
-  function openColumnModal(column = null) {
-    editingColumn = column;
-    newColumnName = column ? column.name : '';
-    showColumnModal = true;
-  }
-
-  async function handleSaveColumn() {
-    if (!newColumnName.trim()) return;
-
-    if (editingColumn) {
-      await updateColumn(editingColumn.id, newColumnName);
-    } else {
-      await addColumn(newColumnName);
-    }
-
-    showColumnModal = false;
-    editingColumn = null;
-    newColumnName = '';
-    await loadBoard();
-  }
-
-  async function handleDeleteColumn(column) {
-    if (board.columns.length <= 1) {
-      alert('Cannot delete the last column');
-      return;
-    }
-
-    const taskCount = getColumnTasks(column.id).length;
-    const message = taskCount > 0
-      ? `Delete "${column.name}"? ${taskCount} task(s) will be moved to the first column.`
-      : `Delete "${column.name}"?`;
-
-    if (confirm(message)) {
-      await deleteColumn(column.id);
-      await loadBoard();
+  function getPriorityLabel(priority) {
+    switch (priority) {
+      case 'high': return 'Hard';
+      case 'medium': return 'Normal';
+      case 'low': return 'Easy';
+      default: return 'Normal';
     }
   }
 
-  function getPriorityClass(priority) {
-    return `priority-${priority}`;
+  function getPriorityXP(priority) {
+    switch (priority) {
+      case 'high': return '50 XP';
+      case 'medium': return '25 XP';
+      case 'low': return '10 XP';
+      default: return '25 XP';
+    }
   }
 
   function isOverdue(dueDate) {
@@ -264,134 +186,177 @@
     const today = new Date().toISOString().split('T')[0];
     return dueDate === today;
   }
+
+  function formatTimer(seconds) {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+
+    if (hrs > 0) {
+      return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  }
+
+  $: filteredTasks = getFilteredTasks();
+  $: activeTask = tasks.find(t => t.status === 'active');
+  $: todoCount = tasks.filter(t => t.status === 'todo' && !t.completed).length;
+  $: activeCount = tasks.filter(t => t.status === 'active').length;
+  $: doneCount = tasks.filter(t => t.completed).length;
 </script>
 
+<div class="bounty-board">
+  <header class="board-header">
+    <h1>Bounty Board</h1>
+    <Button on:click={() => openTaskModal()}>+ New Bounty</Button>
+  </header>
 
-<div class="board-page">
+  <!-- Active Task Banner -->
+  {#if activeTask}
+    <div class="active-banner">
+      <div class="active-info">
+        <span class="active-label">Working on:</span>
+        <span class="active-title">{activeTask.title}</span>
+      </div>
+      <div class="active-timer">
+        {formatTimer(currentTime + (activeTask.timeSpent || 0) * 60)}
+      </div>
+      <div class="active-actions">
+        <button class="btn-pause" on:click={() => handlePauseTask(activeTask)}>
+          Pause
+        </button>
+        <button class="btn-complete" on:click={() => handleCompleteTask(activeTask)}>
+          Complete
+        </button>
+      </div>
+    </div>
+  {/if}
+
+  <!-- Filter Tabs -->
+  <div class="filter-tabs">
+    <button
+      class="filter-tab"
+      class:active={filter === 'all'}
+      on:click={() => filter = 'all'}
+    >
+      All ({todoCount + activeCount})
+    </button>
+    <button
+      class="filter-tab"
+      class:active={filter === 'todo'}
+      on:click={() => filter = 'todo'}
+    >
+      To Do ({todoCount})
+    </button>
+    <button
+      class="filter-tab"
+      class:active={filter === 'active'}
+      on:click={() => filter = 'active'}
+    >
+      Active ({activeCount})
+    </button>
+    <button
+      class="filter-tab"
+      class:active={filter === 'done'}
+      on:click={() => filter = 'done'}
+    >
+      Done ({doneCount})
+    </button>
+  </div>
+
+  <!-- Task List -->
   {#if loading}
-    <div class="loading">Loading board...</div>
-  {:else if !board}
-    <div class="not-found">
-      <h2>Board not found</h2>
-      <p>Please refresh the page.</p>
+    <div class="loading">Loading bounties...</div>
+  {:else if filteredTasks.length === 0}
+    <div class="empty-state">
+      {#if filter === 'all'}
+        <p>No bounties yet. Create your first one!</p>
+      {:else if filter === 'done'}
+        <p>No completed bounties yet.</p>
+      {:else}
+        <p>No {filter} bounties.</p>
+      {/if}
     </div>
   {:else}
-    <header class="board-header">
-      <h1>Task Board</h1>
-      <Button variant="secondary" on:click={() => openColumnModal()}>
-        + Add Column
-      </Button>
-    </header>
+    <div class="task-list">
+      {#each filteredTasks as task (task.id)}
+        <div
+          class="task-card"
+          class:active={task.status === 'active'}
+          class:completed={task.completed}
+          class:overdue={isOverdue(task.dueDate) && !task.completed}
+          class:due-today={isDueToday(task.dueDate) && !task.completed}
+        >
+          <div class="task-main" on:click={() => openTaskModal(task)}>
+            <div class="task-header">
+              <span class="priority-badge priority-{task.priority}">
+                {getPriorityLabel(task.priority)}
+              </span>
+              <span class="xp-reward">{getPriorityXP(task.priority)}</span>
+            </div>
 
-    <div
-      class="kanban-board"
-      bind:this={boardContainer}
-      on:touchmove={handleTouchMove}
-      on:pointermove={handlePointerMove}
-    >
-      {#each board.columns as column}
-        <div class="kanban-column">
-          <div class="column-header">
-            <button class="column-title" on:click={() => openColumnModal(column)}>
-              <h3>{column.name}</h3>
-            </button>
-            <div class="column-actions">
-              <span class="task-count">{getColumnTasks(column.id).length}</span>
-              {#if board.columns.length > 1}
-                <button
-                  class="column-delete"
-                  on:click={() => handleDeleteColumn(column)}
-                  title="Delete column"
-                >
-                  &times;
-                </button>
+            <h3 class="task-title">{task.title}</h3>
+
+            {#if task.description}
+              <p class="task-description">{task.description}</p>
+            {/if}
+
+            <div class="task-meta">
+              {#if task.dueDate}
+                <span class="due-date" class:overdue={isOverdue(task.dueDate)}>
+                  {task.dueDate}
+                </span>
+              {/if}
+              {#if task.timeSpent > 0 || task.status === 'active'}
+                <span class="time-spent">
+                  {formatTimeSpent(task.timeSpent || 0)}
+                  {#if task.status === 'active'}
+                    + {formatTimer(currentTime)}
+                  {/if}
+                </span>
               {/if}
             </div>
           </div>
 
-          <div
-            class="column-tasks"
-            use:dndzone={{
-              items: getColumnTasks(column.id),
-              flipDurationMs,
-              dropTargetStyle: { outline: '2px dashed var(--accent)' },
-              type: 'tasks',
-              centreDraggedOnCursor: true
-            }}
-            on:consider={(e) => handleDndConsider(column.id, e)}
-            on:finalize={(e) => handleDndFinalize(column.id, e)}
-          >
-            {#each getColumnTasks(column.id) as task (task.id)}
-              <div
-                class="task-card"
-                class:overdue={isOverdue(task.dueDate)}
-                class:due-today={isDueToday(task.dueDate)}
-              >
-                <div class="task-header">
-                  <span class="priority-dot {getPriorityClass(task.priority)}"></span>
-                  <button class="task-title-btn" on:click={() => openTaskModal(column.id, task)}>
-                    {task.title}
-                  </button>
-                </div>
-
-                {#if task.dueDate}
-                  <div class="task-due-date" class:overdue={isOverdue(task.dueDate)}>
-                    {task.dueDate}
-                  </div>
-                {/if}
-
-                <div class="task-actions">
-                  {#if column.id !== 'done'}
-                    <button
-                      class="action-btn complete"
-                      on:click={() => handleCompleteTask(task)}
-                      title="Complete task"
-                    >
-                      ✓
-                    </button>
-                  {/if}
-                  <button
-                    class="action-btn delete"
-                    on:click={() => handleDeleteTask(task)}
-                    title="Delete task"
-                  >
-                    &times;
-                  </button>
-                </div>
-              </div>
-            {/each}
-          </div>
-
-          <button class="add-task-btn" on:click={() => openTaskModal(column.id)}>
-            + Add Task
-          </button>
+          {#if !task.completed}
+            <div class="task-actions">
+              {#if task.status === 'active'}
+                <button class="action-btn pause" on:click={() => handlePauseTask(task)}>
+                  Pause
+                </button>
+                <button class="action-btn complete" on:click={() => handleCompleteTask(task)}>
+                  Complete
+                </button>
+              {:else}
+                <button class="action-btn start" on:click={() => handleStartTask(task)}>
+                  Start
+                </button>
+                <button class="action-btn complete" on:click={() => handleCompleteTask(task)}>
+                  Done
+                </button>
+              {/if}
+              <button class="action-btn delete" on:click={() => handleDeleteTask(task)}>
+                Delete
+              </button>
+            </div>
+          {:else}
+            <div class="completed-info">
+              <span class="completed-check">Completed</span>
+              {#if task.timeSpent > 0}
+                <span class="final-time">Time: {formatTimeSpent(task.timeSpent)}</span>
+              {/if}
+            </div>
+          {/if}
         </div>
       {/each}
     </div>
-
-    {#if getCompletedTasks().length > 0}
-      <section class="completed-section">
-        <h2>Completed ({getCompletedTasks().length})</h2>
-        <div class="completed-tasks">
-          {#each getCompletedTasks().slice(0, 10) as task}
-            <div class="completed-task">
-              <span class="check">✓</span>
-              <span class="completed-title">{task.title}</span>
-              <span class="completed-date">
-                {new Date(task.completedAt).toLocaleDateString()}
-              </span>
-            </div>
-          {/each}
-        </div>
-      </section>
-    {/if}
   {/if}
 </div>
 
 <!-- Task Modal -->
 <Modal
   open={showTaskModal}
-  title={editingTask ? 'Edit Task' : 'New Task'}
+  title={editingTask ? 'Edit Bounty' : 'New Bounty'}
   on:close={() => { showTaskModal = false; editingTask = null; }}
 >
   <form on:submit|preventDefault={handleSaveTask}>
@@ -407,7 +372,7 @@
     </div>
 
     <div class="form-group">
-      <label for="task-description">Description</label>
+      <label for="task-description">Description (optional)</label>
       <textarea
         id="task-description"
         bind:value={taskForm.description}
@@ -418,11 +383,11 @@
 
     <div class="form-row">
       <div class="form-group">
-        <label for="task-priority">Priority</label>
+        <label for="task-priority">Difficulty</label>
         <select id="task-priority" bind:value={taskForm.priority}>
-          <option value="low">Low (10 XP)</option>
-          <option value="medium">Medium (25 XP)</option>
-          <option value="high">High (50 XP)</option>
+          <option value="low">Easy (10 XP)</option>
+          <option value="medium">Normal (25 XP)</option>
+          <option value="high">Hard (50 XP)</option>
         </select>
       </div>
 
@@ -442,43 +407,16 @@
       Cancel
     </Button>
     <Button on:click={handleSaveTask} disabled={!taskForm.title.trim()}>
-      {editingTask ? 'Save Changes' : 'Create Task'}
-    </Button>
-  </svelte:fragment>
-</Modal>
-
-<!-- Column Modal -->
-<Modal
-  open={showColumnModal}
-  title={editingColumn ? 'Edit Column' : 'New Column'}
-  on:close={() => { showColumnModal = false; editingColumn = null; newColumnName = ''; }}
->
-  <form on:submit|preventDefault={handleSaveColumn}>
-    <div class="form-group">
-      <label for="column-name">Column Name</label>
-      <input
-        id="column-name"
-        type="text"
-        bind:value={newColumnName}
-        placeholder="e.g., Review, Blocked, Testing..."
-        required
-      />
-    </div>
-  </form>
-
-  <svelte:fragment slot="footer">
-    <Button variant="secondary" on:click={() => { showColumnModal = false; editingColumn = null; newColumnName = ''; }}>
-      Cancel
-    </Button>
-    <Button on:click={handleSaveColumn} disabled={!newColumnName.trim()}>
-      {editingColumn ? 'Save' : 'Add Column'}
+      {editingTask ? 'Save Changes' : 'Create Bounty'}
     </Button>
   </svelte:fragment>
 </Modal>
 
 <style>
-  .board-page {
-    min-height: calc(100vh - var(--header-height) - var(--spacing-lg) * 2);
+  .bounty-board {
+    max-width: 800px;
+    margin: 0 auto;
+    padding-bottom: 100px;
   }
 
   .board-header {
@@ -488,171 +426,228 @@
     margin-bottom: var(--spacing-lg);
   }
 
-  .kanban-board {
-    display: flex;
-    gap: var(--spacing-md);
-    overflow-x: auto;
-    padding-bottom: var(--spacing-md);
-    scroll-behavior: auto;
+  .board-header h1 {
+    font-size: 1.5rem;
   }
 
-  .kanban-column {
-    flex: 0 0 300px;
-    background-color: var(--bg-secondary);
+  /* Active Task Banner */
+  .active-banner {
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark, #4f46e5) 100%);
     border-radius: var(--radius-lg);
     padding: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+    color: white;
     display: flex;
-    flex-direction: column;
-    max-height: calc(100vh - 200px);
-  }
-
-  .column-header {
-    display: flex;
-    justify-content: space-between;
+    flex-wrap: wrap;
     align-items: center;
-    margin-bottom: var(--spacing-md);
+    gap: var(--spacing-md);
   }
 
-  .column-title {
+  .active-info {
     flex: 1;
-    text-align: left;
-    padding: var(--spacing-xs);
-    border-radius: var(--radius-sm);
-    transition: background-color var(--transition-fast);
+    min-width: 150px;
   }
 
-  .column-title:hover {
-    background-color: var(--bg-tertiary);
+  .active-label {
+    font-size: 0.75rem;
+    opacity: 0.9;
+    display: block;
   }
 
-  .column-title h3 {
-    font-size: 0.875rem;
+  .active-title {
     font-weight: 600;
-    text-transform: uppercase;
-    color: var(--text-muted);
-    margin: 0;
+    font-size: 1rem;
   }
 
-  .column-actions {
+  .active-timer {
+    font-size: 1.5rem;
+    font-weight: 700;
+    font-family: monospace;
+  }
+
+  .active-actions {
     display: flex;
-    align-items: center;
     gap: var(--spacing-xs);
   }
 
-  .task-count {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    background-color: var(--bg-tertiary);
-    padding: 2px 8px;
-    border-radius: var(--radius-full);
+  .btn-pause, .btn-complete {
+    padding: var(--spacing-xs) var(--spacing-md);
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    font-size: 0.875rem;
   }
 
-  .column-delete {
-    width: 24px;
-    height: 24px;
-    font-size: 1rem;
-    color: var(--text-muted);
-    opacity: 0.5;
-    transition: all var(--transition-fast);
+  .btn-pause {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: white;
+  }
+
+  .btn-complete {
+    background-color: white;
+    color: var(--accent);
+  }
+
+  /* Filter Tabs */
+  .filter-tabs {
     display: flex;
-    align-items: center;
-    justify-content: center;
+    gap: var(--spacing-xs);
+    margin-bottom: var(--spacing-lg);
+    overflow-x: auto;
+    padding-bottom: var(--spacing-xs);
   }
 
-  .column-delete:hover {
-    opacity: 1;
-    color: var(--error);
+  .filter-tab {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    background-color: var(--bg-secondary);
+    white-space: nowrap;
+    transition: all var(--transition-fast);
   }
 
-  .column-tasks {
-    flex: 1;
-    overflow-y: auto;
-    min-height: 100px;
+  .filter-tab:hover {
+    color: var(--text-primary);
+  }
+
+  .filter-tab.active {
+    background-color: var(--accent);
+    color: white;
+  }
+
+  /* Task List */
+  .task-list {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-sm);
+    gap: var(--spacing-md);
   }
 
   .task-card {
-    background-color: var(--bg-card);
+    background-color: var(--bg-secondary);
     border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    padding: var(--spacing-sm) var(--spacing-md);
-    cursor: grab;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
     transition: all var(--transition-fast);
   }
 
   .task-card:hover {
     border-color: var(--border-light);
-    box-shadow: var(--shadow-sm);
+  }
+
+  .task-card.active {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+  }
+
+  .task-card.completed {
+    opacity: 0.7;
   }
 
   .task-card.overdue {
-    border-left: 3px solid var(--error);
+    border-left: 4px solid var(--error);
   }
 
   .task-card.due-today {
-    border-left: 3px solid var(--warning);
+    border-left: 4px solid var(--warning);
+  }
+
+  .task-main {
+    padding: var(--spacing-md);
+    cursor: pointer;
   }
 
   .task-header {
     display: flex;
-    align-items: flex-start;
-    gap: var(--spacing-sm);
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-sm);
   }
 
-  .priority-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: var(--radius-full);
-    margin-top: 6px;
-    flex-shrink: 0;
-  }
-
-  .priority-low { background-color: var(--priority-low); }
-  .priority-medium { background-color: var(--priority-medium); }
-  .priority-high { background-color: var(--priority-high); }
-
-  .task-title-btn {
-    flex: 1;
-    text-align: left;
-    font-weight: 500;
-    color: var(--text-primary);
-    line-height: 1.3;
-  }
-
-  .task-due-date {
+  .priority-badge {
     font-size: 0.75rem;
-    color: var(--text-muted);
-    margin-top: var(--spacing-xs);
-    padding-left: calc(8px + var(--spacing-sm));
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    text-transform: uppercase;
   }
 
-  .task-due-date.overdue {
+  .priority-low {
+    background-color: rgba(34, 197, 94, 0.2);
+    color: var(--success);
+  }
+
+  .priority-medium {
+    background-color: rgba(234, 179, 8, 0.2);
+    color: var(--warning);
+  }
+
+  .priority-high {
+    background-color: rgba(239, 68, 68, 0.2);
     color: var(--error);
   }
 
+  .xp-reward {
+    font-size: 0.75rem;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .task-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-xs);
+  }
+
+  .task-description {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    margin-bottom: var(--spacing-sm);
+    line-height: 1.4;
+  }
+
+  .task-meta {
+    display: flex;
+    gap: var(--spacing-md);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+
+  .due-date.overdue {
+    color: var(--error);
+  }
+
+  .time-spent {
+    color: var(--accent);
+  }
+
+  /* Task Actions */
   .task-actions {
     display: flex;
     gap: var(--spacing-xs);
-    margin-top: var(--spacing-sm);
-    padding-left: calc(8px + var(--spacing-sm));
+    padding: var(--spacing-sm) var(--spacing-md);
+    background-color: var(--bg-tertiary);
+    border-top: 1px solid var(--border);
   }
 
   .action-btn {
-    width: 24px;
-    height: 24px;
-    border-radius: var(--radius-sm);
-    font-size: 0.75rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0.6;
+    flex: 1;
+    padding: var(--spacing-sm);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    font-weight: 500;
     transition: all var(--transition-fast);
   }
 
-  .action-btn:hover {
-    opacity: 1;
+  .action-btn.start {
+    background-color: var(--accent);
+    color: white;
+  }
+
+  .action-btn.pause {
+    background-color: var(--warning);
+    color: white;
   }
 
   .action-btn.complete {
@@ -661,66 +656,44 @@
   }
 
   .action-btn.delete {
-    background-color: var(--error);
-    color: white;
-  }
-
-  .add-task-btn {
-    margin-top: var(--spacing-sm);
+    background-color: transparent;
+    color: var(--text-muted);
+    flex: 0;
     padding: var(--spacing-sm);
-    color: var(--text-muted);
-    border-radius: var(--radius-md);
-    transition: all var(--transition-fast);
-    text-align: center;
   }
 
-  .add-task-btn:hover {
-    background-color: var(--bg-tertiary);
-    color: var(--text-primary);
+  .action-btn.delete:hover {
+    color: var(--error);
   }
 
-  .completed-section {
-    margin-top: var(--spacing-xl);
-  }
-
-  .completed-section h2 {
-    font-size: 1rem;
-    color: var(--text-muted);
-    margin-bottom: var(--spacing-md);
-  }
-
-  .completed-tasks {
+  /* Completed Info */
+  .completed-info {
     display: flex;
-    flex-direction: column;
-    gap: var(--spacing-xs);
-  }
-
-  .completed-task {
-    display: flex;
+    justify-content: space-between;
     align-items: center;
-    gap: var(--spacing-sm);
-    padding: var(--spacing-sm);
-    background-color: var(--bg-secondary);
-    border-radius: var(--radius-md);
-    opacity: 0.7;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background-color: var(--bg-tertiary);
+    border-top: 1px solid var(--border);
+    font-size: 0.875rem;
   }
 
-  .check {
+  .completed-check {
     color: var(--success);
-    font-weight: 700;
+    font-weight: 500;
   }
 
-  .completed-title {
-    flex: 1;
-    text-decoration: line-through;
+  .final-time {
     color: var(--text-muted);
   }
 
-  .completed-date {
-    font-size: 0.75rem;
+  /* Empty & Loading States */
+  .empty-state, .loading {
+    text-align: center;
+    padding: var(--spacing-2xl);
     color: var(--text-muted);
   }
 
+  /* Form Styles */
   .form-group {
     margin-bottom: var(--spacing-md);
   }
@@ -743,9 +716,19 @@
     gap: var(--spacing-md);
   }
 
-  .loading, .not-found {
-    text-align: center;
-    padding: var(--spacing-2xl);
-    color: var(--text-muted);
+  @media (max-width: 480px) {
+    .form-row {
+      grid-template-columns: 1fr;
+    }
+
+    .active-banner {
+      flex-direction: column;
+      text-align: center;
+    }
+
+    .active-actions {
+      width: 100%;
+      justify-content: center;
+    }
   }
 </style>
