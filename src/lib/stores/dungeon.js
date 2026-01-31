@@ -523,6 +523,9 @@ async function monsterAttack(run, monster) {
   let damage = Math.floor(monster.damage * (roll / 3.5)); // Scale with roll
   damage = Math.max(1, damage); // Minimum 1 damage
 
+  // Set lastRoll for enemy attack display
+  lastRoll.set({ rolls: [roll], total: damage, type: 'enemy', critical: false });
+
   // Apply defense if player is defending
   if (run.isDefending && run.defenseAmount) {
     damage = Math.max(0, damage - run.defenseAmount);
