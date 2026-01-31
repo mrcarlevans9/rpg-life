@@ -319,6 +319,10 @@ export async function startRun() {
   // Lock scroll immediately when entering dungeon
   if (typeof document !== 'undefined') {
     document.body.classList.add('no-scroll');
+    // Reset scroll position to top
+    window.scrollTo(0, 0);
+    document.body.scrollTop = 0;
+    document.documentElement.scrollTop = 0;
   }
 
   currentRun.set(run);

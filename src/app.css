@@ -31,16 +31,24 @@ body {
 }
 
 body.no-scroll {
-  overflow: hidden;
+  overflow: hidden !important;
   position: fixed;
   width: 100%;
   height: 100%;
+  top: 0;
+  left: 0;
 }
 
-/* Remove extra padding during combat to prevent scroll */
+/* Remove extra padding and prevent scroll during combat */
 body.no-scroll .main-content {
   padding: 0;
   padding-bottom: var(--mobile-nav-height);
+  overflow: hidden !important;
+}
+
+body.no-scroll .app-layout {
+  overflow: hidden !important;
+  height: 100vh;
 }
 
 h1 {
