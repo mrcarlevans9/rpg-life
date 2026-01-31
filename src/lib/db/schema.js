@@ -126,36 +126,36 @@ export const TITLES = [
 
 // Dungeon monster definitions
 export const MONSTERS = {
-  // Tier 1 (Floors 1-3)
+  // Tier 1 (Floors 1-3) - Should take 2-3 hits to kill, deal meaningful damage
   common: [
-    { key: 'slime', name: 'Slime', emoji: '🟢', baseHp: 8, baseDamage: 3, goldDrop: [2, 5] },
-    { key: 'rat', name: 'Giant Rat', emoji: '🐀', baseHp: 6, baseDamage: 4, goldDrop: [2, 4] },
-    { key: 'bat', name: 'Cave Bat', emoji: '🦇', baseHp: 5, baseDamage: 3, goldDrop: [1, 4] },
-    { key: 'spider', name: 'Spider', emoji: '🕷️', baseHp: 7, baseDamage: 4, goldDrop: [2, 5] }
+    { key: 'slime', name: 'Slime', emoji: '🟢', baseHp: 15, baseDamage: 6, goldDrop: [2, 5] },
+    { key: 'rat', name: 'Giant Rat', emoji: '🐀', baseHp: 12, baseDamage: 8, goldDrop: [2, 4] },
+    { key: 'bat', name: 'Cave Bat', emoji: '🦇', baseHp: 10, baseDamage: 7, goldDrop: [1, 4] },
+    { key: 'spider', name: 'Spider', emoji: '🕷️', baseHp: 14, baseDamage: 7, goldDrop: [2, 5] }
   ],
-  // Tier 2 (Floors 4-6)
+  // Tier 2 (Floors 4-6) - Tougher fights, need strategy
   uncommon: [
-    { key: 'goblin', name: 'Goblin', emoji: '👺', baseHp: 15, baseDamage: 5, goldDrop: [5, 10] },
-    { key: 'skeleton', name: 'Skeleton', emoji: '💀', baseHp: 12, baseDamage: 6, goldDrop: [4, 9] },
-    { key: 'zombie', name: 'Zombie', emoji: '🧟', baseHp: 18, baseDamage: 4, goldDrop: [5, 8] },
-    { key: 'ghost', name: 'Ghost', emoji: '👻', baseHp: 10, baseDamage: 7, goldDrop: [6, 11] }
+    { key: 'goblin', name: 'Goblin', emoji: '👺', baseHp: 28, baseDamage: 10, goldDrop: [5, 10] },
+    { key: 'skeleton', name: 'Skeleton', emoji: '💀', baseHp: 24, baseDamage: 12, goldDrop: [4, 9] },
+    { key: 'zombie', name: 'Zombie', emoji: '🧟', baseHp: 35, baseDamage: 8, goldDrop: [5, 8] },
+    { key: 'ghost', name: 'Ghost', emoji: '👻', baseHp: 20, baseDamage: 14, goldDrop: [6, 11] }
   ],
-  // Tier 3 (Floors 7-9)
+  // Tier 3 (Floors 7-9) - Dangerous, may need potions
   rare: [
-    { key: 'orc', name: 'Orc Warrior', emoji: '👹', baseHp: 25, baseDamage: 8, goldDrop: [10, 18] },
-    { key: 'wraith', name: 'Wraith', emoji: '🌑', baseHp: 20, baseDamage: 10, goldDrop: [12, 20] },
-    { key: 'golem', name: 'Stone Golem', emoji: '🗿', baseHp: 35, baseDamage: 6, goldDrop: [15, 22] },
-    { key: 'demon', name: 'Lesser Demon', emoji: '😈', baseHp: 22, baseDamage: 9, goldDrop: [11, 19] }
+    { key: 'orc', name: 'Orc Warrior', emoji: '👹', baseHp: 45, baseDamage: 14, goldDrop: [10, 18] },
+    { key: 'wraith', name: 'Wraith', emoji: '🌑', baseHp: 38, baseDamage: 18, goldDrop: [12, 20] },
+    { key: 'golem', name: 'Stone Golem', emoji: '🗿', baseHp: 60, baseDamage: 12, goldDrop: [15, 22] },
+    { key: 'demon', name: 'Lesser Demon', emoji: '😈', baseHp: 42, baseDamage: 16, goldDrop: [11, 19] }
   ]
 };
 
-// Dungeon boss definitions (Floor 10)
+// Dungeon boss definitions (Floor 10) - Epic fights requiring strategy and potions
 export const BOSSES = [
-  { key: 'dragon', name: 'Ancient Dragon', emoji: '🐉', baseHp: 80, baseDamage: 12, goldDrop: [50, 80], special: 'Fire Breath' },
-  { key: 'lich', name: 'Lich King', emoji: '☠️', baseHp: 60, baseDamage: 15, goldDrop: [45, 75], special: 'Soul Drain' },
-  { key: 'demon_lord', name: 'Demon Lord', emoji: '👿', baseHp: 70, baseDamage: 14, goldDrop: [55, 85], special: 'Hellfire' },
-  { key: 'hydra', name: 'Hydra', emoji: '🐍', baseHp: 90, baseDamage: 10, goldDrop: [60, 90], special: 'Multi-Strike' },
-  { key: 'titan', name: 'Fallen Titan', emoji: '🦾', baseHp: 100, baseDamage: 11, goldDrop: [65, 95], special: 'Ground Slam' }
+  { key: 'dragon', name: 'Ancient Dragon', emoji: '🐉', baseHp: 120, baseDamage: 18, goldDrop: [50, 80], special: 'Fire Breath' },
+  { key: 'lich', name: 'Lich King', emoji: '☠️', baseHp: 100, baseDamage: 22, goldDrop: [45, 75], special: 'Soul Drain' },
+  { key: 'demon_lord', name: 'Demon Lord', emoji: '👿', baseHp: 110, baseDamage: 20, goldDrop: [55, 85], special: 'Hellfire' },
+  { key: 'hydra', name: 'Hydra', emoji: '🐍', baseHp: 140, baseDamage: 16, goldDrop: [60, 90], special: 'Multi-Strike' },
+  { key: 'titan', name: 'Fallen Titan', emoji: '🦾', baseHp: 150, baseDamage: 17, goldDrop: [65, 95], special: 'Ground Slam' }
 ];
 
 // Monster modifiers (randomly applied)

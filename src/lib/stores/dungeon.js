@@ -186,12 +186,12 @@ function generateMonster(floor) {
   const monsterPool = MONSTERS[tier];
   const baseMonster = monsterPool[Math.floor(Math.random() * monsterPool.length)];
 
-  // Scale stats with floor
-  const floorMultiplier = 1 + (floor - 1) * 0.1;
+  // Scale stats with floor (18% per floor for meaningful progression)
+  const floorMultiplier = 1 + (floor - 1) * 0.18;
 
-  // Random chance for modifier (20%)
+  // Random chance for modifier (35% - more elite encounters)
   let modifier = null;
-  if (Math.random() < 0.2) {
+  if (Math.random() < 0.35) {
     modifier = MONSTER_MODIFIERS[Math.floor(Math.random() * MONSTER_MODIFIERS.length)];
   }
 
