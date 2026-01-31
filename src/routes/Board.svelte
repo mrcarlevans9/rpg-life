@@ -457,26 +457,35 @@
   /* Filter Tabs */
   .filter-tabs {
     display: flex;
-    gap: 8px;
+    gap: 4px;
     margin-bottom: 20px;
-    overflow-x: auto;
+    background: var(--bg-secondary);
+    padding: 4px;
+    border-radius: 12px;
   }
 
   .filter-tab {
-    padding: 8px 16px;
+    flex: 1;
+    padding: 10px 12px;
     border-radius: 8px;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
-    background: var(--bg-secondary);
+    background: transparent;
     color: var(--text-muted);
     border: none;
     cursor: pointer;
     white-space: nowrap;
+    transition: all 0.2s ease;
+  }
+
+  .filter-tab:hover {
+    color: var(--text-primary);
   }
 
   .filter-tab.active {
     background: #6366f1;
     color: white;
+    box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3);
   }
 
   /* Task List */
