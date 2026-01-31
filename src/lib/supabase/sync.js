@@ -74,10 +74,11 @@ export async function syncPlayer() {
       // Update local
       await db.player.update(1, merged);
 
-      // Update remote
+      // Update remote (use upsert to create if not exists)
       const { error: updateError } = await supabase
         .from('players')
-        .update({
+        .upsert({
+          user_id: userId,
           total_xp: merged.totalXP,
           current_streak: merged.currentStreak,
           longest_streak: merged.longestStreak,
@@ -90,11 +91,10 @@ export async function syncPlayer() {
           purchased_spell_slot: merged.purchasedSpellSlot,
           highest_floor: merged.highestFloor,
           total_kills: merged.totalKills
-        })
-        .eq('user_id', userId);
+        }, { onConflict: 'user_id' });
 
       if (updateError) {
-        console.error('UPDATE ERROR:', updateError.message, updateError.details, updateError.hint);
+        console.error('UPSERT ERROR:', updateError.message, updateError.details, updateError.hint);
       }
       console.log('MERGED result:', JSON.stringify({ gold: merged.gold, healthPotions: merged.healthPotions, customSpells: merged.customSpells }));
       console.log('Player synced:', merged.gold, 'gold,', merged.highestFloor, 'best floor');
