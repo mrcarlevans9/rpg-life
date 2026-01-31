@@ -298,7 +298,7 @@
                   {#if room.completed}
                     <span class="defeated-x">✕</span>
                   {/if}
-                  <span class="enemy-icon" class:faded={room.completed}>{room.monster?.emoji || '👹'}</span>
+                  <span class="enemy-icon" class:faded={room.completed}>{room.type === 'boss' ? '👑' : '⚔️'}</span>
                 </span>
               {/if}
             {/each}
