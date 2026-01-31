@@ -30,6 +30,7 @@ export async function initializeDB() {
 
     // Create default avatar
     await db.avatar.add({
+      gender: 'neutral',
       skinTone: 'medium',
       hairStyle: 'default',
       hairColor: 'brown',

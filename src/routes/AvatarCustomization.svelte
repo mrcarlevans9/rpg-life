@@ -8,7 +8,7 @@
   import { TITLES } from '../lib/db/schema.js';
   import { showSuccess } from '../lib/stores/notifications.js';
 
-  let activeTab = 'hair';
+  let activeTab = 'gender';
   let cosmetics = {
     hairStyles: [],
     hairColors: [],
@@ -17,9 +17,16 @@
     accessories: []
   };
 
+  const genderOptions = [
+    { key: 'male', label: 'Male', icon: '👨' },
+    { key: 'female', label: 'Female', icon: '👩' },
+    { key: 'neutral', label: 'Neutral', icon: '🧑' }
+  ];
+
   const tabs = [
+    { id: 'gender', label: 'Body', icon: '🧍' },
     { id: 'hair', label: 'Hair', icon: '💇' },
-    { id: 'color', label: 'Hair Color', icon: '🎨' },
+    { id: 'color', label: 'Color', icon: '🎨' },
     { id: 'skin', label: 'Skin', icon: '👤' },
     { id: 'outfit', label: 'Outfit', icon: '👕' },
     { id: 'accessory', label: 'Accessory', icon: '✨' },
@@ -33,6 +40,11 @@
     cosmetics.outfits = await getCosmeticsOfType('outfits');
     cosmetics.accessories = await getCosmeticsOfType('accessories');
   });
+
+  async function selectGender(key) {
+    await updateAvatar('gender', key);
+    showSuccess('Body type updated!');
+  }
 
   async function selectHairStyle(key) {
     await updateAvatar('hairStyle', key);
@@ -70,6 +82,7 @@
 
   function isSelected(type, key) {
     switch (type) {
+      case 'gender': return ($avatarData?.gender || 'neutral') === key;
       case 'hairStyle': return $avatarData?.hairStyle === key;
       case 'hairColor': return $avatarData?.hairColor === key;
       case 'skinTone': return $avatarData?.skinTone === key;
@@ -122,7 +135,20 @@
   </div>
 
   <div class="customization-content">
-    {#if activeTab === 'hair'}
+    {#if activeTab === 'gender'}
+      <div class="gender-grid">
+        {#each genderOptions as option}
+          <button
+            class="gender-option"
+            class:selected={isSelected('gender', option.key)}
+            on:click={() => selectGender(option.key)}
+          >
+            <span class="gender-icon">{option.icon}</span>
+            <span class="gender-label">{option.label}</span>
+          </button>
+        {/each}
+      </div>
+    {:else if activeTab === 'hair'}
       <div class="options-grid">
         {#each cosmetics.hairStyles as item}
           <button
@@ -228,22 +254,32 @@
   .avatar-page {
     max-width: 800px;
     margin: 0 auto;
+    padding: 0 var(--spacing-md);
   }
 
   .page-header {
-    margin-bottom: var(--spacing-xl);
+    margin-bottom: var(--spacing-lg);
+    text-align: center;
+  }
+
+  .page-header h1 {
+    font-size: 1.5rem;
   }
 
   .avatar-preview {
-    margin-bottom: var(--spacing-xl);
+    margin-bottom: var(--spacing-lg);
+    display: flex;
+    justify-content: center;
   }
 
   .preview-card {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: var(--spacing-xl);
+    justify-content: center;
+    padding: var(--spacing-xl) var(--spacing-2xl);
     gap: var(--spacing-md);
+    min-height: 280px;
   }
 
   .preview-info {
@@ -251,17 +287,19 @@
     flex-direction: column;
     align-items: center;
     gap: var(--spacing-xs);
+    margin-top: var(--spacing-sm);
   }
 
   .preview-level {
     font-weight: 600;
     color: var(--level-color);
+    font-size: 1.1rem;
   }
 
   .preview-title {
     font-size: 0.875rem;
     color: var(--accent);
-    padding: var(--spacing-xs) var(--spacing-sm);
+    padding: var(--spacing-xs) var(--spacing-md);
     background-color: var(--accent-light);
     border-radius: var(--radius-full);
   }
@@ -272,6 +310,46 @@
     overflow-x: auto;
     padding-bottom: var(--spacing-sm);
     margin-bottom: var(--spacing-lg);
+    justify-content: center;
+  }
+
+  .gender-grid {
+    display: flex;
+    justify-content: center;
+    gap: var(--spacing-lg);
+    flex-wrap: wrap;
+  }
+
+  .gender-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-lg) var(--spacing-xl);
+    background-color: var(--bg-secondary);
+    border: 3px solid var(--border);
+    border-radius: var(--radius-xl);
+    transition: all var(--transition-fast);
+    min-width: 100px;
+  }
+
+  .gender-option:hover {
+    border-color: var(--border-light);
+    transform: translateY(-2px);
+  }
+
+  .gender-option.selected {
+    border-color: var(--accent);
+    background-color: var(--accent-light);
+  }
+
+  .gender-icon {
+    font-size: 3rem;
+  }
+
+  .gender-label {
+    font-weight: 600;
+    font-size: 0.9rem;
   }
 
   .tab {

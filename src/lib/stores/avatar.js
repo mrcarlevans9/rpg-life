@@ -76,6 +76,7 @@ export async function updateTitle(titleKey) {
 export function getAvatarDisplayData(avatar) {
   if (!avatar) {
     return {
+      gender: 'neutral',
       skinColor: '#D4A574',
       hairColor: '#8B4513',
       hairStyle: 'default',
@@ -88,6 +89,7 @@ export function getAvatarDisplayData(avatar) {
   const hairColor = UNLOCKABLES.hairColors.find(h => h.key === avatar.hairColor);
 
   return {
+    gender: avatar.gender || 'neutral',
     skinColor: skinTone?.color || '#D4A574',
     hairColor: hairColor?.color || '#8B4513',
     hairStyle: avatar.hairStyle || 'default',

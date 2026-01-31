@@ -385,6 +385,7 @@ export async function syncAvatar() {
     if (remoteAvatar) {
       // Remote exists, update local
       const avatar = {
+        gender: remoteAvatar.gender || 'neutral',
         skinTone: remoteAvatar.skin_tone || 'medium',
         hairStyle: remoteAvatar.hair_style || 'default',
         hairColor: remoteAvatar.hair_color || 'brown',
@@ -398,6 +399,7 @@ export async function syncAvatar() {
       // Push local avatar to remote
       await supabase.from('avatars').insert({
         user_id: userId,
+        gender: localAvatar.gender || 'neutral',
         skin_tone: localAvatar.skinTone,
         hair_style: localAvatar.hairStyle,
         hair_color: localAvatar.hairColor,
@@ -420,6 +422,7 @@ export async function pushAvatarUpdate(updates) {
 
   try {
     const remoteUpdates = {};
+    if (updates.gender !== undefined) remoteUpdates.gender = updates.gender;
     if (updates.skinTone !== undefined) remoteUpdates.skin_tone = updates.skinTone;
     if (updates.hairStyle !== undefined) remoteUpdates.hair_style = updates.hairStyle;
     if (updates.hairColor !== undefined) remoteUpdates.hair_color = updates.hairColor;

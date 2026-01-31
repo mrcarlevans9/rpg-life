@@ -83,4 +83,7 @@ UPDATE tasks SET status = CASE
   ELSE 'todo'
 END WHERE status IS NULL OR status = 'todo';
 
+-- 10. Add gender column to avatars table
+ALTER TABLE avatars ADD COLUMN IF NOT EXISTS gender TEXT DEFAULT 'neutral';
+
 -- Done! Your database is now migrated to the single board structure.

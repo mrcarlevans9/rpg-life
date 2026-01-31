@@ -17,18 +17,47 @@
 </script>
 
 <div class="avatar-container size-{size}" style="--pixel-size: {pixelSize}px">
-  <!-- Base body -->
+  <!-- Base body - varies by gender -->
   <div class="avatar-layer body" style="--skin-color: {displayData.skinColor}">
-    <!-- Head -->
-    <div class="pixel" style="grid-area: 3/6/5/11; background: var(--skin-color)"></div>
-    <!-- Body -->
-    <div class="pixel" style="grid-area: 5/7/8/10; background: var(--skin-color)"></div>
-    <!-- Arms -->
-    <div class="pixel" style="grid-area: 5/5/7/7; background: var(--skin-color)"></div>
-    <div class="pixel" style="grid-area: 5/10/7/12; background: var(--skin-color)"></div>
-    <!-- Legs -->
-    <div class="pixel" style="grid-area: 8/7/10/8; background: var(--skin-color)"></div>
-    <div class="pixel" style="grid-area: 8/9/10/10; background: var(--skin-color)"></div>
+    {#if displayData.gender === 'female'}
+      <!-- Female body shape -->
+      <!-- Head (slightly rounder) -->
+      <div class="pixel" style="grid-area: 3/6/5/11; background: var(--skin-color); border-radius: 20%"></div>
+      <!-- Neck -->
+      <div class="pixel" style="grid-area: 5/7/6/10; background: var(--skin-color)"></div>
+      <!-- Body (curved torso) -->
+      <div class="pixel" style="grid-area: 6/6/8/11; background: var(--skin-color); border-radius: 10%"></div>
+      <!-- Arms (slimmer) -->
+      <div class="pixel" style="grid-area: 6/4/7/6; background: var(--skin-color)"></div>
+      <div class="pixel" style="grid-area: 6/11/7/13; background: var(--skin-color)"></div>
+      <!-- Legs -->
+      <div class="pixel" style="grid-area: 8/7/10/8; background: var(--skin-color)"></div>
+      <div class="pixel" style="grid-area: 8/9/10/10; background: var(--skin-color)"></div>
+    {:else if displayData.gender === 'male'}
+      <!-- Male body shape -->
+      <!-- Head -->
+      <div class="pixel" style="grid-area: 3/6/5/11; background: var(--skin-color)"></div>
+      <!-- Body (broader shoulders) -->
+      <div class="pixel" style="grid-area: 5/5/8/12; background: var(--skin-color)"></div>
+      <!-- Arms (thicker) -->
+      <div class="pixel" style="grid-area: 5/4/7/5; background: var(--skin-color)"></div>
+      <div class="pixel" style="grid-area: 5/12/7/13; background: var(--skin-color)"></div>
+      <!-- Legs -->
+      <div class="pixel" style="grid-area: 8/6/10/8; background: var(--skin-color)"></div>
+      <div class="pixel" style="grid-area: 8/9/10/11; background: var(--skin-color)"></div>
+    {:else}
+      <!-- Neutral/default body shape -->
+      <!-- Head -->
+      <div class="pixel" style="grid-area: 3/6/5/11; background: var(--skin-color)"></div>
+      <!-- Body -->
+      <div class="pixel" style="grid-area: 5/7/8/10; background: var(--skin-color)"></div>
+      <!-- Arms -->
+      <div class="pixel" style="grid-area: 5/5/7/7; background: var(--skin-color)"></div>
+      <div class="pixel" style="grid-area: 5/10/7/12; background: var(--skin-color)"></div>
+      <!-- Legs -->
+      <div class="pixel" style="grid-area: 8/7/10/8; background: var(--skin-color)"></div>
+      <div class="pixel" style="grid-area: 8/9/10/10; background: var(--skin-color)"></div>
+    {/if}
   </div>
 
   <!-- Hair layer -->
