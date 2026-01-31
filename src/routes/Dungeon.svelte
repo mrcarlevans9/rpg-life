@@ -8,6 +8,7 @@
     lastRoll,
     currentMonster,
     combatState,
+    currentMessage,
     startRun,
     playerAttack,
     playerDefend,
@@ -321,18 +322,26 @@
 
       <!-- Action Panel -->
       <div class="action-panel">
-        <!-- Dice display (compact) -->
-        {#if $lastRoll && $combatState.isAnimating}
-          <div class="dice-row">
-            {#each $lastRoll.rolls as roll}
-              <span class="mini-die" class:crit={$lastRoll.critical}>{roll}</span>
-            {/each}
-            {#if $lastRoll.critical}
-              <span class="crit-badge">CRIT!</span>
-            {/if}
+        <!-- Combat Message Overlay -->
+        {#if $combatState.isAnimating && $currentMessage}
+          <div class="combat-overlay">
+            <div class="combat-message-box">
+              <p class="combat-message">{$currentMessage}</p>
+              {#if $lastRoll}
+                <div class="dice-row">
+                  {#each $lastRoll.rolls as roll}
+                    <span class="mini-die" class:crit={$lastRoll.critical}>{roll}</span>
+                  {/each}
+                  {#if $lastRoll.critical}
+                    <span class="crit-badge">CRIT!</span>
+                  {/if}
+                </div>
+              {/if}
+            </div>
           </div>
-        {:else}
-          <!-- Action Buttons -->
+        {/if}
+
+        <!-- Action Buttons -->
           <div class="action-grid" class:has-spells={($currentRun?.customSpells || []).filter(s => s).length > 0}>
             {#if $currentMonster}
               <button
@@ -419,7 +428,6 @@
               </div>
             </div>
           {/if}
-        {/if}
       </div>
     </div>
   {/if}
@@ -1057,6 +1065,57 @@
     border-top: 1px solid var(--border);
     padding: 8px;
     position: relative;
+  }
+
+  /* Combat Message Overlay */
+  .combat-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    padding: 8px;
+  }
+
+  .combat-message-box {
+    background: linear-gradient(180deg, #1a1a2e 0%, #0f0f1a 100%);
+    border: 2px solid var(--accent);
+    border-radius: var(--radius-md);
+    padding: 12px 16px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 4px 20px rgba(99, 102, 241, 0.3);
+    animation: messageSlideIn 0.2s ease-out;
+  }
+
+  @keyframes messageSlideIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .combat-message {
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    font-weight: 500;
+    margin: 0 0 8px 0;
+    line-height: 1.4;
+  }
+
+  .combat-message-box .dice-row {
+    justify-content: center;
+    padding: 4px 0 0 0;
+    background: none;
   }
 
   .action-grid {
