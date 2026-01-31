@@ -30,6 +30,8 @@
   let currentTime = 0;
 
   onMount(async () => {
+    console.log('Board mounted, loading tasks...');
+    console.log('localStorage rpglife_db_reset_v:', localStorage.getItem('rpglife_db_reset_v'));
     await loadTasks();
     startTimerInterval();
   });
@@ -56,10 +58,14 @@
       loading = true;
       // Ensure db is open
       if (!db.isOpen()) {
+        console.log('DB was closed, opening...');
         await db.open();
       }
-      tasks = await db.tasks.orderBy('order').toArray();
-      console.log('Loaded tasks:', tasks.length);
+      console.log('DB is open:', db.isOpen());
+      const allTasks = await db.tasks.toArray();
+      console.log('All tasks in DB:', allTasks);
+      tasks = allTasks.sort((a, b) => (a.order || 0) - (b.order || 0));
+      console.log('Loaded tasks:', tasks.length, tasks);
     } catch (err) {
       console.error('Error loading tasks:', err);
       tasks = [];
