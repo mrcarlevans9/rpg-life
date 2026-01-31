@@ -257,12 +257,12 @@
           </div>
           <div class="stat-item">
             <span class="stat-icon">🏔️</span>
-            <span class="stat-value">{$dungeonData?.highestFloor || 0}</span>
+            <span class="stat-value">{$playerData?.highestFloor || 0}</span>
             <span class="stat-label">Best Floor</span>
           </div>
           <div class="stat-item">
             <span class="stat-icon">💀</span>
-            <span class="stat-value">{$dungeonData?.totalKills || 0}</span>
+            <span class="stat-value">{$playerData?.totalKills || 0}</span>
             <span class="stat-label">Monsters Slain</span>
           </div>
         </div>
