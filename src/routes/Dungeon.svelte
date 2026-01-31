@@ -554,6 +554,16 @@
     max-width: 600px;
     margin: 0 auto;
     padding: 0 var(--spacing-xs);
+    /* Fill available height during combat to prevent scroll */
+    height: calc(100vh - var(--header-height) - var(--mobile-nav-height) - var(--spacing-lg) * 2);
+    display: flex;
+    flex-direction: column;
+  }
+
+  @media (min-width: 1024px) {
+    .dungeon-page {
+      height: calc(100vh - var(--header-height) - var(--spacing-lg) * 2);
+    }
   }
 
   .page-header {
@@ -639,9 +649,8 @@
   .battle-screen {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 140px);
-    max-height: 480px;
-    min-height: 320px;
+    flex: 1;
+    min-height: 0; /* Allow shrinking */
     background: linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
     border-radius: var(--radius-md);
     overflow: hidden;
