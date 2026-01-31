@@ -96,49 +96,50 @@
     await loadBoard();
   }
 
-  // Auto-scroll during drag - track mouse position
+  // Auto-scroll during drag - track pointer position
   let lastPointerX = 0;
-  let scrollDirection = 0;
-  let animationFrame = null;
+  let scrollInterval = null;
 
   function handlePointerMove(e) {
-    lastPointerX = e.clientX || (e.touches && e.touches[0]?.clientX) || lastPointerX;
-
-    if (!isDragging || !boardContainer) return;
-
-    const rect = boardContainer.getBoundingClientRect();
-    const threshold = 80;
-
-    if (lastPointerX - rect.left < threshold) {
-      scrollDirection = -1;
-      startAutoScroll();
-    } else if (rect.right - lastPointerX < threshold) {
-      scrollDirection = 1;
-      startAutoScroll();
-    } else {
-      scrollDirection = 0;
-      stopAutoScroll();
+    // Track position from mouse, touch, or pointer events
+    if (e.clientX !== undefined) {
+      lastPointerX = e.clientX;
+    } else if (e.touches && e.touches[0]) {
+      lastPointerX = e.touches[0].clientX;
     }
   }
 
-  function startAutoScroll() {
-    if (animationFrame) return;
+  // Start polling for scroll when drag begins
+  function startDragScrolling() {
+    if (scrollInterval) return;
 
-    function scroll() {
-      if (boardContainer && scrollDirection !== 0) {
-        boardContainer.scrollLeft += scrollDirection * 12;
-        animationFrame = requestAnimationFrame(scroll);
+    scrollInterval = setInterval(() => {
+      if (!isDragging || !boardContainer) return;
+
+      const rect = boardContainer.getBoundingClientRect();
+      const threshold = 60;
+      const scrollSpeed = 8;
+
+      if (lastPointerX > 0 && lastPointerX - rect.left < threshold) {
+        boardContainer.scrollLeft -= scrollSpeed;
+      } else if (lastPointerX > 0 && rect.right - lastPointerX < threshold) {
+        boardContainer.scrollLeft += scrollSpeed;
       }
-    }
-    animationFrame = requestAnimationFrame(scroll);
+    }, 16);
   }
 
   function stopAutoScroll() {
-    scrollDirection = 0;
-    if (animationFrame) {
-      cancelAnimationFrame(animationFrame);
-      animationFrame = null;
+    if (scrollInterval) {
+      clearInterval(scrollInterval);
+      scrollInterval = null;
     }
+  }
+
+  // Watch isDragging to start/stop scroll polling
+  $: if (isDragging) {
+    startDragScrolling();
+  } else {
+    stopAutoScroll();
   }
 
   function openTaskModal(columnId = 'todo', task = null) {
