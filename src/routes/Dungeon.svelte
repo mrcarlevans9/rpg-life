@@ -778,6 +778,9 @@
         <Button variant="primary" on:click={leaveFloorMerchant}>
           Descend to Floor {($currentRun?.currentFloor || 0) + 1}
         </Button>
+        <Button variant="secondary" on:click={retreat}>
+          End Run & Collect Rewards
+        </Button>
       </div>
 
       <!-- Show temp buffs if any -->
