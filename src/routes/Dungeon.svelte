@@ -27,7 +27,9 @@
     leaveMerchant,
     leaveFloorMerchant,
     purchaseFloorMerchantItem,
-    chooseLootChestItem
+    openLootChest,
+    chooseLootChestItem,
+    skipLootChest
   } from '../lib/stores/dungeon.js';
   import { DUNGEON_UPGRADES } from '../lib/db/index.js';
   import { playerData } from '../lib/stores/player.js';
@@ -51,7 +53,7 @@
   }
 
   // Lock body scroll during dungeon run (active phases + any current run)
-  $: inCombat = ['exploring', 'merchant', 'floor_merchant', 'loot_chest'].includes($gamePhase) || $currentRun !== null;
+  $: inCombat = ['exploring', 'merchant', 'floor_merchant', 'loot_chest', 'loot_chest_open'].includes($gamePhase) || $currentRun !== null;
   $: if (typeof document !== 'undefined') {
     if (inCombat) {
       document.body.classList.add('no-scroll');
@@ -581,13 +583,51 @@
     </div>
   {/if}
 
-  <!-- Loot Chest Encounter -->
+  <!-- Loot Chest Encounter - Unopened -->
   {#if $gamePhase === 'loot_chest'}
     {@const room = $currentRun?.floor?.rooms[$currentRun?.floor?.currentRoom]}
     <div class="loot-chest-screen">
       <div class="chest-header">
-        <span class="chest-emoji">🎁</span>
+        <span class="chest-emoji chest-closed">📦</span>
         <h2>Mysterious Chest!</h2>
+        <p class="chest-subtitle">Do you dare open it?</p>
+        <p class="chest-warning">⚠️ Beware... some chests are not what they seem...</p>
+      </div>
+
+      <div class="chest-actions">
+        <button class="chest-action-btn open" on:click={openLootChest}>
+          🔓 Open Chest
+        </button>
+        <button class="chest-action-btn skip" on:click={skipLootChest}>
+          🚶 Walk Past
+        </button>
+      </div>
+
+      <!-- Show temp buffs if any -->
+      {#if $currentRun?.tempBuffs && ($currentRun.tempBuffs.bonusDamage > 0 || $currentRun.tempBuffs.defenseBonus > 0 || $currentRun.tempBuffs.goldBonus > 0)}
+        <div class="active-buffs">
+          <span class="buffs-label">Active Buffs:</span>
+          {#if $currentRun.tempBuffs.bonusDamage > 0}
+            <span class="buff">💪 +{$currentRun.tempBuffs.bonusDamage} DMG</span>
+          {/if}
+          {#if $currentRun.tempBuffs.defenseBonus > 0}
+            <span class="buff">🛡️ +{$currentRun.tempBuffs.defenseBonus} DEF</span>
+          {/if}
+          {#if $currentRun.tempBuffs.goldBonus > 0}
+            <span class="buff">🍀 +{$currentRun.tempBuffs.goldBonus} Gold/kill</span>
+          {/if}
+        </div>
+      {/if}
+    </div>
+  {/if}
+
+  <!-- Loot Chest Opened - Choose Item -->
+  {#if $gamePhase === 'loot_chest_open'}
+    {@const room = $currentRun?.floor?.rooms[$currentRun?.floor?.currentRoom]}
+    <div class="loot-chest-screen chest-opened">
+      <div class="chest-header">
+        <span class="chest-emoji">🎁</span>
+        <h2>Treasure!</h2>
         <p class="chest-subtitle">Choose one reward</p>
       </div>
 
@@ -2443,5 +2483,79 @@
     border-radius: var(--radius-md);
     text-transform: uppercase;
     letter-spacing: 0.5px;
+  }
+
+  /* Closed chest styling */
+  .chest-closed {
+    animation: chestShake 2s ease-in-out infinite;
+  }
+
+  @keyframes chestShake {
+    0%, 100% { transform: rotate(-2deg); }
+    25% { transform: rotate(2deg); }
+    50% { transform: rotate(-2deg); }
+    75% { transform: rotate(1deg); }
+  }
+
+  .chest-warning {
+    color: #f59e0b;
+    font-size: 0.85rem;
+    margin-top: var(--spacing-sm);
+    animation: warningPulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes warningPulse {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 1; }
+  }
+
+  .chest-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    padding: var(--spacing-lg);
+  }
+
+  .chest-action-btn {
+    padding: var(--spacing-lg);
+    border: 2px solid;
+    border-radius: var(--radius-md);
+    font-size: 1.1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+  }
+
+  .chest-action-btn.open {
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(251, 191, 36, 0.1));
+    border-color: #fbbf24;
+    color: #fbbf24;
+  }
+
+  .chest-action-btn.open:hover {
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.3), rgba(251, 191, 36, 0.2));
+    transform: scale(1.02);
+    box-shadow: 0 4px 20px rgba(251, 191, 36, 0.3);
+  }
+
+  .chest-action-btn.skip {
+    background: rgba(0, 0, 0, 0.3);
+    border-color: var(--text-muted);
+    color: var(--text-muted);
+  }
+
+  .chest-action-btn.skip:hover {
+    background: rgba(0, 0, 0, 0.5);
+    border-color: var(--text-secondary);
+    color: var(--text-secondary);
+  }
+
+  /* Opened chest has green tint */
+  .chest-opened {
+    background: linear-gradient(180deg, #1a3d1a 0%, #2d1b0e 50%, #1a1a2e 100%);
   }
 </style>

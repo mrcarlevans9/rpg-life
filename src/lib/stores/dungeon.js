@@ -262,14 +262,23 @@ function generateFloor(floorNumber) {
   const roomCount = 4 + Math.floor(Math.random() * 7); // 4 to 10
   const rooms = [];
 
-  // Check if merchant appears on this floor (12% chance, max 1 per floor)
+  // First, check if loot chest appears (8% chance)
+  // Loot chest can appear in rooms 2 through (roomCount - 1) - not first, not last
+  let lootChestRoomIndex = -1;
+  if (Math.random() < 0.08 && roomCount >= 3) {
+    const minIndex = 1;
+    const maxIndex = roomCount - 2;
+    if (maxIndex >= minIndex) {
+      lootChestRoomIndex = minIndex + Math.floor(Math.random() * (maxIndex - minIndex + 1));
+    }
+  }
+
+  // Merchant can only appear if NO loot chest on this floor
   // Merchant can only appear in rooms 3 through (roomCount - 1) - not first 2, not last
-  const merchantSpawns = Math.random() < MERCHANT.spawnChance;
+  const merchantSpawns = lootChestRoomIndex === -1 && Math.random() < MERCHANT.spawnChance;
   let merchantRoomIndex = -1;
 
   if (merchantSpawns && roomCount >= 4) {
-    // Valid merchant positions: index 2 to (roomCount - 2)
-    // That's rooms 3 through second-to-last
     const minIndex = 2;
     const maxIndex = roomCount - 2;
     if (maxIndex >= minIndex) {
@@ -278,6 +287,32 @@ function generateFloor(floorNumber) {
   }
 
   for (let i = 0; i < roomCount; i++) {
+    // Loot chest room
+    if (i === lootChestRoomIndex) {
+      // Determine if chest is a mimic (20% chance) or boss mimic (3% chance)
+      const mimicRoll = Math.random();
+      let isMimic = false;
+      let isBossMimic = false;
+
+      if (mimicRoll < 0.03) {
+        isBossMimic = true;
+        isMimic = true;
+      } else if (mimicRoll < 0.20) {
+        isMimic = true;
+      }
+
+      rooms.push({
+        type: 'loot_chest',
+        items: generateLootChestItems(),
+        isMimic,
+        isBossMimic,
+        mimicMonster: isMimic ? (isBossMimic ? generateBoss() : generateMonster(floorNumber)) : null,
+        opened: false,
+        completed: false
+      });
+      continue;
+    }
+
     // Merchant room
     if (i === merchantRoomIndex) {
       rooms.push({
@@ -292,7 +327,7 @@ function generateFloor(floorNumber) {
     }
 
     // Special room chances (not first room):
-    // 12% treasure, 10% shrine, 8% loot chest
+    // 12% treasure, 10% shrine
     const roll = Math.random();
     if (roll < 0.12 && i > 0) {
       // Treasure room (bonus gold)
@@ -306,13 +341,6 @@ function generateFloor(floorNumber) {
       rooms.push({
         type: 'shrine',
         healAmount: 10 + Math.floor(Math.random() * 10),
-        completed: false
-      });
-    } else if (roll < 0.30 && i > 0) {
-      // Loot chest (choose 1 of 3 items)
-      rooms.push({
-        type: 'loot_chest',
-        items: generateLootChestItems(),
         completed: false
       });
     } else {
@@ -1194,13 +1222,49 @@ export async function purchaseFloorMerchantItem(itemKey) {
 
 // ============ Loot Chest Functions ============
 
-export function chooseLootChestItem(itemKey) {
+// Open the chest - might be a mimic!
+export function openLootChest() {
   const run = get(currentRun);
   if (!run) return { success: false, error: 'No active run' };
 
   const room = run.floor.rooms[run.floor.currentRoom];
   if (room.type !== 'loot_chest') {
     return { success: false, error: 'Not at loot chest' };
+  }
+
+  room.opened = true;
+
+  // Check if it's a mimic!
+  if (room.isMimic) {
+    if (room.isBossMimic) {
+      addLog('danger', `IT'S A MIMIC! A powerful ${room.mimicMonster.displayName} attacks!`);
+    } else {
+      addLog('danger', `IT'S A MIMIC! A ${room.mimicMonster.displayName} attacks!`);
+    }
+    // Convert room to combat with the mimic
+    room.type = 'combat';
+    room.monster = room.mimicMonster;
+    gamePhase.set('exploring');
+    resetCombatState();
+    currentRun.set(run);
+    return { success: true, isMimic: true, monster: room.mimicMonster };
+  }
+
+  // Safe chest - show items
+  addLog('treasure', `The chest opens safely! Choose your reward...`);
+  gamePhase.set('loot_chest_open');
+  currentRun.set(run);
+  return { success: true, isMimic: false };
+}
+
+// Choose an item from an opened chest
+export function chooseLootChestItem(itemKey) {
+  const run = get(currentRun);
+  if (!run) return { success: false, error: 'No active run' };
+
+  const room = run.floor.rooms[run.floor.currentRoom];
+  if (room.type !== 'loot_chest' || !room.opened) {
+    return { success: false, error: 'Chest not open' };
   }
 
   // Find the item
@@ -1247,6 +1311,20 @@ export function chooseLootChestItem(itemKey) {
   advanceRoom(run);
 
   return { success: true, item };
+}
+
+// Skip the chest without opening
+export function skipLootChest() {
+  const run = get(currentRun);
+  if (!run) return;
+
+  const room = run.floor.rooms[run.floor.currentRoom];
+  if (room.type !== 'loot_chest') return;
+
+  room.completed = true;
+  addLog('info', `You carefully walk past the chest...`);
+  gamePhase.set('exploring');
+  advanceRoom(run);
 }
 
 // ============ Derived Stores ============
