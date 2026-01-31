@@ -103,7 +103,12 @@ export async function initializeDB() {
       bonusDamage: 0,
       potionBonus: 0,
       critBonus: 0,
-      defenseBonus: 0
+      defenseBonus: 0,
+      // Mana system
+      maxMpBonus: 0,
+      // Custom spell (null if not created yet)
+      customSpell: null
+      // customSpell structure: { name, description, damage, manaCost }
     });
 
     console.log('Database initialized with default data');
@@ -139,9 +144,21 @@ export async function initializeDB() {
       bonusDamage: 0,
       potionBonus: 0,
       critBonus: 0,
-      defenseBonus: 0
+      defenseBonus: 0,
+      maxMpBonus: 0,
+      customSpell: null
     });
     console.log('Dungeon initialized');
+  }
+
+  // Ensure existing dungeon has spell fields (migration for existing users)
+  const dungeon = await db.dungeon.get(1);
+  if (dungeon && dungeon.customSpell === undefined) {
+    await db.dungeon.update(1, {
+      maxMpBonus: 0,
+      customSpell: null
+    });
+    console.log('Dungeon migrated with spell system');
   }
 }
 

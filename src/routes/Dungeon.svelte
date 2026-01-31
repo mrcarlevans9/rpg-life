@@ -15,11 +15,71 @@
     usePotion,
     collectRewards,
     retreat,
-    purchaseUpgrade
+    purchaseUpgrade,
+    castSpell,
+    saveCustomSpell,
+    deleteCustomSpell,
+    calculateManaCost,
+    validateSpell
   } from '../lib/stores/dungeon.js';
   import { DUNGEON_UPGRADES } from '../lib/db/index.js';
 
   let showShop = false;
+  let showSpellEditor = false;
+
+  // Spell editor state
+  let spellName = '';
+  let spellDescription = '';
+  let spellDamage = 15;
+  let spellManaCost = 10;
+  let spellError = '';
+
+  // Initialize spell editor with existing spell
+  function openSpellEditor() {
+    const existing = $dungeonData?.customSpell;
+    if (existing) {
+      spellName = existing.name;
+      spellDescription = existing.description || '';
+      spellDamage = existing.damage;
+      spellManaCost = existing.manaCost;
+    } else {
+      spellName = '';
+      spellDescription = '';
+      spellDamage = 15;
+      spellManaCost = calculateManaCost(15);
+    }
+    spellError = '';
+    showSpellEditor = true;
+  }
+
+  // Update mana cost when damage changes
+  function onDamageChange() {
+    spellManaCost = calculateManaCost(spellDamage);
+    spellError = '';
+  }
+
+  // Save the spell
+  async function handleSaveSpell() {
+    const result = await saveCustomSpell({
+      name: spellName,
+      description: spellDescription,
+      damage: spellDamage,
+      manaCost: spellManaCost
+    });
+
+    if (result.success) {
+      showSpellEditor = false;
+      spellError = '';
+    } else {
+      spellError = result.error;
+    }
+  }
+
+  // Delete the spell
+  async function handleDeleteSpell() {
+    await deleteCustomSpell();
+    showSpellEditor = false;
+  }
 
   function canRetreat() {
     if (!$currentRun) return false;
@@ -112,6 +172,9 @@
         <Button variant="secondary" on:click={() => showShop = true}>
           Shop
         </Button>
+        <Button variant="secondary" on:click={openSpellEditor}>
+          {$dungeonData?.customSpell ? '✨ Edit Spell' : '✨ Create Spell'}
+        </Button>
       </div>
     </div>
   {/if}
@@ -121,9 +184,10 @@
     <div class="battle-screen" class:screen-shake={$combatState.lastDamageToPlayer}>
       <!-- Top HUD: Player HP left, Floor center, Enemy HP right -->
       <div class="battle-hud">
-        <!-- Player HP -->
+        <!-- Player HP + MP -->
         <div class="hud-box player-hud">
           <div class="hud-label">YOU</div>
+          <!-- HP Bar -->
           <div class="hud-hp-bar" class:hp-flash={$combatState.lastDamageToPlayer}>
             <div
               class="hud-hp-fill player-hp"
@@ -132,12 +196,22 @@
             ></div>
           </div>
           <div class="hud-hp-text">
-            <span>{$currentRun?.playerHp}/{$currentRun?.maxHp}</span>
+            <span>HP {$currentRun?.playerHp}/{$currentRun?.maxHp}</span>
             {#key $combatState.lastDamageToPlayer}
               {#if $combatState.lastDamageToPlayer}
                 <span class="hud-damage">-{$combatState.lastDamageToPlayer}</span>
               {/if}
             {/key}
+          </div>
+          <!-- MP Bar -->
+          <div class="hud-mp-bar">
+            <div
+              class="hud-mp-fill"
+              style="width: {($currentRun?.playerMp / $currentRun?.maxMp) * 100}%"
+            ></div>
+          </div>
+          <div class="hud-hp-text mp-text">
+            <span>MP {$currentRun?.playerMp}/{$currentRun?.maxMp}</span>
           </div>
         </div>
 
@@ -225,7 +299,7 @@
           </div>
         {:else}
           <!-- Action Buttons -->
-          <div class="action-grid">
+          <div class="action-grid" class:has-spell={$currentRun?.customSpell}>
             {#if $currentMonster}
               <button
                 class="action-btn attack"
@@ -241,6 +315,17 @@
               >
                 🛡️ DEFEND
               </button>
+              {#if $currentRun?.customSpell}
+                <button
+                  class="action-btn spell"
+                  on:click={castSpell}
+                  disabled={$combatState.isAnimating || $currentRun.playerMp < $currentRun.customSpell.manaCost}
+                  title="{$currentRun.customSpell.description || ''}"
+                >
+                  ✨ {$currentRun.customSpell.name}
+                  <span class="item-count">({$currentRun.customSpell.manaCost} MP)</span>
+                </button>
+              {/if}
             {/if}
             <button
               class="action-btn item"
@@ -362,6 +447,96 @@
       </div>
     </div>
   {/if}
+
+  <!-- Spell Editor Modal -->
+  {#if showSpellEditor}
+    <div class="modal-overlay" on:click={() => showSpellEditor = false} role="button" tabindex="0" on:keypress={(e) => e.key === 'Escape' && (showSpellEditor = false)}>
+      <div class="spell-modal" on:click|stopPropagation role="dialog" aria-modal="true">
+        <div class="spell-header">
+          <h2>✨ {$dungeonData?.customSpell ? 'Edit' : 'Create'} Your Spell</h2>
+          <button class="close-btn" on:click={() => showSpellEditor = false}>×</button>
+        </div>
+        <div class="spell-content">
+          <div class="spell-field">
+            <label for="spell-name">Spell Name</label>
+            <input
+              id="spell-name"
+              type="text"
+              bind:value={spellName}
+              placeholder="Fireball, Ice Blast, etc."
+              maxlength="20"
+            />
+          </div>
+
+          <div class="spell-field">
+            <label for="spell-desc">Description (optional)</label>
+            <input
+              id="spell-desc"
+              type="text"
+              bind:value={spellDescription}
+              placeholder="A powerful blast of fire..."
+              maxlength="100"
+            />
+          </div>
+
+          <div class="spell-stats">
+            <div class="spell-field">
+              <label for="spell-damage">Damage</label>
+              <input
+                id="spell-damage"
+                type="number"
+                bind:value={spellDamage}
+                on:input={onDamageChange}
+                min="1"
+                max="100"
+              />
+            </div>
+
+            <div class="spell-field">
+              <label for="spell-mana">Mana Cost</label>
+              <input
+                id="spell-mana"
+                type="number"
+                bind:value={spellManaCost}
+                min="1"
+                max="200"
+              />
+              <span class="mana-hint">Min: {calculateManaCost(spellDamage)} MP</span>
+            </div>
+          </div>
+
+          <div class="spell-preview">
+            <div class="preview-card">
+              <span class="preview-icon">✨</span>
+              <div class="preview-info">
+                <strong>{spellName || 'Unnamed Spell'}</strong>
+                <span class="preview-stats">{spellDamage} DMG | {spellManaCost} MP</span>
+              </div>
+            </div>
+          </div>
+
+          <p class="balance-note">
+            Higher damage requires more mana. You start each dungeon run with 50 MP and regenerate 5 MP after each fight.
+          </p>
+
+          {#if spellError}
+            <p class="spell-error">{spellError}</p>
+          {/if}
+
+          <div class="spell-actions">
+            <Button variant="primary" on:click={handleSaveSpell}>
+              Save Spell
+            </Button>
+            {#if $dungeonData?.customSpell}
+              <Button variant="secondary" on:click={handleDeleteSpell}>
+                Delete Spell
+              </Button>
+            {/if}
+          </div>
+        </div>
+      </div>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -447,6 +622,7 @@
   .lobby-actions {
     display: flex;
     justify-content: center;
+    gap: var(--spacing-md);
   }
 
   /* ========== KNIGHTS OF PEN AND PAPER STYLE ========== */
@@ -560,6 +736,26 @@
   @keyframes hudDamageFlash {
     0% { transform: scale(1.3); }
     100% { transform: scale(1); }
+  }
+
+  /* MP Bar */
+  .hud-mp-bar {
+    height: 6px;
+    background: rgba(0, 0, 0, 0.6);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    margin-top: 4px;
+  }
+
+  .hud-mp-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+    transition: width 0.4s ease-out;
+  }
+
+  .mp-text {
+    color: #8b5cf6;
   }
 
   /* Floor Indicator (center) */
@@ -743,6 +939,16 @@
     gap: var(--spacing-xs);
   }
 
+  .action-grid.has-spell {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+
+  .action-grid.has-spell .action-btn.item,
+  .action-grid.has-spell .action-btn.run,
+  .action-grid.has-spell .action-btn.placeholder {
+    grid-column: span 1;
+  }
+
   .action-btn {
     padding: var(--spacing-sm) var(--spacing-md);
     border: 2px solid var(--border);
@@ -803,6 +1009,19 @@
 
   .action-btn.run:hover:not(:disabled) {
     background: rgba(245, 158, 11, 0.1);
+  }
+
+  .action-btn.spell {
+    border-color: #8b5cf6;
+    color: #8b5cf6;
+    flex-direction: column;
+    gap: 0;
+    padding: var(--spacing-xs);
+    font-size: 0.7rem;
+  }
+
+  .action-btn.spell:hover:not(:disabled) {
+    background: rgba(139, 92, 246, 0.1);
   }
 
   .action-btn.placeholder {
@@ -1044,5 +1263,132 @@
 
   .locked-badge {
     font-size: 1.25rem;
+  }
+
+  /* ========== SPELL EDITOR MODAL ========== */
+  .spell-modal {
+    background: var(--bg-primary);
+    border-radius: var(--radius-lg);
+    width: 100%;
+    max-width: 400px;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .spell-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(59, 130, 246, 0.1));
+  }
+
+  .spell-header h2 {
+    font-size: 1.25rem;
+    color: #8b5cf6;
+  }
+
+  .spell-content {
+    padding: var(--spacing-lg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    overflow-y: auto;
+  }
+
+  .spell-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+  }
+
+  .spell-field label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+
+  .spell-field input {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 2px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 1rem;
+  }
+
+  .spell-field input:focus {
+    outline: none;
+    border-color: #8b5cf6;
+  }
+
+  .spell-field input[type="number"] {
+    width: 100%;
+  }
+
+  .spell-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-md);
+  }
+
+  .mana-hint {
+    font-size: 0.75rem;
+    color: #8b5cf6;
+    margin-top: 2px;
+  }
+
+  .spell-preview {
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+  }
+
+  .preview-card {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+  }
+
+  .preview-icon {
+    font-size: 2rem;
+  }
+
+  .preview-info {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .preview-info strong {
+    color: #8b5cf6;
+  }
+
+  .preview-stats {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+  }
+
+  .balance-note {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-align: center;
+    padding: var(--spacing-sm);
+    background: rgba(139, 92, 246, 0.1);
+    border-radius: var(--radius-md);
+  }
+
+  .spell-error {
+    color: var(--danger);
+    font-size: 0.875rem;
+    text-align: center;
+  }
+
+  .spell-actions {
+    display: flex;
+    gap: var(--spacing-md);
+    justify-content: center;
   }
 </style>

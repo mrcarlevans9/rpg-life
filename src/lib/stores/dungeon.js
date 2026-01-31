@@ -46,13 +46,70 @@ export const lastRoll = writable(null);
 export const combatState = writable({
   turn: 'player', // 'player' | 'enemy' | 'animating'
   isAnimating: false,
-  playerAction: null, // 'attack' | 'defend' | 'potion' | null
+  playerAction: null, // 'attack' | 'defend' | 'potion' | 'spell' | null
   enemyAction: null, // 'attack' | null
   lastDamageToEnemy: null,
   lastDamageToPlayer: null,
   monsterDefeated: false,
   playerDefeated: false
 });
+
+// ============ Spell Balancing System ============
+// The formula ensures spells are balanced based on mana cost
+// Higher damage = higher mana cost, with diminishing returns
+
+const BASE_MAX_MP = 50; // Starting mana pool
+const MP_REGEN_PER_TURN = 5; // Mana regenerated each turn
+
+// Calculate required mana cost for a given damage
+// Formula: manaCost = (damage / 2) + (damage^1.5 / 10)
+// This means high damage spells cost proportionally more mana
+export function calculateManaCost(damage) {
+  const baseCost = damage / 2;
+  const scalingCost = Math.pow(damage, 1.5) / 10;
+  return Math.ceil(baseCost + scalingCost);
+}
+
+// Calculate max damage allowed for a given mana cost
+// Inverse of the above formula (approximate)
+export function calculateMaxDamage(manaCost) {
+  // Solve for damage: we need to find damage where calculateManaCost(damage) = manaCost
+  // Using binary search for accuracy
+  let low = 0;
+  let high = manaCost * 3; // Upper bound estimate
+  while (high - low > 1) {
+    const mid = Math.floor((low + high) / 2);
+    if (calculateManaCost(mid) <= manaCost) {
+      low = mid;
+    } else {
+      high = mid;
+    }
+  }
+  return low;
+}
+
+// Validate spell - returns { valid, error, suggestedManaCost }
+export function validateSpell(damage, manaCost) {
+  const requiredCost = calculateManaCost(damage);
+
+  if (damage < 1) {
+    return { valid: false, error: 'Damage must be at least 1', suggestedManaCost: 1 };
+  }
+
+  if (damage > 100) {
+    return { valid: false, error: 'Maximum damage is 100', suggestedManaCost: calculateManaCost(100) };
+  }
+
+  if (manaCost < requiredCost) {
+    return {
+      valid: false,
+      error: `Mana cost too low! ${damage} damage requires at least ${requiredCost} MP`,
+      suggestedManaCost: requiredCost
+    };
+  }
+
+  return { valid: true, suggestedManaCost: requiredCost };
+}
 
 // Helper to reset combat state for new encounter
 function resetCombatState() {
@@ -207,11 +264,16 @@ export async function startRun() {
   const baseMaxHp = 100;
   const maxHp = baseMaxHp + (dungeon?.maxHpBonus || 0);
 
+  // Calculate max MP with upgrades
+  const maxMp = BASE_MAX_MP + (dungeon?.maxMpBonus || 0);
+
   const run = {
     currentFloor: 1,
     floor: generateFloor(1),
     playerHp: maxHp,
     maxHp,
+    playerMp: maxMp,
+    maxMp,
     goldCollected: 0,
     potionsUsed: 0,
     monstersKilled: 0,
@@ -220,7 +282,9 @@ export async function startRun() {
     bonusDamage: dungeon?.bonusDamage || 0,
     potionHeal: 25 + (dungeon?.potionBonus || 0),
     critBonus: dungeon?.critBonus || 0,
-    defenseBonus: dungeon?.defenseBonus || 0
+    defenseBonus: dungeon?.defenseBonus || 0,
+    // Store custom spell for this run
+    customSpell: dungeon?.customSpell || null
   };
 
   currentRun.set(run);
@@ -449,6 +513,9 @@ async function monsterDefeated(run, room, monster) {
   run.monstersKilled++;
   room.completed = true;
 
+  // Regenerate some mana after each fight
+  regenerateMana(run);
+
   // Update kills in DB
   const dungeon = await db.dungeon.get(1);
   await db.dungeon.update(1, {
@@ -551,6 +618,123 @@ export async function awardPotions(count = 1) {
   await db.dungeon.update(1, {
     healthPotions: (dungeon.healthPotions || 0) + count
   });
+}
+
+// ============ Custom Spell System ============
+
+// Create or update custom spell
+export async function saveCustomSpell(spell) {
+  const { name, description, damage, manaCost } = spell;
+
+  // Validate the spell
+  const validation = validateSpell(damage, manaCost);
+  if (!validation.valid) {
+    return { success: false, error: validation.error };
+  }
+
+  // Validate name
+  if (!name || name.trim().length === 0) {
+    return { success: false, error: 'Spell name is required' };
+  }
+
+  if (name.length > 20) {
+    return { success: false, error: 'Spell name must be 20 characters or less' };
+  }
+
+  const customSpell = {
+    name: name.trim(),
+    description: (description || '').trim().slice(0, 100),
+    damage: Math.floor(damage),
+    manaCost: Math.floor(manaCost)
+  };
+
+  await db.dungeon.update(1, { customSpell });
+
+  return { success: true, spell: customSpell };
+}
+
+// Delete custom spell
+export async function deleteCustomSpell() {
+  await db.dungeon.update(1, { customSpell: null });
+  return { success: true };
+}
+
+// Cast custom spell in combat
+export async function castSpell() {
+  const run = get(currentRun);
+  if (!run) return false;
+
+  const state = get(combatState);
+  if (state.isAnimating) return false;
+
+  const room = run.floor.rooms[run.floor.currentRoom];
+  if (room.type !== 'combat' && room.type !== 'boss') return false;
+
+  const spell = run.customSpell;
+  if (!spell) {
+    addLog('error', 'No spell equipped!');
+    return false;
+  }
+
+  // Check mana
+  if (run.playerMp < spell.manaCost) {
+    addLog('error', `Not enough mana! Need ${spell.manaCost} MP`);
+    return false;
+  }
+
+  const monster = room.monster;
+
+  // Start spell animation
+  combatState.update(s => ({ ...s, isAnimating: true, playerAction: 'spell', turn: 'animating' }));
+
+  // Consume mana
+  run.playerMp -= spell.manaCost;
+
+  addLog('spell', `You cast ${spell.name}!`);
+
+  // No dice roll for spells - fixed damage
+  lastRoll.set({ rolls: [spell.damage], total: spell.damage, type: 'spell', critical: false });
+
+  await delay(500);
+
+  // Apply damage
+  monster.currentHp = Math.max(0, monster.currentHp - spell.damage);
+  combatState.update(s => ({ ...s, lastDamageToEnemy: spell.damage }));
+  addLog('damage', `${spell.name} deals ${spell.damage} damage!`);
+
+  currentRun.set(run);
+
+  await delay(600);
+
+  // Clear player action
+  combatState.update(s => ({ ...s, playerAction: null, lastDamageToEnemy: null }));
+
+  // Clear defending status
+  run.isDefending = false;
+
+  // Check if monster is dead
+  if (monster.currentHp <= 0) {
+    combatState.update(s => ({ ...s, monsterDefeated: true }));
+    await delay(800);
+    await monsterDefeated(run, room, monster);
+    combatState.update(s => ({ ...s, isAnimating: false, monsterDefeated: false }));
+  } else {
+    // Monster counter-attacks
+    combatState.update(s => ({ ...s, turn: 'enemy' }));
+    await delay(400);
+    await monsterAttack(run, monster);
+    combatState.update(s => ({ ...s, isAnimating: false, turn: 'player' }));
+  }
+
+  currentRun.set(run);
+  return true;
+}
+
+// Regenerate mana (called after combat ends)
+function regenerateMana(run) {
+  if (run.playerMp < run.maxMp) {
+    run.playerMp = Math.min(run.maxMp, run.playerMp + MP_REGEN_PER_TURN);
+  }
 }
 
 // ============ Shop Functions ============
