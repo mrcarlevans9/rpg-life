@@ -843,6 +843,75 @@ export async function awardPotions(count = 1) {
   });
 }
 
+// ============ Expedition Inventory System ============
+
+// Use an item from expedition inventory during a dungeon run
+export async function useExpeditionItem(itemId) {
+  const run = get(currentRun);
+  if (!run) {
+    return { success: false, error: 'No active dungeon run' };
+  }
+
+  const dungeon = await db.dungeon.get(1);
+  if (!dungeon) {
+    return { success: false, error: 'Dungeon data not found' };
+  }
+
+  const inventory = dungeon.expeditionInventory || [];
+  const itemIndex = inventory.findIndex(item => item.id === itemId);
+
+  if (itemIndex === -1) {
+    return { success: false, error: 'Item not found in inventory' };
+  }
+
+  const item = inventory[itemIndex];
+  const effect = item.effect;
+
+  // Apply item effects
+  if (effect.heal) {
+    const oldHp = run.playerHp;
+    run.playerHp = Math.min(run.maxHp, run.playerHp + effect.heal);
+    const actualHeal = run.playerHp - oldHp;
+    addLog('heal', `Used ${item.name}! +${actualHeal} HP`);
+  }
+
+  if (effect.mana) {
+    const oldMp = run.playerMp;
+    run.playerMp = Math.min(run.maxMp, run.playerMp + effect.mana);
+    const actualMana = run.playerMp - oldMp;
+    addLog('spell', `Used ${item.name}! +${actualMana} MP`);
+  }
+
+  if (effect.bonusDamage) {
+    run.tempBuffs.bonusDamage += effect.bonusDamage;
+    addLog('info', `${item.name} grants +${effect.bonusDamage} damage for this run!`);
+  }
+
+  if (effect.defenseBonus) {
+    run.tempBuffs.defenseBonus += effect.defenseBonus;
+    addLog('info', `${item.name} grants +${effect.defenseBonus} defense for this run!`);
+  }
+
+  if (effect.goldBonus) {
+    run.tempBuffs.goldBonus += effect.goldBonus;
+    addLog('info', `${item.name} grants +${effect.goldBonus} gold per kill for this run!`);
+  }
+
+  // Remove item from inventory
+  inventory.splice(itemIndex, 1);
+  await db.dungeon.update(1, { expeditionInventory: inventory });
+
+  currentRun.set(run);
+
+  return { success: true, item };
+}
+
+// Get expedition inventory
+export function getExpeditionInventory() {
+  const dungeon = get(dungeonData);
+  return dungeon?.expeditionInventory || [];
+}
+
 // ============ Custom Spell System ============
 
 // Create or update custom spell at a specific slot index
