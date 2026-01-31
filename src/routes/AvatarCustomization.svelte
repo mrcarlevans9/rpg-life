@@ -675,57 +675,45 @@
   }
 
   .dungeon-stats {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: var(--spacing-md);
+    display: flex;
+    gap: var(--spacing-sm);
   }
 
   .dstat-card {
+    flex: 1;
     display: flex;
     align-items: center;
-    gap: var(--spacing-md);
-    padding: var(--spacing-md);
-    background: linear-gradient(135deg, var(--bg-tertiary), var(--bg-secondary));
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm);
+    background: var(--bg-tertiary);
     border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
-  }
-
-  .dstat-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border-radius: var(--radius-md);
+    min-width: 0;
   }
 
   .dstat-icon {
-    font-size: 2rem;
-    width: 48px;
-    height: 48px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--bg-primary);
-    border-radius: var(--radius-md);
+    font-size: 1.25rem;
     flex-shrink: 0;
   }
 
   .dstat-info {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    min-width: 0;
   }
 
   .dstat-value {
     font-weight: 700;
-    font-size: 1.5rem;
+    font-size: 1.1rem;
     color: var(--text-primary);
-    line-height: 1;
+    line-height: 1.2;
   }
 
   .dstat-label {
     color: var(--text-muted);
-    font-size: 0.7rem;
+    font-size: 0.6rem;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.3px;
   }
 
   .sync-section {
