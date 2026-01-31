@@ -8,6 +8,7 @@
     lastRoll,
     currentMonster,
     combatState,
+    currentMessage,
     startRun,
     playerAttack,
     playerDefend,
@@ -278,6 +279,25 @@
         {#if $combatState.playerAction === 'defend'}
           <div class="battle-effect shield">🛡️</div>
         {/if}
+
+        <!-- Combat Message Overlay (bottom of arena) -->
+        {#if $combatState.isAnimating && $currentMessage}
+          <div class="combat-message-overlay">
+            <div class="combat-message-box">
+              <p class="combat-message">{$currentMessage}</p>
+              {#if $lastRoll}
+                <div class="dice-row">
+                  {#each $lastRoll.rolls as roll}
+                    <span class="mini-die" class:crit={$lastRoll.critical}>{roll}</span>
+                  {/each}
+                  {#if $lastRoll.critical}
+                    <span class="crit-badge">CRIT!</span>
+                  {/if}
+                </div>
+              {/if}
+            </div>
+          </div>
+        {/if}
       </div>
 
       <!-- Player Stats Bar (below arena) -->
@@ -321,18 +341,7 @@
 
       <!-- Action Panel -->
       <div class="action-panel">
-        <!-- Dice display (compact) -->
-        {#if $lastRoll && $combatState.isAnimating}
-          <div class="dice-row">
-            {#each $lastRoll.rolls as roll}
-              <span class="mini-die" class:crit={$lastRoll.critical}>{roll}</span>
-            {/each}
-            {#if $lastRoll.critical}
-              <span class="crit-badge">CRIT!</span>
-            {/if}
-          </div>
-        {:else}
-          <!-- Action Buttons -->
+        <!-- Action Buttons -->
           <div class="action-grid" class:has-spells={($currentRun?.customSpells || []).filter(s => s).length > 0}>
             {#if $currentMonster}
               <button
@@ -419,7 +428,6 @@
               </div>
             </div>
           {/if}
-        {/if}
       </div>
     </div>
   {/if}
@@ -1057,6 +1065,52 @@
     border-top: 1px solid var(--border);
     padding: 8px;
     position: relative;
+  }
+
+  /* Combat Message Overlay (inside battle arena) */
+  .combat-message-overlay {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    right: 8px;
+    z-index: 30;
+    pointer-events: none;
+  }
+
+  .combat-message-box {
+    background: linear-gradient(180deg, rgba(26, 26, 46, 0.95) 0%, rgba(15, 15, 26, 0.95) 100%);
+    border: 2px solid var(--accent);
+    border-radius: var(--radius-md);
+    padding: 10px 14px;
+    text-align: center;
+    box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
+    animation: messageSlideUp 0.25s ease-out;
+  }
+
+  @keyframes messageSlideUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .combat-message {
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    font-weight: 500;
+    margin: 0;
+    line-height: 1.3;
+  }
+
+  .combat-message-box .dice-row {
+    justify-content: center;
+    padding: 6px 0 0 0;
+    background: none;
+    margin-top: 4px;
   }
 
   .action-grid {
