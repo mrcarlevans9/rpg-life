@@ -90,6 +90,30 @@ export async function syncPlayer() {
 
       console.log('Player synced:', merged.gold, 'gold,', merged.highestFloor, 'best floor');
       return merged;
+    } else if (localPlayer) {
+      // No remote player exists - create one!
+      console.log('No remote player found, creating one...');
+      const { error: insertError } = await supabase.from('players').insert({
+        user_id: userId,
+        total_xp: localPlayer.totalXP || 0,
+        current_streak: localPlayer.currentStreak || 0,
+        longest_streak: localPlayer.longestStreak || 0,
+        total_tasks_completed: localPlayer.totalTasksCompleted || 0,
+        total_expedition_minutes: localPlayer.totalExpeditionMinutes || 0,
+        last_active_date: localPlayer.lastActiveDate,
+        gold: localPlayer.gold || 0,
+        health_potions: localPlayer.healthPotions || 0,
+        custom_spells: localPlayer.customSpells || [],
+        purchased_spell_slot: localPlayer.purchasedSpellSlot || false,
+        highest_floor: localPlayer.highestFloor || 0,
+        total_kills: localPlayer.totalKills || 0
+      });
+
+      if (insertError) {
+        console.error('Failed to create remote player:', insertError);
+      } else {
+        console.log('Remote player created successfully');
+      }
     }
 
     return localPlayer;
@@ -122,10 +146,17 @@ export async function pushPlayerUpdate(updates) {
     if (updates.totalKills !== undefined) remoteUpdates.total_kills = updates.totalKills;
 
     if (Object.keys(remoteUpdates).length > 0) {
-      await supabase
+      // Use upsert to create row if it doesn't exist
+      const { error } = await supabase
         .from('players')
-        .update(remoteUpdates)
-        .eq('user_id', userId);
+        .upsert({
+          user_id: userId,
+          ...remoteUpdates
+        }, { onConflict: 'user_id' });
+
+      if (error) {
+        console.error('Push player update failed:', error);
+      }
     }
   } catch (error) {
     console.error('Push player update error:', error);
