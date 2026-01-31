@@ -39,9 +39,11 @@
   </div>
 
   <div class="header-right">
-    <StreakCounter size="sm" showMultiplier={false} />
+    <div class="desktop-only">
+      <StreakCounter size="sm" showMultiplier={false} />
+    </div>
 
-    <button class="icon-btn" on:click={toggleTheme} title="Toggle theme">
+    <button class="icon-btn desktop-only" on:click={toggleTheme} title="Toggle theme">
       {#if $settingsData?.theme === 'dark'}
         <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
           <path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z"/>
@@ -66,11 +68,21 @@
       {#if menuOpen}
         <div class="menu-overlay" on:click={closeMenu}></div>
         <div class="dropdown-menu">
-          <div class="menu-gold">
-            <span class="gold-icon">🪙</span>
-            <span>{$playerData?.gold || 0} Gold</span>
+          <div class="menu-stats mobile-only">
+            <div class="menu-gold">
+              <span class="gold-icon">🪙</span>
+              <span>{$playerData?.gold || 0} Gold</span>
+            </div>
+            <div class="menu-streak">
+              <StreakCounter size="sm" showMultiplier={false} />
+            </div>
           </div>
-          <div class="menu-divider"></div>
+          <div class="menu-divider mobile-only"></div>
+          <button class="menu-item mobile-only" on:click={() => { toggleTheme(); closeMenu(); }}>
+            <span class="menu-icon">{$settingsData?.theme === 'dark' ? '☀️' : '🌙'}</span>
+            {$settingsData?.theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+          </button>
+          <div class="menu-divider mobile-only"></div>
           <a href="#/avatar" class="menu-item" on:click={closeMenu}>
             <span class="menu-icon">👤</span>
             Profile & Spells
@@ -180,10 +192,8 @@
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
-    padding: var(--spacing-sm) var(--spacing-md);
     color: #fbbf24;
     font-weight: 600;
-    background: linear-gradient(135deg, rgba(251, 191, 36, 0.1), transparent);
   }
 
   .avatar-menu {
@@ -268,9 +278,29 @@
     display: none;
   }
 
+  .mobile-only {
+    display: flex;
+  }
+
+  .menu-stats {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-sm) var(--spacing-md);
+  }
+
+  .menu-streak {
+    display: flex;
+    align-items: center;
+  }
+
   @media (min-width: 768px) {
     .desktop-only {
-      display: block;
+      display: flex;
+    }
+
+    .mobile-only {
+      display: none !important;
     }
   }
 </style>
