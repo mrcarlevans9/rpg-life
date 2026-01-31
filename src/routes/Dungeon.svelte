@@ -115,12 +115,12 @@
 </script>
 
 <div class="dungeon-page">
-  <div class="page-header">
-    <h1>Dungeon</h1>
-    {#if $gamePhase === 'idle'}
+  {#if $gamePhase === 'idle'}
+    <div class="page-header">
+      <h1>Dungeon</h1>
       <p class="subtitle">Descend into the depths and test your might</p>
-    {/if}
-  </div>
+    </div>
+  {/if}
 
   <!-- Idle / Lobby State -->
   {#if $gamePhase === 'idle'}
@@ -251,36 +251,37 @@
       <!-- Player Stats Bar (below arena) -->
       <div class="player-bar" class:bar-flash={$combatState.lastDamageToPlayer}>
         <div class="player-bar-content">
-          <!-- HP -->
-          <div class="bar-section hp-section">
-            <span class="bar-label">HP</span>
-            <div class="bar-track hp-track">
-              <div
-                class="bar-fill hp-fill"
-                style="width: {($currentRun?.playerHp / $currentRun?.maxHp) * 100}%;
-                       background: {getHpBarColor($currentRun?.playerHp, $currentRun?.maxHp)}"
-              ></div>
+          <!-- HP + MP stacked -->
+          <div class="bars-stack">
+            <div class="bar-row hp-row">
+              <span class="bar-label">HP</span>
+              <div class="bar-track">
+                <div
+                  class="bar-fill hp-fill"
+                  style="width: {($currentRun?.playerHp / $currentRun?.maxHp) * 100}%;
+                         background: {getHpBarColor($currentRun?.playerHp, $currentRun?.maxHp)}"
+                ></div>
+              </div>
+              <span class="bar-value">{$currentRun?.playerHp}/{$currentRun?.maxHp}</span>
+              {#key $combatState.lastDamageToPlayer}
+                {#if $combatState.lastDamageToPlayer}
+                  <span class="bar-damage">-{$combatState.lastDamageToPlayer}</span>
+                {/if}
+              {/key}
             </div>
-            <span class="bar-value">{$currentRun?.playerHp}/{$currentRun?.maxHp}</span>
-            {#key $combatState.lastDamageToPlayer}
-              {#if $combatState.lastDamageToPlayer}
-                <span class="bar-damage">-{$combatState.lastDamageToPlayer}</span>
-              {/if}
-            {/key}
-          </div>
-          <!-- MP -->
-          <div class="bar-section mp-section">
-            <span class="bar-label">MP</span>
-            <div class="bar-track mp-track">
-              <div
-                class="bar-fill mp-fill"
-                style="width: {($currentRun?.playerMp / $currentRun?.maxMp) * 100}%"
-              ></div>
+            <div class="bar-row mp-row">
+              <span class="bar-label">MP</span>
+              <div class="bar-track">
+                <div
+                  class="bar-fill mp-fill"
+                  style="width: {($currentRun?.playerMp / $currentRun?.maxMp) * 100}%"
+                ></div>
+              </div>
+              <span class="bar-value">{$currentRun?.playerMp}/{$currentRun?.maxMp}</span>
             </div>
-            <span class="bar-value">{$currentRun?.playerMp}/{$currentRun?.maxMp}</span>
           </div>
           <!-- Gold -->
-          <div class="bar-section gold-section">
+          <div class="gold-section">
             <span class="gold-display">🪙 {$currentRun?.goldCollected || 0}</span>
           </div>
         </div>
@@ -638,8 +639,9 @@
   .battle-screen {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 120px);
-    min-height: 360px;
+    height: calc(100vh - 140px);
+    max-height: 480px;
+    min-height: 320px;
     background: linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
     border-radius: var(--radius-md);
     overflow: hidden;
@@ -780,7 +782,7 @@
     align-items: center;
     justify-content: center;
     position: relative;
-    min-height: 140px;
+    min-height: 100px;
   }
 
   .monster-display {
@@ -890,7 +892,7 @@
   .player-bar {
     background: rgba(0, 0, 0, 0.5);
     border-top: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 4px var(--spacing-sm);
+    padding: 3px var(--spacing-sm);
   }
 
   .player-bar.bar-flash {
@@ -908,34 +910,33 @@
     gap: var(--spacing-sm);
   }
 
-  .bar-section {
+  .bars-stack {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .bar-row {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
   }
 
-  .bar-section.hp-section {
-    flex: 2;
-  }
-
-  .bar-section.mp-section {
-    flex: 1;
-  }
-
-  .bar-section.gold-section {
+  .gold-section {
     flex: 0 0 auto;
   }
 
   .bar-label {
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     font-weight: 700;
     color: var(--text-muted);
-    min-width: 18px;
+    min-width: 16px;
   }
 
   .bar-track {
     flex: 1;
-    height: 8px;
+    height: 6px;
     background: rgba(0, 0, 0, 0.6);
     border-radius: var(--radius-full);
     overflow: hidden;
@@ -956,14 +957,14 @@
   }
 
   .bar-value {
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     color: var(--text-primary);
-    min-width: 45px;
+    min-width: 40px;
     text-align: right;
   }
 
   .bar-damage {
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     color: #ef4444;
     font-weight: 700;
     animation: barDamageFlash 0.5s ease-out;
@@ -975,7 +976,7 @@
   }
 
   .gold-display {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     font-weight: 600;
     color: #fbbf24;
   }
