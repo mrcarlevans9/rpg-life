@@ -70,46 +70,32 @@ export const overdueTasks = createLiveQueryStore(() => {
 
 // Create a new task/bounty
 export async function createTask(taskData) {
-  try {
-    // Ensure db is open
-    if (!db.isOpen()) {
-      await db.open();
-    }
-
-    const count = await db.tasks.count();
-    console.log('Creating task, current count:', count);
-
-    const taskToAdd = {
-      status: taskData.status || 'todo',
-      title: taskData.title,
-      description: taskData.description || '',
-      subtasks: taskData.subtasks || [],
-      tags: taskData.tags || [],
-      dueDate: taskData.dueDate || null,
-      priority: taskData.priority || 'medium',
-      recurring: taskData.recurring || null,
-      completed: false,
-      completedAt: null,
-      timeSpent: 0,
-      activeStartTime: null,
-      order: count,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-
-    console.log('Adding task:', taskToAdd);
-    const id = await db.tasks.add(taskToAdd);
-    console.log('Task created with id:', id);
-
-    // Verify it was saved
-    const saved = await db.tasks.get(id);
-    console.log('Verified saved task:', saved);
-
-    return id;
-  } catch (err) {
-    console.error('Error in createTask:', err);
-    throw err;
+  // Ensure db is open
+  if (!db.isOpen()) {
+    await db.open();
   }
+
+  const count = await db.tasks.count();
+
+  const id = await db.tasks.add({
+    status: taskData.status || 'todo',
+    title: taskData.title,
+    description: taskData.description || '',
+    subtasks: taskData.subtasks || [],
+    tags: taskData.tags || [],
+    dueDate: taskData.dueDate || null,
+    priority: taskData.priority || 'medium',
+    recurring: taskData.recurring || null,
+    completed: false,
+    completedAt: null,
+    timeSpent: 0,
+    activeStartTime: null,
+    order: count,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  });
+
+  return id;
 }
 
 // Update a task

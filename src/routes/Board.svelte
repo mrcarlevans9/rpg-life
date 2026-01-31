@@ -30,8 +30,6 @@
   let currentTime = 0;
 
   onMount(async () => {
-    console.log('Board mounted, loading tasks...');
-    console.log('localStorage rpglife_db_reset_v:', localStorage.getItem('rpglife_db_reset_v'));
     await loadTasks();
     startTimerInterval();
   });
@@ -61,11 +59,10 @@
         console.log('DB was closed, opening...');
         await db.open();
       }
-      console.log('DB is open:', db.isOpen());
       const allTasks = await db.tasks.toArray();
-      console.log('All tasks in DB:', allTasks);
-      tasks = allTasks.sort((a, b) => (a.order || 0) - (b.order || 0));
-      console.log('Loaded tasks:', tasks.length, tasks);
+      console.log('Loaded from DB:', allTasks.length, 'tasks');
+      // Force reactivity by creating a new array reference
+      tasks = [...allTasks].sort((a, b) => (a.order || 0) - (b.order || 0));
     } catch (err) {
       console.error('Error loading tasks:', err);
       tasks = [];
@@ -98,8 +95,6 @@
     if (!taskForm.title.trim()) return;
 
     try {
-      console.log('Saving task:', taskForm);
-
       if (editingTask) {
         await updateTask(editingTask.id, {
           title: taskForm.title,
@@ -107,7 +102,6 @@
           priority: taskForm.priority,
           dueDate: taskForm.dueDate || null
         });
-        console.log('Task updated successfully');
       } else {
         const newId = await createTask({
           status: 'todo',
@@ -116,14 +110,14 @@
           priority: taskForm.priority,
           dueDate: taskForm.dueDate || null
         });
-        console.log('Task created with id:', newId);
+        console.log('Created bounty with id:', newId);
       }
       closeModal();
+      // Reload tasks from database
       await loadTasks();
-      console.log('Tasks reloaded, count:', tasks.length);
     } catch (err) {
-      console.error('Error saving task:', err);
-      alert('Failed to save bounty: ' + err.message);
+      console.error('Error saving bounty:', err);
+      alert('Failed to save bounty: ' + (err.message || 'Unknown error'));
     }
   }
 

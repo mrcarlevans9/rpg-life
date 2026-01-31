@@ -1,33 +1,15 @@
 import { db, ACHIEVEMENTS, UNLOCKABLES, TITLES } from './schema.js';
 
-// Database reset version - increment to force reset on all clients
-const DB_RESET_VERSION = 3;
-const resetKey = 'rpglife_db_reset_v';
-
 // Initialize database with default data
 export async function initializeDB() {
-  // Check if we need to reset the database
-  const currentResetFlag = localStorage.getItem(resetKey);
-  const needsReset = currentResetFlag !== String(DB_RESET_VERSION);
-
-  if (needsReset) {
-    console.log('Database reset needed for migration v' + DB_RESET_VERSION);
-    localStorage.setItem(resetKey, String(DB_RESET_VERSION));
-
-    // Close and delete the database, then reopen
-    if (db.isOpen()) {
-      db.close();
-    }
-    await db.delete();
-    console.log('Database deleted, reopening...');
-  }
-
   // Ensure database is open
   if (!db.isOpen()) {
     await db.open();
+    console.log('Database opened');
   }
 
   const playerCount = await db.player.count();
+  console.log('Player count:', playerCount);
 
   if (playerCount === 0) {
     // Create default player
