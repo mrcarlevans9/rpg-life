@@ -126,14 +126,9 @@
   $: playerLevel = $playerData?.level || 1;
   $: maxSpellDamage = getMaxSpellDamage(playerLevel);
 
-  // Check if the current slot has an existing spell (more robust check)
-  function hasSpellInSlot(slotIndex) {
-    const spell = customSpells[slotIndex];
-    return spell !== null && spell !== undefined && typeof spell === 'object';
-  }
-
-  // Recalculate edit cost whenever the editor is opened or customSpells changes
-  $: currentSpellEditCost = showSpellEditor ? getSpellEditCost(editingSlotIndex, hasSpellInSlot(editingSlotIndex)) : 0;
+  // Track edit cost - set when editor opens
+  let currentSpellEditCost = 0;
+  let isEditingExistingSpell = false;
 
   // Close spell menu when combat state changes
   $: if ($combatState.isAnimating || !$currentMonster) showSpellMenu = false;
@@ -142,6 +137,11 @@
   function openSpellEditor(slotIndex = 0) {
     editingSlotIndex = slotIndex;
     const existing = customSpells[slotIndex];
+
+    // Calculate if this is an existing spell and what the edit cost would be
+    isEditingExistingSpell = existing !== null && existing !== undefined && typeof existing === 'object';
+    currentSpellEditCost = getSpellEditCost(slotIndex, isEditingExistingSpell);
+
     if (existing) {
       spellName = existing.name;
       spellDescription = existing.description || '';
