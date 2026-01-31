@@ -948,7 +948,6 @@
     justify-content: center;
     position: relative;
     min-height: 0;
-    max-height: 45%;
     overflow: hidden;
   }
 
