@@ -41,8 +41,7 @@ body.no-scroll {
 
 /* Remove extra padding and prevent scroll during combat */
 body.no-scroll .main-content {
-  padding: 0;
-  padding-bottom: var(--mobile-nav-height);
+  padding: 0 !important;
   overflow: hidden !important;
 }
 
