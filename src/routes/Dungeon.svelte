@@ -29,7 +29,8 @@
     purchaseFloorMerchantItem,
     openLootChest,
     chooseLootChestItem,
-    skipLootChest
+    skipLootChest,
+    useExpeditionItem
   } from '../lib/stores/dungeon.js';
   import { DUNGEON_UPGRADES } from '../lib/db/index.js';
   import { playerData } from '../lib/stores/player.js';
@@ -37,6 +38,10 @@
   let showShop = false;
   let showSpellEditor = false;
   let showSpellMenu = false;
+  let showInventoryMenu = false;
+
+  // Derived: expedition inventory items
+  $: expeditionInventory = $dungeonData?.expeditionInventory || [];
 
   // Dice rolling animation state
   let displayedRolls = [];
@@ -465,6 +470,15 @@
             >
               🧪 POTION <span class="item-count">({$dungeonData?.healthPotions || 0})</span>
             </button>
+            {#if expeditionInventory.length > 0}
+              <button
+                class="action-btn item inventory"
+                on:click={() => showInventoryMenu = !showInventoryMenu}
+                disabled={$combatState.isAnimating}
+              >
+                🎒 ITEMS <span class="item-count">({expeditionInventory.length})</span>
+              </button>
+            {/if}
             {#if canRetreat()}
               <!-- Safe retreat - floor complete, keep all gold -->
               <button
@@ -513,6 +527,30 @@
                       </span>
                     </button>
                   {/if}
+                {/each}
+              </div>
+            </div>
+          {/if}
+
+          <!-- Expedition Inventory Menu -->
+          {#if showInventoryMenu && expeditionInventory.length > 0}
+            <div class="inventory-menu">
+              <div class="inventory-menu-header">
+                <span>🎒 Expedition Items</span>
+                <button class="inventory-menu-close" on:click={() => showInventoryMenu = false}>×</button>
+              </div>
+              <div class="inventory-menu-list">
+                {#each expeditionInventory as item}
+                  <button
+                    class="inventory-menu-item"
+                    on:click={async () => { await useExpeditionItem(item.id); showInventoryMenu = false; }}
+                  >
+                    <span class="inventory-menu-icon">{item.emoji}</span>
+                    <div class="inventory-menu-info">
+                      <span class="inventory-menu-name">{item.name}</span>
+                      <span class="inventory-menu-desc">{item.description}</span>
+                    </div>
+                  </button>
                 {/each}
               </div>
             </div>
@@ -1775,6 +1813,105 @@
   .spell-menu-cost.insufficient {
     color: #ef4444;
     background: rgba(239, 68, 68, 0.1);
+  }
+
+  /* Inventory Menu */
+  .inventory-menu {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    right: 0;
+    background: var(--bg-primary);
+    border: 2px solid #f59e0b;
+    border-radius: var(--radius-md);
+    margin-bottom: 8px;
+    box-shadow: 0 -4px 20px rgba(245, 158, 11, 0.3);
+    z-index: 100;
+    overflow: hidden;
+  }
+
+  .inventory-menu-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(234, 179, 8, 0.2));
+    border-bottom: 1px solid rgba(245, 158, 11, 0.3);
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #f59e0b;
+  }
+
+  .inventory-menu-close {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.25rem;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+  }
+
+  .inventory-menu-close:hover {
+    color: var(--text-primary);
+  }
+
+  .inventory-menu-list {
+    display: flex;
+    flex-direction: column;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  .inventory-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-align: left;
+  }
+
+  .inventory-menu-item:last-child {
+    border-bottom: none;
+  }
+
+  .inventory-menu-item:hover {
+    background: rgba(245, 158, 11, 0.1);
+  }
+
+  .inventory-menu-icon {
+    font-size: 1.5rem;
+  }
+
+  .inventory-menu-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .inventory-menu-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+  }
+
+  .inventory-menu-desc {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+
+  .action-btn.item.inventory {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+  }
+
+  .action-btn.item.inventory:hover:not(:disabled) {
+    background: linear-gradient(135deg, #d97706, #b45309);
   }
 
   .item-count {

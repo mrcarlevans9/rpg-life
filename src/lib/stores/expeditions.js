@@ -6,6 +6,7 @@ import { xpGainNotification, updateStreak } from './player.js';
 import { settingsData } from './settings.js';
 import { get } from 'svelte/store';
 import { awardPotions } from './dungeon.js';
+import { MERCHANT_ITEMS } from '../db/index.js';
 
 // Create a store from a Dexie liveQuery
 function createLiveQueryStore(queryFn, defaultValue = null) {
@@ -35,13 +36,62 @@ export const expeditionsData = createLiveQueryStore(
   []
 );
 
-// Current expedition timer state (not persisted)
-export const expeditionTimer = writable({
-  isRunning: false,
-  isPaused: false,
-  startTime: null,
-  pausedTime: null,
-  elapsedSeconds: 0
+// LocalStorage key for timer persistence
+const TIMER_STORAGE_KEY = 'expedition_timer_state';
+
+// Load timer state from localStorage
+function loadTimerState() {
+  try {
+    const saved = localStorage.getItem(TIMER_STORAGE_KEY);
+    if (saved) {
+      const state = JSON.parse(saved);
+      // Recalculate elapsed time if timer was running
+      if (state.isRunning && !state.isPaused && state.startTime) {
+        state.elapsedSeconds = Math.floor((Date.now() - state.startTime) / 1000);
+      } else if (state.isPaused && state.pausedTime && state.startTime) {
+        state.elapsedSeconds = Math.floor((state.pausedTime - state.startTime) / 1000);
+      }
+      return state;
+    }
+  } catch (e) {
+    console.error('Error loading timer state:', e);
+  }
+  return {
+    isRunning: false,
+    isPaused: false,
+    startTime: null,
+    pausedTime: null,
+    elapsedSeconds: 0
+  };
+}
+
+// Save timer state to localStorage
+function saveTimerState(state) {
+  try {
+    localStorage.setItem(TIMER_STORAGE_KEY, JSON.stringify(state));
+  } catch (e) {
+    console.error('Error saving timer state:', e);
+  }
+}
+
+// Clear timer state from localStorage
+function clearTimerState() {
+  try {
+    localStorage.removeItem(TIMER_STORAGE_KEY);
+  } catch (e) {
+    console.error('Error clearing timer state:', e);
+  }
+}
+
+// Current expedition timer state (persisted to localStorage)
+const initialTimerState = loadTimerState();
+export const expeditionTimer = writable(initialTimerState);
+
+// Subscribe to timer changes to persist them
+expeditionTimer.subscribe(state => {
+  if (state.isRunning || state.isPaused) {
+    saveTimerState(state);
+  }
 });
 
 // Today's expedition minutes
@@ -72,6 +122,23 @@ export const expeditionGoalProgress = derived(
 // Timer update interval
 let timerInterval = null;
 
+// Restore timer interval if there's an active expedition
+function restoreTimerInterval() {
+  const state = get(expeditionTimer);
+  if (state.isRunning && !timerInterval) {
+    timerInterval = setInterval(() => {
+      expeditionTimer.update(s => {
+        if (!s.isRunning || s.isPaused) return s;
+        const elapsed = Math.floor((Date.now() - s.startTime) / 1000);
+        return { ...s, elapsedSeconds: elapsed };
+      });
+    }, 1000);
+  }
+}
+
+// Auto-restore timer on module load
+restoreTimerInterval();
+
 // Start the expedition timer
 export function startExpedition() {
   const now = Date.now();
@@ -83,6 +150,11 @@ export function startExpedition() {
     pausedTime: null,
     elapsedSeconds: 0
   }));
+
+  // Clear any existing interval
+  if (timerInterval) {
+    clearInterval(timerInterval);
+  }
 
   // Update elapsed time every second
   timerInterval = setInterval(() => {
@@ -118,6 +190,64 @@ export function resumeExpedition() {
   });
 }
 
+// Generate random expedition loot items
+function generateExpeditionLoot(extraMinutes) {
+  const loot = [];
+
+  // Award gold: 1-3 gold per extra minute
+  const goldEarned = extraMinutes * (Math.floor(Math.random() * 3) + 1);
+
+  // Award random items: chance increases with extra time
+  // ~1 item per 5 extra minutes on average
+  const itemChances = Math.floor(extraMinutes / 5);
+  const itemsToAward = [];
+
+  for (let i = 0; i < itemChances; i++) {
+    if (Math.random() < 0.6) { // 60% chance per 5 minutes
+      // Pick a random item from merchant items
+      const randomItem = MERCHANT_ITEMS[Math.floor(Math.random() * MERCHANT_ITEMS.length)];
+      itemsToAward.push(randomItem);
+    }
+  }
+
+  return { goldEarned, itemsToAward };
+}
+
+// Award expedition items to dungeon inventory
+async function awardExpeditionItems(items) {
+  if (!items || items.length === 0) return;
+
+  const dungeon = await db.dungeon.get(1);
+  if (!dungeon) return;
+
+  // Get existing expedition inventory or create empty array
+  const inventory = dungeon.expeditionInventory || [];
+
+  // Add new items
+  for (const item of items) {
+    inventory.push({
+      ...item,
+      id: Date.now() + Math.random(), // Unique ID for each item instance
+      source: 'expedition',
+      awardedAt: new Date().toISOString()
+    });
+  }
+
+  await db.dungeon.update(1, { expeditionInventory: inventory });
+}
+
+// Award gold from expedition
+async function awardExpeditionGold(amount) {
+  if (amount <= 0) return;
+
+  const dungeon = await db.dungeon.get(1);
+  if (!dungeon) return;
+
+  await db.dungeon.update(1, {
+    gold: (dungeon.gold || 0) + amount
+  });
+}
+
 // End the expedition and log it
 export async function endExpedition() {
   const state = get(expeditionTimer);
@@ -133,7 +263,7 @@ export async function endExpedition() {
   const durationSeconds = state.elapsedSeconds;
   const durationMinutes = Math.floor(durationSeconds / 60);
 
-  // Reset timer state
+  // Reset timer state and clear persistence
   expeditionTimer.set({
     isRunning: false,
     isPaused: false,
@@ -141,6 +271,7 @@ export async function endExpedition() {
     pausedTime: null,
     elapsedSeconds: 0
   });
+  clearTimerState();
 
   // Don't log expeditions shorter than 1 minute
   if (durationMinutes < 1) return null;
@@ -159,6 +290,29 @@ export async function endExpedition() {
   // Calculate XP
   const xpEarned = calculateExpeditionXP(durationMinutes, hitGoal);
 
+  // Calculate bonus rewards for going beyond goal in this single expedition
+  let bonusRewards = null;
+  const totalAfter = previousMinutes + durationMinutes;
+
+  if (totalAfter > goal) {
+    // Minutes beyond the daily goal from this expedition
+    const minutesBeyondGoal = totalAfter - Math.max(previousMinutes, goal);
+
+    if (minutesBeyondGoal > 0) {
+      bonusRewards = generateExpeditionLoot(minutesBeyondGoal);
+
+      // Award gold
+      if (bonusRewards.goldEarned > 0) {
+        await awardExpeditionGold(bonusRewards.goldEarned);
+      }
+
+      // Award items to inventory
+      if (bonusRewards.itemsToAward.length > 0) {
+        await awardExpeditionItems(bonusRewards.itemsToAward);
+      }
+    }
+  }
+
   // Log the expedition
   await db.expeditions.add({
     date: today,
@@ -166,7 +320,9 @@ export async function endExpedition() {
     xpEarned,
     startTime: new Date(state.startTime).toISOString(),
     endTime: new Date().toISOString(),
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    bonusGold: bonusRewards?.goldEarned || 0,
+    bonusItems: bonusRewards?.itemsToAward?.length || 0
   });
 
   // Update player total expedition minutes
@@ -206,7 +362,8 @@ export async function endExpedition() {
     amount: xpEarned,
     source: 'expedition',
     hitGoal,
-    leveledUp: xpResult?.leveledUp
+    leveledUp: xpResult?.leveledUp,
+    bonusRewards
   });
 
   return {
@@ -214,6 +371,7 @@ export async function endExpedition() {
     xpEarned,
     hitGoal,
     potionsEarned,
+    bonusRewards,
     ...xpResult
   };
 }
@@ -232,6 +390,7 @@ export function cancelExpedition() {
     pausedTime: null,
     elapsedSeconds: 0
   });
+  clearTimerState();
 }
 
 // Format seconds to MM:SS or HH:MM:SS

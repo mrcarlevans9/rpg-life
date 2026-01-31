@@ -21,7 +21,18 @@
   async function handleEndExpedition() {
     lastExpeditionResult = await endExpedition();
     if (lastExpeditionResult) {
-      showSuccess(`Earned ${lastExpeditionResult.xpEarned} XP from your expedition!`, 'Expedition Complete');
+      let message = `Earned ${lastExpeditionResult.xpEarned} XP`;
+      if (lastExpeditionResult.bonusRewards) {
+        const { goldEarned, itemsToAward } = lastExpeditionResult.bonusRewards;
+        if (goldEarned > 0) {
+          message += `, +${goldEarned} gold`;
+        }
+        if (itemsToAward && itemsToAward.length > 0) {
+          message += `, +${itemsToAward.length} item${itemsToAward.length > 1 ? 's' : ''}`;
+        }
+      }
+      message += '!';
+      showSuccess(message, 'Expedition Complete');
     }
   }
 
@@ -139,6 +150,28 @@
               </div>
             {/if}
           </div>
+
+          {#if lastExpeditionResult.bonusRewards}
+            <div class="bonus-rewards">
+              <h4>Bonus Loot (Beyond Goal)</h4>
+              <div class="bonus-stats">
+                {#if lastExpeditionResult.bonusRewards.goldEarned > 0}
+                  <div class="bonus-item">
+                    <span class="bonus-icon">💰</span>
+                    <span class="bonus-value">+{lastExpeditionResult.bonusRewards.goldEarned} gold</span>
+                  </div>
+                {/if}
+                {#if lastExpeditionResult.bonusRewards.itemsToAward && lastExpeditionResult.bonusRewards.itemsToAward.length > 0}
+                  {#each lastExpeditionResult.bonusRewards.itemsToAward as item}
+                    <div class="bonus-item">
+                      <span class="bonus-icon">{item.emoji}</span>
+                      <span class="bonus-value">{item.name}</span>
+                    </div>
+                  {/each}
+                {/if}
+              </div>
+            </div>
+          {/if}
         </div>
       </Card>
     </section>
@@ -366,5 +399,44 @@
   @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }
+  }
+
+  .bonus-rewards {
+    margin-top: var(--spacing-lg);
+    padding-top: var(--spacing-md);
+    border-top: 1px solid var(--border);
+  }
+
+  .bonus-rewards h4 {
+    font-size: 0.875rem;
+    color: var(--warning);
+    margin-bottom: var(--spacing-sm);
+    text-align: center;
+  }
+
+  .bonus-stats {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--spacing-md);
+  }
+
+  .bonus-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    background: var(--bg-secondary);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-sm);
+  }
+
+  .bonus-icon {
+    font-size: 1rem;
+  }
+
+  .bonus-value {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-primary);
   }
 </style>
