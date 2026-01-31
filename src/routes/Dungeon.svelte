@@ -45,9 +45,10 @@
     diceRevealed = [];
   }
 
-  // Lock body scroll during combat
+  // Lock body scroll during combat (check both gamePhase and currentRun for reliability)
+  $: inCombat = $gamePhase !== 'idle' || $currentRun !== null;
   $: if (typeof document !== 'undefined') {
-    if ($gamePhase !== 'idle') {
+    if (inCombat) {
       document.body.classList.add('no-scroll');
     } else {
       document.body.classList.remove('no-scroll');
@@ -194,7 +195,7 @@
   }
 </script>
 
-<div class="dungeon-page" class:in-combat={$gamePhase !== 'idle'}>
+<div class="dungeon-page" class:in-combat={inCombat}>
   {#if $gamePhase === 'idle'}
     <div class="page-header">
       <h1>Dungeon</h1>
