@@ -806,8 +806,10 @@ async function monsterDefeated(run, room, monster) {
   if (monster.isBoss) {
     if (monster.isMajorBoss) {
       addLog('boss', `MAJOR BOSS DEFEATED! You've conquered Floor ${run.currentFloor}!`);
+      run.lastBossDefeated = { type: 'major', goldEarned: totalGold, name: monster.displayName };
     } else {
       addLog('boss', `ELITE DEFEATED! Floor ${run.currentFloor} cleared!`);
+      run.lastBossDefeated = { type: 'mini', goldEarned: totalGold, name: monster.displayName };
     }
     // Mark room complete and advance like normal floor completion
     run.floor.rooms[run.floor.currentRoom].completed = true;
@@ -881,16 +883,29 @@ function advanceRoom(run) {
     // Floor complete - advance to next floor (no limit!)
     // Only show end-of-floor merchant if no mid-floor merchant appeared
     if (!run.floor.hasMidFloorMerchant) {
+      // Customize greeting based on whether boss was just defeated
+      let greeting = "Floor cleared! Care to browse before you descend?";
+      if (run.lastBossDefeated) {
+        const bossType = run.lastBossDefeated.type === 'major' ? 'Boss' : 'Elite';
+        greeting = `${bossType} vanquished! Your gold is safe. Browse or continue?`;
+      }
+
       // Show end-of-floor merchant
       run.floorMerchant = {
         ...MERCHANT,
         items: generateMerchantItems(),
-        greeting: "Floor cleared! Care to browse before you descend?"
+        greeting,
+        afterBoss: !!run.lastBossDefeated,
+        bossGoldEarned: run.lastBossDefeated?.goldEarned || 0
       };
-      addLog('info', `"Floor cleared! Care to browse before you descend?"`);
+      addLog('info', `"${greeting}"`);
       gamePhase.set('floor_merchant');
+
+      // Clear the boss defeated flag
+      run.lastBossDefeated = null;
     } else {
       // Skip merchant, go straight to next floor
+      run.lastBossDefeated = null;
       goToNextFloor(run);
     }
   }
