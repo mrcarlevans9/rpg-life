@@ -156,9 +156,19 @@ export async function pushBoardUpdate(columns) {
 // ============ Tasks Sync ============
 export async function syncTasks() {
   const userId = getUserId();
-  if (!userId) return [];
+  if (!userId) {
+    console.log('No user ID for task sync');
+    return [];
+  }
 
   try {
+    console.log('Syncing tasks for user:', userId);
+
+    // Get local tasks first
+    const localTasks = await db.tasks.toArray();
+    console.log('Local tasks:', localTasks.length);
+
+    // Try to fetch remote tasks
     const { data: remoteTasks, error } = await supabase
       .from('tasks')
       .select('*')
@@ -167,51 +177,70 @@ export async function syncTasks() {
 
     if (error) {
       console.error('Error fetching remote tasks:', error);
-      return [];
+      // Don't clear local data on error - just return local tasks
+      return localTasks;
     }
 
-    const localTasks = await db.tasks.toArray();
+    console.log('Remote tasks:', remoteTasks?.length || 0);
 
+    // Case 1: Remote has tasks - import them (they're the source of truth after cache clear)
     if (remoteTasks && remoteTasks.length > 0) {
+      console.log('Importing tasks from remote...');
       await db.tasks.clear();
       for (const rt of remoteTasks) {
         await db.tasks.add({
-          id: rt.id,
-          columnId: rt.column_id,
+          status: rt.status || 'todo',
           title: rt.title,
-          description: rt.description,
-          priority: rt.priority,
+          description: rt.description || '',
+          priority: rt.priority || 'medium',
           dueDate: rt.due_date,
-          completed: rt.completed,
+          completed: rt.completed || false,
           completedAt: rt.completed_at,
-          order: rt.sort_order,
-          tags: rt.tags,
+          timeSpent: rt.time_spent || 0,
+          activeStartTime: rt.active_start_time,
+          order: rt.sort_order || 0,
+          subtasks: rt.subtasks || [],
+          tags: rt.tags || [],
           createdAt: rt.created_at,
           updatedAt: rt.updated_at
         });
       }
+      console.log('Imported', remoteTasks.length, 'tasks from remote');
       return remoteTasks;
-    } else if (localTasks.length > 0) {
+    }
+
+    // Case 2: Remote is empty but local has tasks - push to remote
+    if (localTasks.length > 0) {
+      console.log('Pushing local tasks to remote...');
       for (const lt of localTasks) {
-        await supabase.from('tasks').insert({
+        const { error: insertError } = await supabase.from('tasks').insert({
           user_id: userId,
-          column_id: lt.columnId,
+          status: lt.status || 'todo',
           title: lt.title,
-          description: lt.description,
-          priority: lt.priority,
+          description: lt.description || '',
+          priority: lt.priority || 'medium',
           due_date: lt.dueDate,
-          completed: lt.completed,
+          completed: lt.completed || false,
           completed_at: lt.completedAt,
-          sort_order: lt.order,
-          tags: lt.tags
+          time_spent: lt.timeSpent || 0,
+          active_start_time: lt.activeStartTime,
+          sort_order: lt.order || 0,
+          subtasks: lt.subtasks || [],
+          tags: lt.tags || []
         });
+        if (insertError) {
+          console.error('Error pushing task to remote:', insertError);
+        }
       }
+      console.log('Pushed', localTasks.length, 'tasks to remote');
     }
 
     return localTasks;
   } catch (error) {
     console.error('Sync tasks error:', error);
-    return [];
+    // Return local tasks on any error - don't lose data
+    const localTasks = await db.tasks.toArray();
+    return localTasks;
   }
 }
 
@@ -224,18 +253,24 @@ export async function pushTaskCreate(task) {
       .from('tasks')
       .insert({
         user_id: userId,
-        column_id: task.columnId,
+        status: task.status || 'todo',
         title: task.title,
-        description: task.description,
-        priority: task.priority,
+        description: task.description || '',
+        priority: task.priority || 'medium',
         due_date: task.dueDate,
         completed: task.completed || false,
-        sort_order: task.order
+        time_spent: task.timeSpent || 0,
+        sort_order: task.order || 0,
+        subtasks: task.subtasks || [],
+        tags: task.tags || []
       })
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Push task create error:', error);
+      return null;
+    }
     return data;
   } catch (error) {
     console.error('Push task create error:', error);
@@ -249,13 +284,15 @@ export async function pushTaskUpdate(taskId, updates) {
 
   try {
     const remoteUpdates = {};
-    if (updates.columnId !== undefined) remoteUpdates.column_id = updates.columnId;
+    if (updates.status !== undefined) remoteUpdates.status = updates.status;
     if (updates.title !== undefined) remoteUpdates.title = updates.title;
     if (updates.description !== undefined) remoteUpdates.description = updates.description;
     if (updates.priority !== undefined) remoteUpdates.priority = updates.priority;
     if (updates.dueDate !== undefined) remoteUpdates.due_date = updates.dueDate;
     if (updates.completed !== undefined) remoteUpdates.completed = updates.completed;
     if (updates.completedAt !== undefined) remoteUpdates.completed_at = updates.completedAt;
+    if (updates.timeSpent !== undefined) remoteUpdates.time_spent = updates.timeSpent;
+    if (updates.activeStartTime !== undefined) remoteUpdates.active_start_time = updates.activeStartTime;
     if (updates.order !== undefined) remoteUpdates.sort_order = updates.order;
 
     if (Object.keys(remoteUpdates).length > 0) {
@@ -384,9 +421,8 @@ export async function fullSync() {
     await syncPlayer();
     await syncSettings();
     await syncBoard();
-    // Temporarily disabled task sync to debug local persistence
-    // await syncTasks();
-    console.log('Full sync complete (task sync disabled)');
+    await syncTasks();
+    console.log('Full sync complete');
   } catch (error) {
     console.error('Full sync error:', error);
   }

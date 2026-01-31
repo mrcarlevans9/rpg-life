@@ -1,3 +1,4 @@
+
 -- RPG Life Migration: Projects -> Global Board
 -- Run this in your Supabase SQL Editor
 
@@ -59,5 +60,23 @@ INSERT INTO board (user_id)
 SELECT id FROM auth.users
 WHERE id NOT IN (SELECT user_id FROM board)
 ON CONFLICT (user_id) DO NOTHING;
+
+-- 9. Update tasks table for bounty board schema
+-- Add status column (replaces column_id)
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'todo' CHECK (status IN ('todo', 'active', 'done'));
+
+-- Add time tracking columns
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS time_spent INTEGER DEFAULT 0;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS active_start_time TIMESTAMPTZ;
+
+-- Add subtasks column
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS subtasks JSONB DEFAULT '[]'::jsonb;
+
+-- Migrate column_id values to status (if column_id exists)
+UPDATE tasks SET status = CASE
+  WHEN column_id = 'in-progress' THEN 'active'
+  WHEN column_id = 'done' THEN 'done'
+  ELSE 'todo'
+END WHERE status IS NULL OR status = 'todo';
 
 -- Done! Your database is now migrated to the single board structure.
