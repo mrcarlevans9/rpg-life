@@ -2,7 +2,7 @@ import { writable, derived, get } from 'svelte/store';
 import { liveQuery } from 'dexie';
 import { db, MONSTERS, BOSSES, MONSTER_MODIFIERS, DUNGEON_UPGRADES, MERCHANT, MERCHANT_ITEMS } from '../db/index.js';
 import { playerData } from './player.js';
-import { pushDungeonUpdate } from '../supabase/sync.js';
+import { pushDungeonUpdate, pushPlayerUpdate } from '../supabase/sync.js';
 
 // Create a store from a Dexie liveQuery
 function createLiveQueryStore(queryFn, defaultValue = null) {
@@ -160,9 +160,8 @@ export function calculateSpellSlots(level, purchasedSpellSlot = false) {
 // Get current player's spell slots
 export function getSpellSlots() {
   const player = get(playerData);
-  const dungeon = get(dungeonData);
   const level = player?.level || 1;
-  const purchased = dungeon?.purchasedSpellSlot || false;
+  const purchased = player?.purchasedSpellSlot || false;
   return calculateSpellSlots(level, purchased);
 }
 
@@ -392,6 +391,7 @@ function generateFloor(floorNumber) {
 
 export async function startRun() {
   const dungeon = await db.dungeon.get(1);
+  const player = await db.player.get(1);
 
   // Calculate max HP with upgrades
   const baseMaxHp = 100;
@@ -399,6 +399,11 @@ export async function startRun() {
 
   // Calculate max MP with upgrades
   const maxMp = BASE_MAX_MP + (dungeon?.maxMpBonus || 0);
+
+  // Get gold, potions, spells from PLAYER (syncs with cloud)
+  const bankGold = player?.gold || 0;
+  const healthPotions = player?.healthPotions || 0;
+  const customSpells = player?.customSpells || [];
 
   const run = {
     currentFloor: 1,
@@ -408,7 +413,8 @@ export async function startRun() {
     playerMp: maxMp,
     maxMp,
     goldCollected: 0,
-    bankGold: dungeon?.gold || 0, // Store bank gold at start of run (safe, won't be lost)
+    bankGold, // From player - syncs with cloud
+    healthPotions, // Track potions for this run
     potionsUsed: 0,
     monstersKilled: 0,
     isDefending: false,
@@ -417,8 +423,8 @@ export async function startRun() {
     potionHeal: 25 + (dungeon?.potionBonus || 0),
     critBonus: dungeon?.critBonus || 0,
     defenseBonus: dungeon?.defenseBonus || 0,
-    // Store custom spells for this run (array)
-    customSpells: dungeon?.customSpells || [],
+    // Store custom spells for this run (array) - from player
+    customSpells,
     // Temporary buffs from merchant (this run only)
     tempBuffs: {
       bonusDamage: 0,
@@ -467,10 +473,15 @@ export async function collectRewards() {
   if (!run) return;
 
   const dungeon = await db.dungeon.get(1);
+  const player = await db.player.get(1);
 
-  // Add gold to persistent storage
-  const rewardUpdates = {
-    gold: (dungeon?.gold || 0) + run.goldCollected,
+  // Add gold to PLAYER (syncs with cloud)
+  const newGold = (player?.gold || 0) + run.goldCollected;
+  await db.player.update(1, { gold: newGold });
+  pushPlayerUpdate({ gold: newGold });
+
+  // Update dungeon analytics (local stats)
+  const dungeonUpdates = {
     totalGoldEarned: (dungeon?.totalGoldEarned || 0) + run.goldCollected,
     highestFloor: Math.max(dungeon?.highestFloor || 0, run.currentFloor),
     totalKills: (dungeon?.totalKills || 0) + run.monstersKilled,
@@ -478,10 +489,7 @@ export async function collectRewards() {
       ? (dungeon?.bossesDefeated || 0) + 1
       : dungeon?.bossesDefeated || 0
   };
-  await db.dungeon.update(1, rewardUpdates);
-
-  // Sync to cloud
-  pushDungeonUpdate(rewardUpdates);
+  await db.dungeon.update(1, dungeonUpdates);
 
   // Reset run and unlock scroll
   if (typeof document !== 'undefined') {
@@ -840,8 +848,8 @@ export async function usePotion() {
   const run = get(currentRun);
   if (!run) return false;
 
-  const dungeon = await db.dungeon.get(1);
-  if (!dungeon || dungeon.healthPotions <= 0) {
+  const player = await db.player.get(1);
+  if (!player || (player.healthPotions || 0) <= 0) {
     addLog('error', 'No health potions remaining!');
     return false;
   }
@@ -853,13 +861,14 @@ export async function usePotion() {
   const actualHeal = run.playerHp - oldHp;
 
   run.potionsUsed++;
+  run.healthPotions = (run.healthPotions || player.healthPotions) - 1;
 
-  // Update DB
-  await db.dungeon.update(1, {
-    healthPotions: dungeon.healthPotions - 1
-  });
+  // Update player potions (syncs with cloud)
+  const newPotions = (player.healthPotions || 0) - 1;
+  await db.player.update(1, { healthPotions: newPotions });
+  pushPlayerUpdate({ healthPotions: newPotions });
 
-  addLog('heal', `Used health potion! +${actualHeal} HP (${dungeon.healthPotions - 1} potions remaining)`);
+  addLog('heal', `Used health potion! +${actualHeal} HP (${newPotions} potions remaining)`);
 
   currentRun.set(run);
   return true;
@@ -868,12 +877,12 @@ export async function usePotion() {
 // ============ Potion Rewards ============
 
 export async function awardPotions(count = 1) {
-  const dungeon = await db.dungeon.get(1);
-  if (!dungeon) return;
+  const player = await db.player.get(1);
+  if (!player) return;
 
-  await db.dungeon.update(1, {
-    healthPotions: (dungeon.healthPotions || 0) + count
-  });
+  const newPotions = (player.healthPotions || 0) + count;
+  await db.player.update(1, { healthPotions: newPotions });
+  pushPlayerUpdate({ healthPotions: newPotions });
 }
 
 // ============ Expedition Inventory System ============
@@ -976,8 +985,8 @@ export async function saveCustomSpell(spell, slotIndex = 0) {
     return { success: false, error: 'Spell name must be 20 characters or less' };
   }
 
-  const dungeon = await db.dungeon.get(1);
-  const customSpells = [...(dungeon?.customSpells || [])];
+  // player was already fetched above for level validation
+  const customSpells = [...(player?.customSpells || [])];
   // Check if slot has an existing spell (robust check for null/undefined/object)
   const existingSpell = customSpells[slotIndex];
   const hasExistingSpell = existingSpell !== null && existingSpell !== undefined && typeof existingSpell === 'object';
@@ -986,7 +995,7 @@ export async function saveCustomSpell(spell, slotIndex = 0) {
   const editCost = getSpellEditCost(slotIndex, hasExistingSpell);
 
   // Check if player has enough gold
-  if (editCost > 0 && (dungeon?.gold || 0) < editCost) {
+  if (editCost > 0 && (player?.gold || 0) < editCost) {
     return { success: false, error: `Not enough gold! Changing this spell costs ${editCost} gold.` };
   }
 
@@ -1004,24 +1013,24 @@ export async function saveCustomSpell(spell, slotIndex = 0) {
 
   customSpells[slotIndex] = newSpell;
 
-  // Deduct gold if editing existing spell
+  // Update player with new spells and deduct gold if editing
   const updateData = { customSpells };
   if (editCost > 0) {
-    updateData.gold = (dungeon?.gold || 0) - editCost;
+    updateData.gold = (player?.gold || 0) - editCost;
   }
 
-  await db.dungeon.update(1, updateData);
+  await db.player.update(1, updateData);
 
   // Sync to cloud
-  pushDungeonUpdate(updateData);
+  pushPlayerUpdate(updateData);
 
   return { success: true, spell: newSpell, goldSpent: editCost };
 }
 
 // Delete custom spell at a specific slot index
 export async function deleteCustomSpell(slotIndex = 0) {
-  const dungeon = await db.dungeon.get(1);
-  const customSpells = [...(dungeon?.customSpells || [])];
+  const player = await db.player.get(1);
+  const customSpells = [...(player?.customSpells || [])];
 
   // Check if there's actually a spell to delete
   const existingSpell = customSpells[slotIndex];
@@ -1033,7 +1042,7 @@ export async function deleteCustomSpell(slotIndex = 0) {
 
   // Calculate and check delete cost
   const deleteCost = getSpellDeleteCost(slotIndex);
-  if ((dungeon?.gold || 0) < deleteCost) {
+  if ((player?.gold || 0) < deleteCost) {
     return { success: false, error: `Not enough gold! Deleting this spell costs ${deleteCost} gold.` };
   }
 
@@ -1041,12 +1050,12 @@ export async function deleteCustomSpell(slotIndex = 0) {
   customSpells[slotIndex] = null;
   const deleteUpdates = {
     customSpells,
-    gold: (dungeon?.gold || 0) - deleteCost
+    gold: (player?.gold || 0) - deleteCost
   };
-  await db.dungeon.update(1, deleteUpdates);
+  await db.player.update(1, deleteUpdates);
 
   // Sync to cloud
-  pushDungeonUpdate(deleteUpdates);
+  pushPlayerUpdate(deleteUpdates);
 
   return { success: true, goldSpent: deleteCost };
 }
@@ -1145,6 +1154,7 @@ function regenerateMana(run) {
 
 export async function purchaseUpgrade(upgradeKey) {
   const dungeon = await db.dungeon.get(1);
+  const player = await db.player.get(1);
   if (!dungeon) return { success: false, error: 'No dungeon data' };
 
   const upgrade = DUNGEON_UPGRADES.find(u => u.key === upgradeKey);
@@ -1160,42 +1170,46 @@ export async function purchaseUpgrade(upgradeKey) {
     return { success: false, error: 'Prerequisite not met' };
   }
 
-  // Check gold
-  if (dungeon.gold < upgrade.cost) {
+  // Check gold (from player)
+  const playerGold = player?.gold || 0;
+  if (playerGold < upgrade.cost) {
     return { success: false, error: 'Not enough gold' };
   }
 
-  // Purchase
+  // Deduct gold from player
+  const newGold = playerGold - upgrade.cost;
+  await db.player.update(1, { gold: newGold });
+  pushPlayerUpdate({ gold: newGold });
+
+  // Purchase upgrade (stored in dungeon)
   const newUpgrades = [...(dungeon.upgrades || []), upgradeKey];
-  const updates = {
-    gold: dungeon.gold - upgrade.cost,
+  const dungeonUpdates = {
     upgrades: newUpgrades
   };
 
   // Apply effect
   if (upgrade.effect.maxHp) {
-    updates.maxHpBonus = (dungeon.maxHpBonus || 0) + upgrade.effect.maxHp;
+    dungeonUpdates.maxHpBonus = (dungeon.maxHpBonus || 0) + upgrade.effect.maxHp;
   }
   if (upgrade.effect.bonusDamage) {
-    updates.bonusDamage = (dungeon.bonusDamage || 0) + upgrade.effect.bonusDamage;
+    dungeonUpdates.bonusDamage = (dungeon.bonusDamage || 0) + upgrade.effect.bonusDamage;
   }
   if (upgrade.effect.potionBonus) {
-    updates.potionBonus = (dungeon.potionBonus || 0) + upgrade.effect.potionBonus;
+    dungeonUpdates.potionBonus = (dungeon.potionBonus || 0) + upgrade.effect.potionBonus;
   }
   if (upgrade.effect.critBonus) {
-    updates.critBonus = (dungeon.critBonus || 0) + upgrade.effect.critBonus;
+    dungeonUpdates.critBonus = (dungeon.critBonus || 0) + upgrade.effect.critBonus;
   }
   if (upgrade.effect.defenseBonus) {
-    updates.defenseBonus = (dungeon.defenseBonus || 0) + upgrade.effect.defenseBonus;
+    dungeonUpdates.defenseBonus = (dungeon.defenseBonus || 0) + upgrade.effect.defenseBonus;
   }
   if (upgrade.effect.spellSlot) {
-    updates.purchasedSpellSlot = true;
+    // Store spell slot in player (syncs with cloud)
+    await db.player.update(1, { purchasedSpellSlot: true });
+    pushPlayerUpdate({ purchasedSpellSlot: true });
   }
 
-  await db.dungeon.update(1, updates);
-
-  // Sync to cloud
-  pushDungeonUpdate(updates);
+  await db.dungeon.update(1, dungeonUpdates);
 
   return { success: true, upgrade };
 }
