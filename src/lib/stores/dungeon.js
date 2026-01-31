@@ -802,15 +802,49 @@ async function monsterDefeated(run, room, monster) {
     totalKills: (dungeon?.totalKills || 0) + 1
   });
 
-  // Check if boss defeated
+  // Check if boss defeated - advance to next floor instead of ending
   if (monster.isBoss) {
-    addLog('boss', `BOSS DEFEATED! You've conquered the dungeon!`);
-    endRun(true);
+    if (monster.isMajorBoss) {
+      addLog('boss', `MAJOR BOSS DEFEATED! You've conquered Floor ${run.currentFloor}!`);
+    } else {
+      addLog('boss', `ELITE DEFEATED! Floor ${run.currentFloor} cleared!`);
+    }
+    // Mark room complete and advance like normal floor completion
+    run.floor.rooms[run.floor.currentRoom].completed = true;
+    advanceRoom(run);
     return;
   }
 
   // Move to next room or floor
   advanceRoom(run);
+}
+
+// Helper to advance to the next floor
+function goToNextFloor(run) {
+  run.currentFloor++;
+  run.floor = generateFloor(run.currentFloor);
+
+  // Check if this is a major boss floor
+  if (run.floor.isMajorBossFloor) {
+    addLog('boss', `FLOOR ${run.currentFloor} - BOSS CHAMBER`);
+    addLog('boss', `${run.floor.rooms[0].monster.displayName} awaits!`);
+  } else if (run.floor.isMiniBossFloor) {
+    addLog('floor', `Descending to Floor ${run.currentFloor}...`);
+    addLog('warning', `You sense a powerful presence ahead...`);
+    const firstRoom = run.floor.rooms[0];
+    if (firstRoom.type === 'combat' || firstRoom.type === 'boss') {
+      addLog('info', `A ${firstRoom.monster.displayName} blocks your path!`);
+    }
+  } else {
+    addLog('floor', `Descending to Floor ${run.currentFloor}...`);
+    const firstRoom = run.floor.rooms[0];
+    if (firstRoom.type === 'combat') {
+      addLog('info', `A ${firstRoom.monster.displayName} blocks your path!`);
+    }
+  }
+  resetCombatState();
+  gamePhase.set('exploring');
+  currentRun.set(run);
 }
 
 function advanceRoom(run) {
@@ -844,35 +878,20 @@ function advanceRoom(run) {
       resetCombatState(); // Reset combat state for new monster
     }
   } else {
-    // Floor complete - advance to next floor
-    if (run.currentFloor < 10) {
-      // Only show end-of-floor merchant if no mid-floor merchant appeared
-      if (!run.floor.hasMidFloorMerchant) {
-        // Show end-of-floor merchant
-        run.floorMerchant = {
-          ...MERCHANT,
-          items: generateMerchantItems(),
-          greeting: "Floor cleared! Care to browse before you descend?"
-        };
-        addLog('info', `"Floor cleared! Care to browse before you descend?"`);
-        gamePhase.set('floor_merchant');
-      } else {
-        // Skip merchant, go straight to next floor
-        run.currentFloor++;
-        run.floor = generateFloor(run.currentFloor);
-
-        if (run.currentFloor === 10) {
-          addLog('boss', `FLOOR 10 - BOSS CHAMBER`);
-          addLog('boss', `${run.floor.rooms[0].monster.displayName} awaits!`);
-        } else {
-          addLog('floor', `Descending to Floor ${run.currentFloor}...`);
-          const firstRoom = run.floor.rooms[0];
-          if (firstRoom.type === 'combat') {
-            addLog('info', `A ${firstRoom.monster.displayName} blocks your path!`);
-          }
-        }
-        resetCombatState();
-      }
+    // Floor complete - advance to next floor (no limit!)
+    // Only show end-of-floor merchant if no mid-floor merchant appeared
+    if (!run.floor.hasMidFloorMerchant) {
+      // Show end-of-floor merchant
+      run.floorMerchant = {
+        ...MERCHANT,
+        items: generateMerchantItems(),
+        greeting: "Floor cleared! Care to browse before you descend?"
+      };
+      addLog('info', `"Floor cleared! Care to browse before you descend?"`);
+      gamePhase.set('floor_merchant');
+    } else {
+      // Skip merchant, go straight to next floor
+      goToNextFloor(run);
     }
   }
 
@@ -1352,23 +1371,8 @@ export function leaveFloorMerchant() {
   // Clear the floor merchant
   run.floorMerchant = null;
 
-  // Advance to next floor
-  run.currentFloor++;
-  run.floor = generateFloor(run.currentFloor);
-
-  if (run.currentFloor === 10) {
-    addLog('boss', `FLOOR 10 - BOSS CHAMBER`);
-    addLog('boss', `${run.floor.rooms[0].monster.displayName} awaits!`);
-  } else {
-    addLog('floor', `Descending to Floor ${run.currentFloor}...`);
-    const firstRoom = run.floor.rooms[0];
-    if (firstRoom.type === 'combat') {
-      addLog('info', `A ${firstRoom.monster.displayName} blocks your path!`);
-    }
-  }
-  resetCombatState();
-  gamePhase.set('exploring');
-  currentRun.set(run);
+  // Advance to next floor using helper
+  goToNextFloor(run);
 }
 
 // Purchase from the floor merchant (end of floor)
