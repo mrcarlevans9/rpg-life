@@ -23,6 +23,8 @@
     deleteCustomSpell,
     calculateManaCost,
     getSpellSlots,
+    getMaxSpellDamage,
+    getSpellEditCost,
     purchaseMerchantItem,
     leaveMerchant,
     leaveFloorMerchant,
@@ -121,6 +123,9 @@
   // Get spell slots info
   $: spellSlots = getSpellSlots();
   $: customSpells = $dungeonData?.customSpells || [];
+  $: playerLevel = $playerData?.level || 1;
+  $: maxSpellDamage = getMaxSpellDamage(playerLevel);
+  $: currentSpellEditCost = getSpellEditCost(editingSlotIndex, customSpells[editingSlotIndex] != null);
 
   // Close spell menu when combat state changes
   $: if ($combatState.isAnimating || !$currentMonster) showSpellMenu = false;
@@ -146,6 +151,10 @@
 
   // Update mana cost when damage changes
   function onDamageChange() {
+    // Clamp damage to max allowed
+    if (spellDamage > maxSpellDamage) {
+      spellDamage = maxSpellDamage;
+    }
     spellManaCost = calculateManaCost(spellDamage);
     spellError = '';
   }
@@ -893,15 +902,26 @@
 
           <div class="spell-stats">
             <div class="spell-field">
-              <label for="spell-damage">Damage</label>
+              <label for="spell-damage">Damage (Max: {maxSpellDamage})</label>
               <input
                 id="spell-damage"
                 type="number"
                 bind:value={spellDamage}
                 on:input={onDamageChange}
                 min="1"
-                max="100"
+                max={maxSpellDamage}
               />
+              <span class="damage-hint">
+                {#if playerLevel < 10}
+                  Level 10 unlocks max 50 DMG
+                {:else if playerLevel < 25}
+                  Level 25 unlocks max 75 DMG
+                {:else if playerLevel < 50}
+                  Level 50 unlocks max 100 DMG
+                {:else}
+                  Maximum power unlocked!
+                {/if}
+              </span>
             </div>
 
             <div class="spell-field">
@@ -928,16 +948,32 @@
           </div>
 
           <p class="balance-note">
-            Higher damage requires more mana. You start each dungeon run with 50 MP and regenerate 5 MP after each fight.
+            Higher damage requires more mana. You start each run with 50 MP and regenerate 5 MP after each fight.
           </p>
+
+          {#if currentSpellEditCost > 0}
+            <div class="edit-cost-notice">
+              <span class="cost-icon">💰</span>
+              <span>Modifying this spell costs <strong>{currentSpellEditCost} gold</strong></span>
+              <span class="current-gold">(You have: {$dungeonData?.gold || 0})</span>
+            </div>
+          {/if}
 
           {#if spellError}
             <p class="spell-error">{spellError}</p>
           {/if}
 
           <div class="spell-actions">
-            <Button variant="primary" on:click={handleSaveSpell}>
-              Save Spell
+            <Button
+              variant="primary"
+              on:click={handleSaveSpell}
+              disabled={currentSpellEditCost > 0 && ($dungeonData?.gold || 0) < currentSpellEditCost}
+            >
+              {#if currentSpellEditCost > 0}
+                Save ({currentSpellEditCost}g)
+              {:else}
+                Create Spell
+              {/if}
             </Button>
             {#if customSpells[editingSlotIndex]}
               <Button variant="secondary" on:click={handleDeleteSpell}>
@@ -2223,6 +2259,36 @@
     font-size: 0.75rem;
     color: #8b5cf6;
     margin-top: 2px;
+  }
+
+  .damage-hint {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+    font-style: italic;
+  }
+
+  .edit-cost-notice {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: rgba(251, 191, 36, 0.15);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    color: #fbbf24;
+    margin-bottom: var(--spacing-sm);
+  }
+
+  .edit-cost-notice .cost-icon {
+    font-size: 1rem;
+  }
+
+  .edit-cost-notice .current-gold {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-left: auto;
   }
 
   .spell-preview {

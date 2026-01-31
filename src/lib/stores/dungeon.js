@@ -89,16 +89,36 @@ export function calculateMaxDamage(manaCost) {
   return low;
 }
 
+// Calculate max spell damage based on player level
+export function getMaxSpellDamage(level) {
+  if (level >= 50) return 100;
+  if (level >= 25) return 75;
+  if (level >= 10) return 50;
+  return 25;
+}
+
+// Get spell edit cost (0 for new, gold cost for editing existing)
+export function getSpellEditCost(slotIndex, hasExistingSpell) {
+  if (!hasExistingSpell) return 0; // Free to create new spell
+  // Cost scales slightly with slot (higher slots = more powerful = more cost to change)
+  return 15 + (slotIndex * 5); // Slot 1: 15g, Slot 2: 20g, Slot 3: 25g, etc.
+}
+
 // Validate spell - returns { valid, error, suggestedManaCost }
-export function validateSpell(damage, manaCost) {
+export function validateSpell(damage, manaCost, level = 1) {
   const requiredCost = calculateManaCost(damage);
+  const maxDamage = getMaxSpellDamage(level);
 
   if (damage < 1) {
     return { valid: false, error: 'Damage must be at least 1', suggestedManaCost: 1 };
   }
 
-  if (damage > 100) {
-    return { valid: false, error: 'Maximum damage is 100', suggestedManaCost: calculateManaCost(100) };
+  if (damage > maxDamage) {
+    return {
+      valid: false,
+      error: `Max damage at your level is ${maxDamage}. Reach level ${level < 10 ? 10 : level < 25 ? 25 : 50} for higher!`,
+      suggestedManaCost: calculateManaCost(maxDamage)
+    };
   }
 
   if (manaCost < requiredCost) {
@@ -924,8 +944,12 @@ export async function saveCustomSpell(spell, slotIndex = 0) {
     return { success: false, error: 'Spell slot not unlocked' };
   }
 
-  // Validate the spell
-  const validation = validateSpell(damage, manaCost);
+  // Get player level for validation
+  const player = await db.player.get(1);
+  const level = player?.level || 1;
+
+  // Validate the spell with level-based limits
+  const validation = validateSpell(damage, manaCost, level);
   if (!validation.valid) {
     return { success: false, error: validation.error };
   }
@@ -939,15 +963,24 @@ export async function saveCustomSpell(spell, slotIndex = 0) {
     return { success: false, error: 'Spell name must be 20 characters or less' };
   }
 
+  const dungeon = await db.dungeon.get(1);
+  const customSpells = [...(dungeon?.customSpells || [])];
+  const hasExistingSpell = customSpells[slotIndex] != null;
+
+  // Calculate gold cost for editing
+  const editCost = getSpellEditCost(slotIndex, hasExistingSpell);
+
+  // Check if player has enough gold
+  if (editCost > 0 && (dungeon?.gold || 0) < editCost) {
+    return { success: false, error: `Not enough gold! Changing this spell costs ${editCost} gold.` };
+  }
+
   const newSpell = {
     name: name.trim(),
     description: (description || '').trim().slice(0, 100),
     damage: Math.floor(damage),
     manaCost: Math.floor(manaCost)
   };
-
-  const dungeon = await db.dungeon.get(1);
-  const customSpells = [...(dungeon?.customSpells || [])];
 
   // Ensure array is large enough
   while (customSpells.length <= slotIndex) {
@@ -956,9 +989,15 @@ export async function saveCustomSpell(spell, slotIndex = 0) {
 
   customSpells[slotIndex] = newSpell;
 
-  await db.dungeon.update(1, { customSpells });
+  // Deduct gold if editing existing spell
+  const updateData = { customSpells };
+  if (editCost > 0) {
+    updateData.gold = (dungeon?.gold || 0) - editCost;
+  }
 
-  return { success: true, spell: newSpell };
+  await db.dungeon.update(1, updateData);
+
+  return { success: true, spell: newSpell, goldSpent: editCost };
 }
 
 // Delete custom spell at a specific slot index
