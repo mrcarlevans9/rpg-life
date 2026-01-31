@@ -965,7 +965,9 @@ export async function saveCustomSpell(spell, slotIndex = 0) {
 
   const dungeon = await db.dungeon.get(1);
   const customSpells = [...(dungeon?.customSpells || [])];
-  const hasExistingSpell = customSpells[slotIndex] != null;
+  // Check if slot has an existing spell (robust check for null/undefined/object)
+  const existingSpell = customSpells[slotIndex];
+  const hasExistingSpell = existingSpell !== null && existingSpell !== undefined && typeof existingSpell === 'object';
 
   // Calculate gold cost for editing
   const editCost = getSpellEditCost(slotIndex, hasExistingSpell);

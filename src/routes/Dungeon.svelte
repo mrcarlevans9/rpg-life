@@ -125,7 +125,15 @@
   $: customSpells = $dungeonData?.customSpells || [];
   $: playerLevel = $playerData?.level || 1;
   $: maxSpellDamage = getMaxSpellDamage(playerLevel);
-  $: currentSpellEditCost = getSpellEditCost(editingSlotIndex, customSpells[editingSlotIndex] != null);
+
+  // Check if the current slot has an existing spell (more robust check)
+  function hasSpellInSlot(slotIndex) {
+    const spell = customSpells[slotIndex];
+    return spell !== null && spell !== undefined && typeof spell === 'object';
+  }
+
+  // Recalculate edit cost whenever the editor is opened or customSpells changes
+  $: currentSpellEditCost = showSpellEditor ? getSpellEditCost(editingSlotIndex, hasSpellInSlot(editingSlotIndex)) : 0;
 
   // Close spell menu when combat state changes
   $: if ($combatState.isAnimating || !$currentMonster) showSpellMenu = false;
