@@ -5,7 +5,6 @@
     dungeonData,
     currentRun,
     gamePhase,
-    currentMessage,
     lastRoll,
     currentMonster,
     combatState,
@@ -20,8 +19,7 @@
     castSpell,
     saveCustomSpell,
     deleteCustomSpell,
-    calculateManaCost,
-    validateSpell
+    calculateManaCost
   } from '../lib/stores/dungeon.js';
   import { DUNGEON_UPGRADES } from '../lib/db/index.js';
 
@@ -183,39 +181,8 @@
   <!-- Combat State - Knights of Pen and Paper style -->
   {#if $gamePhase === 'exploring'}
     <div class="battle-screen" class:screen-shake={$combatState.lastDamageToPlayer}>
-      <!-- Top HUD: Player HP left, Floor center, Enemy HP right -->
+      <!-- Top HUD: Floor left, Enemy HP right -->
       <div class="battle-hud">
-        <!-- Player HP + MP -->
-        <div class="hud-box player-hud">
-          <div class="hud-label">YOU</div>
-          <!-- HP Bar -->
-          <div class="hud-hp-bar" class:hp-flash={$combatState.lastDamageToPlayer}>
-            <div
-              class="hud-hp-fill player-hp"
-              style="width: {($currentRun?.playerHp / $currentRun?.maxHp) * 100}%;
-                     background: {getHpBarColor($currentRun?.playerHp, $currentRun?.maxHp)}"
-            ></div>
-          </div>
-          <div class="hud-hp-text">
-            <span>HP {$currentRun?.playerHp}/{$currentRun?.maxHp}</span>
-            {#key $combatState.lastDamageToPlayer}
-              {#if $combatState.lastDamageToPlayer}
-                <span class="hud-damage">-{$combatState.lastDamageToPlayer}</span>
-              {/if}
-            {/key}
-          </div>
-          <!-- MP Bar -->
-          <div class="hud-mp-bar">
-            <div
-              class="hud-mp-fill"
-              style="width: {($currentRun?.playerMp / $currentRun?.maxMp) * 100}%"
-            ></div>
-          </div>
-          <div class="hud-hp-text mp-text">
-            <span>MP {$currentRun?.playerMp}/{$currentRun?.maxMp}</span>
-          </div>
-        </div>
-
         <!-- Floor indicator -->
         <div class="floor-indicator">
           <span class="floor-number">F{$currentRun?.currentFloor}</span>
@@ -281,9 +248,42 @@
         {/if}
       </div>
 
-      <!-- Message Box (Pokemon-style) -->
-      <div class="message-box">
-        <p class="message-text">{$currentMessage || 'What will you do?'}</p>
+      <!-- Player Stats Bar (below arena) -->
+      <div class="player-bar" class:bar-flash={$combatState.lastDamageToPlayer}>
+        <div class="player-bar-content">
+          <!-- HP -->
+          <div class="bar-section hp-section">
+            <span class="bar-label">HP</span>
+            <div class="bar-track hp-track">
+              <div
+                class="bar-fill hp-fill"
+                style="width: {($currentRun?.playerHp / $currentRun?.maxHp) * 100}%;
+                       background: {getHpBarColor($currentRun?.playerHp, $currentRun?.maxHp)}"
+              ></div>
+            </div>
+            <span class="bar-value">{$currentRun?.playerHp}/{$currentRun?.maxHp}</span>
+            {#key $combatState.lastDamageToPlayer}
+              {#if $combatState.lastDamageToPlayer}
+                <span class="bar-damage">-{$combatState.lastDamageToPlayer}</span>
+              {/if}
+            {/key}
+          </div>
+          <!-- MP -->
+          <div class="bar-section mp-section">
+            <span class="bar-label">MP</span>
+            <div class="bar-track mp-track">
+              <div
+                class="bar-fill mp-fill"
+                style="width: {($currentRun?.playerMp / $currentRun?.maxMp) * 100}%"
+              ></div>
+            </div>
+            <span class="bar-value">{$currentRun?.playerMp}/{$currentRun?.maxMp}</span>
+          </div>
+          <!-- Gold -->
+          <div class="bar-section gold-section">
+            <span class="gold-display">🪙 {$currentRun?.goldCollected || 0}</span>
+          </div>
+        </div>
       </div>
 
       <!-- Action Panel -->
@@ -355,10 +355,6 @@
                 🏃 FLEE
                 <span class="item-count">(½ gold)</span>
               </button>
-            {:else}
-              <div class="action-btn placeholder">
-                <span class="gold-display">🪙 {$currentRun?.goldCollected || 0}</span>
-              </div>
             {/if}
           </div>
         {/if}
@@ -642,8 +638,8 @@
   .battle-screen {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 140px);
-    min-height: 400px;
+    height: calc(100vh - 120px);
+    min-height: 360px;
     background: linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
     border-radius: var(--radius-md);
     overflow: hidden;
@@ -660,26 +656,23 @@
     40%, 80% { transform: translateX(4px); }
   }
 
-  /* ===== TOP HUD ===== */
+  /* ===== TOP HUD (Floor + Enemy) ===== */
   .battle-hud {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
-    padding: var(--spacing-xs) var(--spacing-sm);
-    gap: var(--spacing-xs);
-    background: rgba(0, 0, 0, 0.3);
-    border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+    align-items: center;
+    padding: 6px var(--spacing-sm);
+    background: rgba(0, 0, 0, 0.4);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   }
 
   .hud-box {
     background: rgba(0, 0, 0, 0.5);
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: var(--radius-sm);
-    padding: 4px 6px;
-    flex: 1;
-    max-width: 130px;
-    min-width: 0;
-    overflow: hidden;
+    padding: 4px 8px;
+    min-width: 100px;
+    max-width: 140px;
   }
 
   .hud-box.empty {
@@ -687,7 +680,7 @@
   }
 
   .hud-label {
-    font-size: 0.65rem;
+    font-size: 0.7rem;
     font-weight: 700;
     color: var(--text-primary);
     margin-bottom: 2px;
@@ -730,10 +723,6 @@
     transition: width 0.4s ease-out;
   }
 
-  .hud-hp-fill.player-hp {
-    background: linear-gradient(90deg, #22c55e, #16a34a);
-  }
-
   .hud-hp-fill.enemy-hp {
     background: linear-gradient(90deg, #ef4444, #dc2626);
   }
@@ -746,46 +735,15 @@
     margin-top: 1px;
   }
 
-  .hud-damage {
-    color: #ef4444;
-    font-weight: 700;
-    animation: hudDamageFlash 0.5s ease-out;
-  }
-
-  @keyframes hudDamageFlash {
-    0% { transform: scale(1.3); }
-    100% { transform: scale(1); }
-  }
-
-  /* MP Bar */
-  .hud-mp-bar {
-    height: 5px;
-    background: rgba(0, 0, 0, 0.6);
-    border-radius: var(--radius-full);
-    overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    margin-top: 2px;
-  }
-
-  .hud-mp-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #3b82f6, #8b5cf6);
-    transition: width 0.4s ease-out;
-  }
-
-  .mp-text {
-    color: #8b5cf6;
-  }
-
-  /* Floor Indicator (center) */
+  /* Floor Indicator (left side) */
   .floor-indicator {
-    text-align: center;
-    padding: 0 4px;
-    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
 
   .floor-number {
-    font-size: 0.875rem;
+    font-size: 1rem;
     font-weight: 800;
     color: var(--accent);
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
@@ -793,9 +751,7 @@
 
   .room-dots {
     display: flex;
-    justify-content: center;
     gap: 4px;
-    margin-top: 4px;
   }
 
   .dot {
@@ -817,14 +773,15 @@
     opacity: 0.6;
   }
 
-  /* ===== BATTLE ARENA (Big Monster) ===== */
+  /* ===== BATTLE ARENA (Compact Monster) ===== */
   .battle-arena {
     flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;
     position: relative;
-    min-height: 180px;
+    min-height: 120px;
+    max-height: 180px;
   }
 
   .monster-display {
@@ -835,9 +792,9 @@
   }
 
   .monster-emoji {
-    font-size: 7rem;
+    font-size: 5rem;
     display: block;
-    filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.5));
+    filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.5));
     animation: monsterIdle 2s ease-in-out infinite;
   }
 
@@ -930,20 +887,98 @@
     100% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.5; }
   }
 
-  /* Message Box (Pokemon-style) */
-  .message-box {
-    background: var(--bg-primary);
-    border-top: 2px solid var(--border);
-    padding: var(--spacing-sm) var(--spacing-md);
-    min-height: 44px;
-    display: flex;
-    align-items: center;
+  /* ===== PLAYER BAR (below arena) ===== */
+  .player-bar {
+    background: rgba(0, 0, 0, 0.5);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 6px var(--spacing-sm);
   }
 
-  .message-text {
-    font-size: 0.9rem;
+  .player-bar.bar-flash {
+    animation: barFlash 0.3s ease-out;
+  }
+
+  @keyframes barFlash {
+    0%, 100% { background: rgba(0, 0, 0, 0.5); }
+    50% { background: rgba(239, 68, 68, 0.3); }
+  }
+
+  .player-bar-content {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+
+  .bar-section {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .bar-section.hp-section {
+    flex: 2;
+  }
+
+  .bar-section.mp-section {
+    flex: 1;
+  }
+
+  .bar-section.gold-section {
+    flex: 0 0 auto;
+  }
+
+  .bar-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    min-width: 18px;
+  }
+
+  .bar-track {
+    flex: 1;
+    height: 10px;
+    background: rgba(0, 0, 0, 0.6);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .bar-fill {
+    height: 100%;
+    transition: width 0.3s ease-out;
+  }
+
+  .bar-fill.hp-fill {
+    background: linear-gradient(90deg, #22c55e, #16a34a);
+  }
+
+  .bar-fill.mp-fill {
+    background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  }
+
+  .bar-value {
+    font-size: 0.65rem;
     color: var(--text-primary);
-    line-height: 1.4;
+    min-width: 45px;
+    text-align: right;
+  }
+
+  .bar-damage {
+    font-size: 0.7rem;
+    color: #ef4444;
+    font-weight: 700;
+    animation: barDamageFlash 0.5s ease-out;
+  }
+
+  @keyframes barDamageFlash {
+    0% { transform: scale(1.3); }
+    100% { transform: scale(1); }
+  }
+
+  .gold-display {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #fbbf24;
   }
 
   /* Action Panel */
@@ -964,8 +999,7 @@
   }
 
   .action-grid.has-spell .action-btn.item,
-  .action-grid.has-spell .action-btn.run,
-  .action-grid.has-spell .action-btn.placeholder {
+  .action-grid.has-spell .action-btn.run {
     grid-column: span 1;
   }
 
@@ -1058,12 +1092,6 @@
 
   .action-btn.spell:hover:not(:disabled) {
     background: rgba(139, 92, 246, 0.1);
-  }
-
-  .action-btn.placeholder {
-    border-color: transparent;
-    background: transparent;
-    cursor: default;
   }
 
   .item-count {
