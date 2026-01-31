@@ -284,6 +284,14 @@
         {#if $combatState.isAnimating && $currentMessage}
           <div class="combat-message-overlay">
             <div class="combat-toast" class:crit={$lastRoll?.critical}>
+              {#if $lastRoll && $lastRoll.rolls.length > 0}
+                <span class="toast-dice">
+                  {#each $lastRoll.rolls as roll, i}
+                    <span class="toast-die">{roll}</span>{#if i < $lastRoll.rolls.length - 1}<span class="toast-plus">+</span>{/if}
+                  {/each}
+                </span>
+                <span class="toast-arrow">→</span>
+              {/if}
               <span class="toast-message">{$currentMessage}</span>
               {#if $lastRoll?.critical}
                 <span class="toast-crit">CRIT!</span>
