@@ -698,8 +698,8 @@
 
   /* Only lock height/scroll during active combat */
   .dungeon-page.in-combat {
-    height: calc(100vh - var(--header-height) - var(--mobile-nav-height));
-    max-height: calc(100vh - var(--header-height) - var(--mobile-nav-height));
+    height: calc(100vh - var(--header-height) - var(--mobile-nav-height) - 8px);
+    max-height: calc(100vh - var(--header-height) - var(--mobile-nav-height) - 8px);
     overflow: hidden;
   }
 
