@@ -601,6 +601,10 @@ async function monsterAttack(run, monster) {
 }
 
 async function monsterDefeated(run, room, monster) {
+  // Clear dice display from combat
+  lastRoll.set({ rolls: [], total: 0, type: 'none', critical: false });
+  currentMessage.set('');
+
   addLog('victory', `${monster.displayName} defeated! +${monster.goldReward} gold`);
 
   run.goldCollected += monster.goldReward;

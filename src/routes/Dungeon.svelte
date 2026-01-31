@@ -38,6 +38,10 @@
   // Watch for new rolls and animate dice
   $: if ($lastRoll && $lastRoll.rolls.length > 0) {
     animateDiceRoll($lastRoll.rolls);
+  } else if ($lastRoll && $lastRoll.rolls.length === 0) {
+    // Clear dice display when rolls are empty
+    displayedRolls = [];
+    diceRevealed = [];
   }
 
   function animateDiceRoll(finalRolls) {
