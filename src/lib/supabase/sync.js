@@ -384,8 +384,9 @@ export async function fullSync() {
     await syncPlayer();
     await syncSettings();
     await syncBoard();
-    await syncTasks();
-    console.log('Full sync complete');
+    // Temporarily disabled task sync to debug local persistence
+    // await syncTasks();
+    console.log('Full sync complete (task sync disabled)');
   } catch (error) {
     console.error('Full sync error:', error);
   }
