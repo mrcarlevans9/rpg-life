@@ -592,6 +592,7 @@
   {#if $gamePhase === 'merchant'}
     {@const room = $currentRun?.floor?.rooms[$currentRun?.floor?.currentRoom]}
     {@const merchant = room?.merchant}
+    {@const totalGold = ($currentRun?.goldCollected || 0) + ($currentRun?.bankGold || 0)}
     <div class="merchant-screen">
       <div class="merchant-header">
         <span class="merchant-emoji">{merchant?.emoji || '🧌'}</span>
@@ -600,8 +601,8 @@
       </div>
 
       <div class="merchant-gold">
-        <span class="gold-available">💰 {$currentRun?.goldCollected || 0} gold to spend</span>
-        <span class="gold-bank-info">(🏦 {$currentRun?.bankGold || 0} safe in bank)</span>
+        <span class="gold-available">🪙 {totalGold} total gold</span>
+        <span class="gold-breakdown">(💰 {$currentRun?.goldCollected || 0} run + 🏦 {$currentRun?.bankGold || 0} bank)</span>
       </div>
 
       <div class="merchant-items">
@@ -615,7 +616,7 @@
               </div>
               <button
                 class="item-buy"
-                disabled={$currentRun?.goldCollected < item.cost}
+                disabled={totalGold < item.cost}
                 on:click={() => purchaseMerchantItem(item.key)}
               >
                 🪙 {item.cost}
@@ -736,6 +737,7 @@
   <!-- Floor Complete Merchant -->
   {#if $gamePhase === 'floor_merchant'}
     {@const merchant = $currentRun?.floorMerchant}
+    {@const floorTotalGold = ($currentRun?.goldCollected || 0) + ($currentRun?.bankGold || 0)}
     <div class="merchant-screen floor-merchant">
       <div class="merchant-header">
         <span class="merchant-emoji">{merchant?.emoji || '🧌'}</span>
@@ -745,8 +747,8 @@
       </div>
 
       <div class="merchant-gold">
-        <span class="gold-available">💰 {$currentRun?.goldCollected || 0} gold to spend</span>
-        <span class="gold-bank-info">(🏦 {$currentRun?.bankGold || 0} safe in bank)</span>
+        <span class="gold-available">🪙 {floorTotalGold} total gold</span>
+        <span class="gold-breakdown">(💰 {$currentRun?.goldCollected || 0} run + 🏦 {$currentRun?.bankGold || 0} bank)</span>
       </div>
 
       <div class="merchant-items">
@@ -760,7 +762,7 @@
               </div>
               <button
                 class="item-buy"
-                disabled={$currentRun?.goldCollected < item.cost}
+                disabled={floorTotalGold < item.cost}
                 on:click={() => purchaseFloorMerchantItem(item.key)}
               >
                 🪙 {item.cost}
@@ -2561,8 +2563,8 @@
     color: #fbbf24;
   }
 
-  .merchant-gold .gold-bank-info {
-    font-size: 0.75rem;
+  .merchant-gold .gold-breakdown {
+    font-size: 0.7rem;
     color: var(--text-muted);
   }
 

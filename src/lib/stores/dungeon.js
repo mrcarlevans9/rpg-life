@@ -1202,14 +1202,25 @@ export async function purchaseMerchantItem(itemKey) {
 
   const item = room.merchant.items[itemIndex];
 
-  // Check run gold only (NOT bank gold!)
+  // Can spend both run gold and bank gold
   const runGold = run.goldCollected || 0;
-  if (runGold < item.cost) {
-    return { success: false, error: `Not enough gold! Need ${item.cost}, have ${runGold}` };
+  const bankGold = run.bankGold || 0;
+  const totalGold = runGold + bankGold;
+
+  if (totalGold < item.cost) {
+    return { success: false, error: `Not enough gold! Need ${item.cost}, have ${totalGold}` };
   }
 
-  // Deduct from run gold only
-  run.goldCollected = runGold - item.cost;
+  // Deduct from run gold first, then bank gold if needed
+  let remaining = item.cost;
+  if (runGold >= remaining) {
+    run.goldCollected = runGold - remaining;
+  } else {
+    // Use all run gold, then dip into bank
+    run.goldCollected = 0;
+    remaining -= runGold;
+    run.bankGold = bankGold - remaining;
+  }
 
   // Apply effect
   const effect = item.effect;
@@ -1305,14 +1316,25 @@ export async function purchaseFloorMerchantItem(itemKey) {
 
   const item = run.floorMerchant.items[itemIndex];
 
-  // Check run gold only (NOT bank gold!)
+  // Can spend both run gold and bank gold
   const runGold = run.goldCollected || 0;
-  if (runGold < item.cost) {
-    return { success: false, error: `Not enough gold! Need ${item.cost}, have ${runGold}` };
+  const bankGold = run.bankGold || 0;
+  const totalGold = runGold + bankGold;
+
+  if (totalGold < item.cost) {
+    return { success: false, error: `Not enough gold! Need ${item.cost}, have ${totalGold}` };
   }
 
-  // Deduct from run gold only
-  run.goldCollected = runGold - item.cost;
+  // Deduct from run gold first, then bank gold if needed
+  let remaining = item.cost;
+  if (runGold >= remaining) {
+    run.goldCollected = runGold - remaining;
+  } else {
+    // Use all run gold, then dip into bank
+    run.goldCollected = 0;
+    remaining -= runGold;
+    run.bankGold = bankGold - remaining;
+  }
 
   // Apply effect
   const effect = item.effect;
