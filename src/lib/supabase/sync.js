@@ -516,6 +516,10 @@ export async function syncDungeon() {
       .eq('user_id', userId)
       .single();
 
+    console.log('syncDungeon - local:', localDungeon);
+    console.log('syncDungeon - remote:', remoteDungeon);
+    console.log('syncDungeon - error:', error);
+
     if (error && error.code !== 'PGRST116') {
       console.error('Error fetching remote dungeon:', error);
       return localDungeon;
@@ -618,7 +622,7 @@ export async function syncDungeon() {
       return merged;
     } else if (localDungeon) {
       // No remote data, push local to remote
-      await supabase.from('dungeon').insert({
+      const { data, error: insertError } = await supabase.from('dungeon').upsert({
         user_id: userId,
         health_potions: localDungeon.healthPotions || 0,
         gold: localDungeon.gold || 0,
@@ -636,8 +640,13 @@ export async function syncDungeon() {
         max_mp_bonus: localDungeon.maxMpBonus || 0,
         custom_spells: localDungeon.customSpells || [],
         purchased_spell_slot: localDungeon.purchasedSpellSlot || false
-      });
-      console.log('Dungeon data pushed to remote');
+      }, { onConflict: 'user_id' }).select();
+
+      if (insertError) {
+        console.error('Dungeon push FAILED:', insertError);
+      } else {
+        console.log('Dungeon data pushed to remote:', data);
+      }
     }
 
     return localDungeon;
@@ -672,12 +681,19 @@ export async function pushDungeonUpdate(updates) {
 
     if (Object.keys(remoteUpdates).length > 0) {
       // Upsert to handle case where row doesn't exist yet
-      await supabase
+      const { data, error } = await supabase
         .from('dungeon')
         .upsert({
           user_id: userId,
           ...remoteUpdates
-        }, { onConflict: 'user_id' });
+        }, { onConflict: 'user_id' })
+        .select();
+
+      if (error) {
+        console.error('Push dungeon update FAILED:', error);
+      } else {
+        console.log('Push dungeon update SUCCESS:', data);
+      }
     }
   } catch (error) {
     console.error('Push dungeon update error:', error);
