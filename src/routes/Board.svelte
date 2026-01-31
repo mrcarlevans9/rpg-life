@@ -16,6 +16,7 @@
   let tasks = [];
   let loading = true;
   let filter = 'all';
+  let expandedTaskId = null;
 
   let showModal = false;
   let editingTask = null;
@@ -211,6 +212,10 @@
   $: todoCount = tasks.filter(t => t.status === 'todo' && !t.completed).length;
   $: activeCount = tasks.filter(t => t.status === 'active').length;
   $: doneCount = tasks.filter(t => t.completed).length;
+
+  function toggleExpand(taskId) {
+    expandedTaskId = expandedTaskId === taskId ? null : taskId;
+  }
 </script>
 
 <div class="bounty-board">
@@ -271,48 +276,63 @@
   {:else}
     <div class="task-list">
       {#each filteredTasks as task (task.id)}
-        <div class="task-card" class:active={task.status === 'active'} class:completed={task.completed}>
-          <div class="task-main" on:click={() => openModal(task)} role="button" tabindex="0" on:keypress={(e) => e.key === 'Enter' && openModal(task)}>
-            <div class="task-header">
-              <span class="priority-badge priority-{task.priority}">
-                {getPriorityLabel(task.priority)}
-              </span>
-              <span class="xp-reward">{getXPReward(task.priority)}</span>
-            </div>
+        {@const isExpanded = expandedTaskId === task.id}
+        <div class="task-card" class:active={task.status === 'active'} class:completed={task.completed} class:expanded={isExpanded}>
+          <!-- Compact View (always visible) -->
+          <div class="task-compact" on:click={() => toggleExpand(task.id)} role="button" tabindex="0" on:keypress={(e) => e.key === 'Enter' && toggleExpand(task.id)}>
+            <span class="priority-badge priority-{task.priority}">
+              {getPriorityLabel(task.priority)}
+            </span>
             <h3 class="task-title">{task.title}</h3>
-            {#if task.description}
-              <p class="task-description">{task.description}</p>
-            {/if}
-            <div class="task-meta">
-              {#if task.dueDate}
-                <span class="due-date">{task.dueDate}</span>
-              {/if}
-              {#if task.timeSpent > 0 || task.status === 'active'}
-                <span class="time-spent">
-                  {formatTimeSpent(task.timeSpent || 0)}
-                  {#if task.status === 'active'}+ {formatTimer(currentTime)}{/if}
-                </span>
-              {/if}
-            </div>
+            <span class="xp-reward">{getXPReward(task.priority)}</span>
+            <span class="expand-icon">{isExpanded ? '▲' : '▼'}</span>
           </div>
 
+          <!-- Action Buttons (always visible below compact) -->
           {#if !task.completed}
             <div class="task-actions">
               {#if task.status === 'active'}
-                <button class="action-btn pause" on:click={() => handlePauseTask(task)}>Pause</button>
-                <button class="action-btn complete" on:click={() => handleCompleteTask(task)}>Complete</button>
+                <button class="action-btn pause" on:click|stopPropagation={() => handlePauseTask(task)}>Pause</button>
+                <button class="action-btn complete" on:click|stopPropagation={() => handleCompleteTask(task)}>Complete</button>
               {:else}
-                <button class="action-btn start" on:click={() => handleStartTask(task)}>Start</button>
-                <button class="action-btn complete" on:click={() => handleCompleteTask(task)}>Done</button>
+                <button class="action-btn start" on:click|stopPropagation={() => handleStartTask(task)}>Start</button>
+                <button class="action-btn complete" on:click|stopPropagation={() => handleCompleteTask(task)}>Done</button>
               {/if}
-              <button class="action-btn delete" on:click={() => handleDeleteTask(task)}>Delete</button>
             </div>
           {:else}
             <div class="completed-info">
               <span class="completed-check">Completed</span>
-              {#if task.timeSpent > 0}
-                <span class="final-time">Time: {formatTimeSpent(task.timeSpent)}</span>
+            </div>
+          {/if}
+
+          <!-- Expanded Details -->
+          {#if isExpanded}
+            <div class="task-expanded">
+              {#if task.description}
+                <div class="detail-row">
+                  <span class="detail-label">Description</span>
+                  <p class="detail-value">{task.description}</p>
+                </div>
               {/if}
+              {#if task.dueDate}
+                <div class="detail-row">
+                  <span class="detail-label">Due Date</span>
+                  <span class="detail-value">{task.dueDate}</span>
+                </div>
+              {/if}
+              {#if task.timeSpent > 0 || task.status === 'active'}
+                <div class="detail-row">
+                  <span class="detail-label">Time Spent</span>
+                  <span class="detail-value time-value">
+                    {formatTimeSpent(task.timeSpent || 0)}
+                    {#if task.status === 'active'}+ {formatTimer(currentTime)}{/if}
+                  </span>
+                </div>
+              {/if}
+              <div class="expanded-actions">
+                <button class="edit-btn" on:click|stopPropagation={() => openModal(task)}>Edit</button>
+                <button class="delete-btn" on:click|stopPropagation={() => handleDeleteTask(task)}>Delete</button>
+              </div>
             </div>
           {/if}
         </div>
@@ -501,6 +521,7 @@
     border: 1px solid var(--border);
     border-radius: 12px;
     overflow: hidden;
+    transition: all 0.2s ease;
   }
 
   .task-card.active {
@@ -512,24 +533,31 @@
     opacity: 0.7;
   }
 
-  .task-main {
-    padding: 16px;
-    cursor: pointer;
+  .task-card.expanded {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   }
 
-  .task-header {
+  /* Compact View */
+  .task-compact {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    margin-bottom: 8px;
+    gap: 12px;
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+  }
+
+  .task-compact:hover {
+    background: var(--bg-tertiary);
   }
 
   .priority-badge {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
-    padding: 2px 8px;
+    padding: 4px 10px;
     border-radius: 999px;
     text-transform: uppercase;
+    flex-shrink: 0;
   }
 
   .priority-low {
@@ -547,41 +575,34 @@
     color: #ef4444;
   }
 
+  .task-title {
+    flex: 1;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   .xp-reward {
     font-size: 12px;
     color: #6366f1;
     font-weight: 600;
+    flex-shrink: 0;
   }
 
-  .task-title {
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: 4px;
-  }
-
-  .task-description {
-    font-size: 14px;
+  .expand-icon {
+    font-size: 10px;
     color: var(--text-muted);
-    margin-bottom: 8px;
-  }
-
-  .task-meta {
-    display: flex;
-    gap: 12px;
-    font-size: 12px;
-    color: var(--text-muted);
-  }
-
-  .time-spent {
-    color: #6366f1;
+    flex-shrink: 0;
   }
 
   /* Task Actions */
   .task-actions {
     display: flex;
     gap: 8px;
-    padding: 12px 16px;
+    padding: 10px 16px;
     background: var(--bg-tertiary);
     border-top: 1px solid var(--border);
   }
@@ -594,6 +615,11 @@
     font-weight: 500;
     border: none;
     cursor: pointer;
+    transition: transform 0.1s ease;
+  }
+
+  .action-btn:active {
+    transform: scale(0.98);
   }
 
   .action-btn.start {
@@ -611,20 +637,10 @@
     color: white;
   }
 
-  .action-btn.delete {
-    background: transparent;
-    color: var(--text-muted);
-    flex: 0;
-  }
-
-  .action-btn.delete:hover {
-    color: #ef4444;
-  }
-
   .completed-info {
     display: flex;
-    justify-content: space-between;
-    padding: 12px 16px;
+    justify-content: center;
+    padding: 10px 16px;
     background: var(--bg-tertiary);
     border-top: 1px solid var(--border);
     font-size: 14px;
@@ -635,8 +651,88 @@
     font-weight: 500;
   }
 
-  .final-time {
+  /* Expanded Details */
+  .task-expanded {
+    padding: 16px;
+    border-top: 1px solid var(--border);
+    background: var(--bg-primary);
+    animation: slideDown 0.2s ease;
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .detail-row {
+    margin-bottom: 12px;
+  }
+
+  .detail-row:last-of-type {
+    margin-bottom: 16px;
+  }
+
+  .detail-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
     color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .detail-value {
+    font-size: 14px;
+    color: var(--text-primary);
+    line-height: 1.4;
+  }
+
+  .time-value {
+    color: #6366f1;
+    font-weight: 500;
+  }
+
+  .expanded-actions {
+    display: flex;
+    gap: 8px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+
+  .edit-btn, .delete-btn {
+    flex: 1;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+  }
+
+  .edit-btn {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+  }
+
+  .edit-btn:hover {
+    background: var(--bg-tertiary);
+  }
+
+  .delete-btn {
+    background: transparent;
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+  }
+
+  .delete-btn:hover {
+    background: rgba(239, 68, 68, 0.1);
   }
 
   /* Empty & Loading */
