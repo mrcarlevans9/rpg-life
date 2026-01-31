@@ -37,6 +37,12 @@ body.no-scroll {
   height: 100%;
 }
 
+/* Remove extra padding during combat to prevent scroll */
+body.no-scroll .main-content {
+  padding: 0;
+  padding-bottom: var(--mobile-nav-height);
+}
+
 h1 {
   font-size: 3.2em;
   line-height: 1.1;
