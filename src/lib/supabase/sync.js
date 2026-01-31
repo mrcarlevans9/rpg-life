@@ -75,7 +75,7 @@ export async function syncPlayer() {
       await db.player.update(1, merged);
 
       // Update remote
-      await supabase
+      const { error: updateError } = await supabase
         .from('players')
         .update({
           total_xp: merged.totalXP,
@@ -93,6 +93,9 @@ export async function syncPlayer() {
         })
         .eq('user_id', userId);
 
+      if (updateError) {
+        console.error('UPDATE ERROR:', updateError.message, updateError.details, updateError.hint);
+      }
       console.log('MERGED result:', JSON.stringify({ gold: merged.gold, healthPotions: merged.healthPotions, customSpells: merged.customSpells }));
       console.log('Player synced:', merged.gold, 'gold,', merged.highestFloor, 'best floor');
       return merged;
