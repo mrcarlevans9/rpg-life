@@ -4,7 +4,7 @@ import Dexie from 'dexie';
 export const db = new Dexie('RPGLifeDB');
 
 // Define the database schema
-db.version(5).stores({
+db.version(6).stores({
   // Player profile - single row (id: 1)
   player: '++id',
 
@@ -39,7 +39,10 @@ db.version(5).stores({
   xpHistory: '++id, timestamp, source',
 
   // Daily stats snapshots
-  dailyStats: '++id, &date'
+  dailyStats: '++id, &date',
+
+  // Dungeon data - single row (id: 1)
+  dungeon: '++id'
 });
 
 // Achievement definitions
@@ -119,6 +122,62 @@ export const TITLES = [
   { key: 'night_owl', name: 'Night Owl', requirement: 'Complete task after midnight', achievement: 'night_owl' },
   { key: 'early_bird', name: 'Early Bird', requirement: 'Complete task before 6am', achievement: 'early_bird' },
   { key: 'explorer', name: 'Explorer', requirement: '10 hours of expeditions', achievement: 'seasoned_explorer' }
+];
+
+// Dungeon monster definitions
+export const MONSTERS = {
+  // Tier 1 (Floors 1-3)
+  common: [
+    { key: 'slime', name: 'Slime', emoji: '🟢', baseHp: 8, baseDamage: 3, goldDrop: [2, 5] },
+    { key: 'rat', name: 'Giant Rat', emoji: '🐀', baseHp: 6, baseDamage: 4, goldDrop: [2, 4] },
+    { key: 'bat', name: 'Cave Bat', emoji: '🦇', baseHp: 5, baseDamage: 3, goldDrop: [1, 4] },
+    { key: 'spider', name: 'Spider', emoji: '🕷️', baseHp: 7, baseDamage: 4, goldDrop: [2, 5] }
+  ],
+  // Tier 2 (Floors 4-6)
+  uncommon: [
+    { key: 'goblin', name: 'Goblin', emoji: '👺', baseHp: 15, baseDamage: 5, goldDrop: [5, 10] },
+    { key: 'skeleton', name: 'Skeleton', emoji: '💀', baseHp: 12, baseDamage: 6, goldDrop: [4, 9] },
+    { key: 'zombie', name: 'Zombie', emoji: '🧟', baseHp: 18, baseDamage: 4, goldDrop: [5, 8] },
+    { key: 'ghost', name: 'Ghost', emoji: '👻', baseHp: 10, baseDamage: 7, goldDrop: [6, 11] }
+  ],
+  // Tier 3 (Floors 7-9)
+  rare: [
+    { key: 'orc', name: 'Orc Warrior', emoji: '👹', baseHp: 25, baseDamage: 8, goldDrop: [10, 18] },
+    { key: 'wraith', name: 'Wraith', emoji: '🌑', baseHp: 20, baseDamage: 10, goldDrop: [12, 20] },
+    { key: 'golem', name: 'Stone Golem', emoji: '🗿', baseHp: 35, baseDamage: 6, goldDrop: [15, 22] },
+    { key: 'demon', name: 'Lesser Demon', emoji: '😈', baseHp: 22, baseDamage: 9, goldDrop: [11, 19] }
+  ]
+};
+
+// Dungeon boss definitions (Floor 10)
+export const BOSSES = [
+  { key: 'dragon', name: 'Ancient Dragon', emoji: '🐉', baseHp: 80, baseDamage: 12, goldDrop: [50, 80], special: 'Fire Breath' },
+  { key: 'lich', name: 'Lich King', emoji: '☠️', baseHp: 60, baseDamage: 15, goldDrop: [45, 75], special: 'Soul Drain' },
+  { key: 'demon_lord', name: 'Demon Lord', emoji: '👿', baseHp: 70, baseDamage: 14, goldDrop: [55, 85], special: 'Hellfire' },
+  { key: 'hydra', name: 'Hydra', emoji: '🐍', baseHp: 90, baseDamage: 10, goldDrop: [60, 90], special: 'Multi-Strike' },
+  { key: 'titan', name: 'Fallen Titan', emoji: '🦾', baseHp: 100, baseDamage: 11, goldDrop: [65, 95], special: 'Ground Slam' }
+];
+
+// Monster modifiers (randomly applied)
+export const MONSTER_MODIFIERS = [
+  { key: 'enraged', name: 'Enraged', damageMultiplier: 1.5, hpMultiplier: 1, goldMultiplier: 1.2 },
+  { key: 'armored', name: 'Armored', damageMultiplier: 1, hpMultiplier: 1.5, goldMultiplier: 1.3 },
+  { key: 'swift', name: 'Swift', damageMultiplier: 1.2, hpMultiplier: 0.9, goldMultiplier: 1.1 },
+  { key: 'giant', name: 'Giant', damageMultiplier: 1.3, hpMultiplier: 1.4, goldMultiplier: 1.5 }
+];
+
+// Dungeon shop upgrades
+export const DUNGEON_UPGRADES = [
+  { key: 'max_hp_1', name: 'Vitality I', description: '+10 Max HP', cost: 50, effect: { maxHp: 10 } },
+  { key: 'max_hp_2', name: 'Vitality II', description: '+20 Max HP', cost: 150, effect: { maxHp: 20 }, requires: 'max_hp_1' },
+  { key: 'max_hp_3', name: 'Vitality III', description: '+30 Max HP', cost: 400, effect: { maxHp: 30 }, requires: 'max_hp_2' },
+  { key: 'damage_1', name: 'Strength I', description: '+1 Damage', cost: 75, effect: { bonusDamage: 1 } },
+  { key: 'damage_2', name: 'Strength II', description: '+2 Damage', cost: 200, effect: { bonusDamage: 2 }, requires: 'damage_1' },
+  { key: 'damage_3', name: 'Strength III', description: '+3 Damage', cost: 500, effect: { bonusDamage: 3 }, requires: 'damage_2' },
+  { key: 'potion_power_1', name: 'Alchemy I', description: 'Potions heal +5 HP', cost: 100, effect: { potionBonus: 5 } },
+  { key: 'potion_power_2', name: 'Alchemy II', description: 'Potions heal +10 HP', cost: 300, effect: { potionBonus: 10 }, requires: 'potion_power_1' },
+  { key: 'crit_chance', name: 'Lucky Strike', description: '+10% Critical Chance', cost: 250, effect: { critBonus: 10 } },
+  { key: 'defense_1', name: 'Fortitude I', description: 'Defend blocks +2 damage', cost: 100, effect: { defenseBonus: 2 } }
 ];
 
 export default db;

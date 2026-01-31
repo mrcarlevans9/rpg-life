@@ -1,4 +1,4 @@
-import { db, ACHIEVEMENTS, UNLOCKABLES, TITLES } from './schema.js';
+import { db, ACHIEVEMENTS, UNLOCKABLES, TITLES, MONSTERS, BOSSES, MONSTER_MODIFIERS, DUNGEON_UPGRADES } from './schema.js';
 
 // Initialize database with default data
 export async function initializeDB() {
@@ -88,6 +88,24 @@ export async function initializeDB() {
       updatedAt: new Date().toISOString()
     });
 
+    // Initialize dungeon data
+    await db.dungeon.add({
+      healthPotions: 3, // Start with 3 potions
+      gold: 0,
+      totalGoldEarned: 0,
+      highestFloor: 0,
+      totalRuns: 0,
+      totalKills: 0,
+      bossesDefeated: 0,
+      upgrades: [], // Array of purchased upgrade keys
+      // Calculated stats from upgrades
+      maxHpBonus: 0,
+      bonusDamage: 0,
+      potionBonus: 0,
+      critBonus: 0,
+      defenseBonus: 0
+    });
+
     console.log('Database initialized with default data');
   }
 
@@ -104,7 +122,28 @@ export async function initializeDB() {
     });
     console.log('Board initialized');
   }
+
+  // Ensure dungeon exists (for existing users upgrading)
+  const dungeonCount = await db.dungeon.count();
+  if (dungeonCount === 0) {
+    await db.dungeon.add({
+      healthPotions: 3,
+      gold: 0,
+      totalGoldEarned: 0,
+      highestFloor: 0,
+      totalRuns: 0,
+      totalKills: 0,
+      bossesDefeated: 0,
+      upgrades: [],
+      maxHpBonus: 0,
+      bonusDamage: 0,
+      potionBonus: 0,
+      critBonus: 0,
+      defenseBonus: 0
+    });
+    console.log('Dungeon initialized');
+  }
 }
 
 // Export db and constants
-export { db, ACHIEVEMENTS, UNLOCKABLES, TITLES };
+export { db, ACHIEVEMENTS, UNLOCKABLES, TITLES, MONSTERS, BOSSES, MONSTER_MODIFIERS, DUNGEON_UPGRADES };

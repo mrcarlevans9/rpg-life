@@ -37,6 +37,9 @@
     '/settings': wrap({
       asyncComponent: () => import('./routes/Settings.svelte')
     }),
+    '/dungeon': wrap({
+      asyncComponent: () => import('./routes/Dungeon.svelte')
+    }),
     '*': wrap({
       asyncComponent: () => import('./routes/NotFound.svelte')
     })

@@ -5,6 +5,7 @@ import { addXP, calculateTaskXP, calculateSubtaskXP } from '../services/xpServic
 import { xpGainNotification, updateStreak, playerData } from './player.js';
 import { get } from 'svelte/store';
 import { pushTaskCreate, pushTaskUpdate, pushTaskDelete } from '../supabase/sync.js';
+import { awardPotions } from './dungeon.js';
 
 // Create a store from a Dexie liveQuery
 function createLiveQueryStore(queryFn, defaultValue = null) {
@@ -246,6 +247,9 @@ export async function completeTask(taskId) {
 
   // Add XP
   const xpResult = await addXP(xpEarned, 'task');
+
+  // Award dungeon health potion
+  await awardPotions(1);
 
   // Trigger notification
   xpGainNotification.set({

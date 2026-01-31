@@ -5,6 +5,7 @@ import { addXP, calculateExpeditionXP } from '../services/xpService.js';
 import { xpGainNotification, updateStreak } from './player.js';
 import { settingsData } from './settings.js';
 import { get } from 'svelte/store';
+import { awardPotions } from './dungeon.js';
 
 // Create a store from a Dexie liveQuery
 function createLiveQueryStore(queryFn, defaultValue = null) {
@@ -196,6 +197,10 @@ export async function endExpedition() {
   // Add XP
   const xpResult = await addXP(xpEarned, 'expedition');
 
+  // Award dungeon health potions (2 base, +1 if hit daily goal)
+  const potionsEarned = hitGoal ? 3 : 2;
+  await awardPotions(potionsEarned);
+
   // Trigger notification
   xpGainNotification.set({
     amount: xpEarned,
@@ -208,6 +213,7 @@ export async function endExpedition() {
     duration: durationMinutes,
     xpEarned,
     hitGoal,
+    potionsEarned,
     ...xpResult
   };
 }
