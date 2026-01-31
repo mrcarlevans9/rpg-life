@@ -17,125 +17,125 @@
 </script>
 
 <div class="avatar-container size-{size}" style="--pixel-size: {pixelSize}px">
-  <!-- Base body - varies by gender -->
+  <!-- Base body - varies by gender (shifted down 3 rows for centering) -->
   <div class="avatar-layer body" style="--skin-color: {displayData.skinColor}">
     {#if displayData.gender === 'female'}
       <!-- Female body shape -->
       <!-- Head (slightly rounder) -->
-      <div class="pixel" style="grid-area: 3/6/5/11; background: var(--skin-color); border-radius: 20%"></div>
+      <div class="pixel" style="grid-area: 6/6/8/11; background: var(--skin-color); border-radius: 20%"></div>
       <!-- Neck -->
-      <div class="pixel" style="grid-area: 5/7/6/10; background: var(--skin-color)"></div>
+      <div class="pixel" style="grid-area: 8/7/9/10; background: var(--skin-color)"></div>
       <!-- Body (curved torso) -->
-      <div class="pixel" style="grid-area: 6/6/8/11; background: var(--skin-color); border-radius: 10%"></div>
+      <div class="pixel" style="grid-area: 9/6/11/11; background: var(--skin-color); border-radius: 10%"></div>
       <!-- Arms (slimmer) -->
-      <div class="pixel" style="grid-area: 6/4/7/6; background: var(--skin-color)"></div>
-      <div class="pixel" style="grid-area: 6/11/7/13; background: var(--skin-color)"></div>
+      <div class="pixel" style="grid-area: 9/4/10/6; background: var(--skin-color)"></div>
+      <div class="pixel" style="grid-area: 9/11/10/13; background: var(--skin-color)"></div>
       <!-- Legs -->
-      <div class="pixel" style="grid-area: 8/7/10/8; background: var(--skin-color)"></div>
-      <div class="pixel" style="grid-area: 8/9/10/10; background: var(--skin-color)"></div>
+      <div class="pixel" style="grid-area: 11/7/13/8; background: var(--skin-color)"></div>
+      <div class="pixel" style="grid-area: 11/9/13/10; background: var(--skin-color)"></div>
     {:else if displayData.gender === 'male'}
       <!-- Male body shape -->
       <!-- Head -->
-      <div class="pixel" style="grid-area: 3/6/5/11; background: var(--skin-color)"></div>
+      <div class="pixel" style="grid-area: 6/6/8/11; background: var(--skin-color)"></div>
       <!-- Body (broader shoulders) -->
-      <div class="pixel" style="grid-area: 5/5/8/12; background: var(--skin-color)"></div>
+      <div class="pixel" style="grid-area: 8/5/11/12; background: var(--skin-color)"></div>
       <!-- Arms (thicker) -->
-      <div class="pixel" style="grid-area: 5/4/7/5; background: var(--skin-color)"></div>
-      <div class="pixel" style="grid-area: 5/12/7/13; background: var(--skin-color)"></div>
+      <div class="pixel" style="grid-area: 8/4/10/5; background: var(--skin-color)"></div>
+      <div class="pixel" style="grid-area: 8/12/10/13; background: var(--skin-color)"></div>
       <!-- Legs -->
-      <div class="pixel" style="grid-area: 8/6/10/8; background: var(--skin-color)"></div>
-      <div class="pixel" style="grid-area: 8/9/10/11; background: var(--skin-color)"></div>
+      <div class="pixel" style="grid-area: 11/6/13/8; background: var(--skin-color)"></div>
+      <div class="pixel" style="grid-area: 11/9/13/11; background: var(--skin-color)"></div>
     {:else}
       <!-- Neutral/default body shape -->
       <!-- Head -->
-      <div class="pixel" style="grid-area: 3/6/5/11; background: var(--skin-color)"></div>
+      <div class="pixel" style="grid-area: 6/6/8/11; background: var(--skin-color)"></div>
       <!-- Body -->
-      <div class="pixel" style="grid-area: 5/7/8/10; background: var(--skin-color)"></div>
+      <div class="pixel" style="grid-area: 8/7/11/10; background: var(--skin-color)"></div>
       <!-- Arms -->
-      <div class="pixel" style="grid-area: 5/5/7/7; background: var(--skin-color)"></div>
-      <div class="pixel" style="grid-area: 5/10/7/12; background: var(--skin-color)"></div>
+      <div class="pixel" style="grid-area: 8/5/10/7; background: var(--skin-color)"></div>
+      <div class="pixel" style="grid-area: 8/10/10/12; background: var(--skin-color)"></div>
       <!-- Legs -->
-      <div class="pixel" style="grid-area: 8/7/10/8; background: var(--skin-color)"></div>
-      <div class="pixel" style="grid-area: 8/9/10/10; background: var(--skin-color)"></div>
+      <div class="pixel" style="grid-area: 11/7/13/8; background: var(--skin-color)"></div>
+      <div class="pixel" style="grid-area: 11/9/13/10; background: var(--skin-color)"></div>
     {/if}
   </div>
 
-  <!-- Hair layer -->
+  <!-- Hair layer (shifted down 3 rows) -->
   <div class="avatar-layer hair hair-{displayData.hairStyle}" style="--hair-color: {displayData.hairColor}">
     {#if displayData.hairStyle === 'default'}
-      <div class="pixel" style="grid-area: 2/6/4/11; background: var(--hair-color)"></div>
+      <div class="pixel" style="grid-area: 5/6/7/11; background: var(--hair-color)"></div>
     {:else if displayData.hairStyle === 'spiky'}
-      <div class="pixel" style="grid-area: 1/6/3/8; background: var(--hair-color)"></div>
-      <div class="pixel" style="grid-area: 1/9/3/11; background: var(--hair-color)"></div>
-      <div class="pixel" style="grid-area: 2/6/4/11; background: var(--hair-color)"></div>
+      <div class="pixel" style="grid-area: 4/6/6/8; background: var(--hair-color)"></div>
+      <div class="pixel" style="grid-area: 4/9/6/11; background: var(--hair-color)"></div>
+      <div class="pixel" style="grid-area: 5/6/7/11; background: var(--hair-color)"></div>
     {:else if displayData.hairStyle === 'long'}
-      <div class="pixel" style="grid-area: 2/5/8/7; background: var(--hair-color)"></div>
-      <div class="pixel" style="grid-area: 2/10/8/12; background: var(--hair-color)"></div>
-      <div class="pixel" style="grid-area: 2/6/4/11; background: var(--hair-color)"></div>
+      <div class="pixel" style="grid-area: 5/5/11/7; background: var(--hair-color)"></div>
+      <div class="pixel" style="grid-area: 5/10/11/12; background: var(--hair-color)"></div>
+      <div class="pixel" style="grid-area: 5/6/7/11; background: var(--hair-color)"></div>
     {:else if displayData.hairStyle === 'mohawk'}
-      <div class="pixel" style="grid-area: 1/7/4/10; background: var(--hair-color)"></div>
+      <div class="pixel" style="grid-area: 4/7/7/10; background: var(--hair-color)"></div>
     {:else if displayData.hairStyle === 'ponytail'}
-      <div class="pixel" style="grid-area: 2/6/4/11; background: var(--hair-color)"></div>
-      <div class="pixel" style="grid-area: 4/10/7/12; background: var(--hair-color)"></div>
+      <div class="pixel" style="grid-area: 5/6/7/11; background: var(--hair-color)"></div>
+      <div class="pixel" style="grid-area: 7/10/10/12; background: var(--hair-color)"></div>
     {:else if displayData.hairStyle === 'curly'}
-      <div class="pixel" style="grid-area: 1/5/4/12; background: var(--hair-color); border-radius: 50%"></div>
+      <div class="pixel" style="grid-area: 4/5/7/12; background: var(--hair-color); border-radius: 50%"></div>
     {:else}
-      <div class="pixel" style="grid-area: 2/6/4/11; background: var(--hair-color)"></div>
+      <div class="pixel" style="grid-area: 5/6/7/11; background: var(--hair-color)"></div>
     {/if}
   </div>
 
-  <!-- Eyes -->
+  <!-- Eyes (shifted down 3 rows) -->
   <div class="avatar-layer eyes">
-    <div class="pixel" style="grid-area: 3/7/4/8; background: #1a1a1a"></div>
-    <div class="pixel" style="grid-area: 3/9/4/10; background: #1a1a1a"></div>
+    <div class="pixel" style="grid-area: 6/7/7/8; background: #1a1a1a"></div>
+    <div class="pixel" style="grid-area: 6/9/7/10; background: #1a1a1a"></div>
   </div>
 
-  <!-- Outfit layer -->
+  <!-- Outfit layer (shifted down 3 rows) -->
   <div class="avatar-layer outfit outfit-{displayData.outfit}">
     {#if displayData.outfit === 'casual'}
-      <div class="pixel" style="grid-area: 5/7/8/10; background: #3b82f6"></div>
-      <div class="pixel" style="grid-area: 8/7/10/8; background: #1e40af"></div>
-      <div class="pixel" style="grid-area: 8/9/10/10; background: #1e40af"></div>
+      <div class="pixel" style="grid-area: 8/7/11/10; background: #3b82f6"></div>
+      <div class="pixel" style="grid-area: 11/7/13/8; background: #1e40af"></div>
+      <div class="pixel" style="grid-area: 11/9/13/10; background: #1e40af"></div>
     {:else if displayData.outfit === 'adventurer'}
-      <div class="pixel" style="grid-area: 5/7/8/10; background: #78350f"></div>
-      <div class="pixel" style="grid-area: 6/6/8/7; background: #78350f"></div>
-      <div class="pixel" style="grid-area: 8/7/10/8; background: #451a03"></div>
-      <div class="pixel" style="grid-area: 8/9/10/10; background: #451a03"></div>
+      <div class="pixel" style="grid-area: 8/7/11/10; background: #78350f"></div>
+      <div class="pixel" style="grid-area: 9/6/11/7; background: #78350f"></div>
+      <div class="pixel" style="grid-area: 11/7/13/8; background: #451a03"></div>
+      <div class="pixel" style="grid-area: 11/9/13/10; background: #451a03"></div>
     {:else if displayData.outfit === 'warrior'}
-      <div class="pixel" style="grid-area: 5/7/8/10; background: #6b7280"></div>
-      <div class="pixel" style="grid-area: 5/5/7/7; background: #6b7280"></div>
-      <div class="pixel" style="grid-area: 5/10/7/12; background: #6b7280"></div>
-      <div class="pixel" style="grid-area: 8/7/10/10; background: #4b5563"></div>
+      <div class="pixel" style="grid-area: 8/7/11/10; background: #6b7280"></div>
+      <div class="pixel" style="grid-area: 8/5/10/7; background: #6b7280"></div>
+      <div class="pixel" style="grid-area: 8/10/10/12; background: #6b7280"></div>
+      <div class="pixel" style="grid-area: 11/7/13/10; background: #4b5563"></div>
     {:else if displayData.outfit === 'mage'}
-      <div class="pixel" style="grid-area: 5/6/10/11; background: #7c3aed"></div>
-      <div class="pixel" style="grid-area: 5/5/6/12; background: #7c3aed"></div>
+      <div class="pixel" style="grid-area: 8/6/13/11; background: #7c3aed"></div>
+      <div class="pixel" style="grid-area: 8/5/9/12; background: #7c3aed"></div>
     {:else if displayData.outfit === 'knight'}
-      <div class="pixel" style="grid-area: 5/5/10/12; background: #9ca3af"></div>
-      <div class="pixel" style="grid-area: 5/7/6/10; background: #fbbf24"></div>
+      <div class="pixel" style="grid-area: 8/5/13/12; background: #9ca3af"></div>
+      <div class="pixel" style="grid-area: 8/7/9/10; background: #fbbf24"></div>
     {:else if displayData.outfit === 'royal'}
-      <div class="pixel" style="grid-area: 5/6/10/11; background: #dc2626"></div>
-      <div class="pixel" style="grid-area: 5/7/6/10; background: #fbbf24"></div>
-      <div class="pixel" style="grid-area: 6/7/7/10; background: #fef3c7"></div>
+      <div class="pixel" style="grid-area: 8/6/13/11; background: #dc2626"></div>
+      <div class="pixel" style="grid-area: 8/7/9/10; background: #fbbf24"></div>
+      <div class="pixel" style="grid-area: 9/7/10/10; background: #fef3c7"></div>
     {:else}
-      <div class="pixel" style="grid-area: 5/7/8/10; background: #3b82f6"></div>
+      <div class="pixel" style="grid-area: 8/7/11/10; background: #3b82f6"></div>
     {/if}
   </div>
 
-  <!-- Accessory layer -->
+  <!-- Accessory layer (shifted down 3 rows) -->
   <div class="avatar-layer accessory accessory-{displayData.accessory}">
     {#if displayData.accessory === 'glasses'}
-      <div class="pixel" style="grid-area: 3/6/4/8; background: #1a1a1a; opacity: 0.8"></div>
-      <div class="pixel" style="grid-area: 3/8/4/11; background: #1a1a1a; opacity: 0.8"></div>
+      <div class="pixel" style="grid-area: 6/6/7/8; background: #1a1a1a; opacity: 0.8"></div>
+      <div class="pixel" style="grid-area: 6/8/7/11; background: #1a1a1a; opacity: 0.8"></div>
     {:else if displayData.accessory === 'headband'}
-      <div class="pixel" style="grid-area: 2/6/3/11; background: #ef4444"></div>
+      <div class="pixel" style="grid-area: 5/6/6/11; background: #ef4444"></div>
     {:else if displayData.accessory === 'earring'}
-      <div class="pixel" style="grid-area: 4/5/5/6; background: #fbbf24"></div>
+      <div class="pixel" style="grid-area: 7/5/8/6; background: #fbbf24"></div>
     {:else if displayData.accessory === 'crown'}
-      <div class="pixel" style="grid-area: 1/6/2/11; background: #fbbf24"></div>
-      <div class="pixel" style="grid-area: 1/7/1/8; background: #fbbf24"></div>
-      <div class="pixel" style="grid-area: 1/9/1/10; background: #fbbf24"></div>
+      <div class="pixel" style="grid-area: 4/6/5/11; background: #fbbf24"></div>
+      <div class="pixel" style="grid-area: 3/7/4/8; background: #fbbf24"></div>
+      <div class="pixel" style="grid-area: 3/9/4/10; background: #fbbf24"></div>
     {:else if displayData.accessory === 'halo'}
-      <div class="pixel halo" style="grid-area: 1/6/2/11; background: rgba(251, 191, 36, 0.7); border-radius: 50%"></div>
+      <div class="pixel halo" style="grid-area: 4/6/5/11; background: rgba(251, 191, 36, 0.7); border-radius: 50%"></div>
     {/if}
   </div>
 
