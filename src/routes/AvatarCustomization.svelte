@@ -581,7 +581,8 @@
   .stat-block h3 {
     margin-bottom: var(--spacing-md);
     font-size: 1rem;
-    color: var(--text-secondary);
+    color: #e5e7eb;
+    font-weight: 600;
   }
 
   .bank-gold {
@@ -604,7 +605,7 @@
   }
 
   .bank-gold .gold-label {
-    color: var(--text-muted);
+    color: #9ca3af;
     font-size: 0.875rem;
   }
 
@@ -630,10 +631,11 @@
   .inventory-item .item-value {
     font-weight: 600;
     font-size: 1.1rem;
+    color: #f3f4f6;
   }
 
   .inventory-item .item-label {
-    color: var(--text-muted);
+    color: #9ca3af;
     font-size: 0.75rem;
   }
 
@@ -659,16 +661,17 @@
   }
 
   .spell-name {
-    font-weight: 500;
+    font-weight: 600;
+    color: #f3f4f6;
   }
 
   .spell-stats {
     font-size: 0.75rem;
-    color: var(--text-muted);
+    color: #9ca3af;
   }
 
   .no-spells {
-    color: var(--text-muted);
+    color: #9ca3af;
     font-size: 0.875rem;
     text-align: center;
     padding: var(--spacing-md);
@@ -705,12 +708,12 @@
   .dstat-value {
     font-weight: 700;
     font-size: 1.1rem;
-    color: var(--text-primary);
+    color: #f3f4f6;
     line-height: 1.2;
   }
 
   .dstat-label {
-    color: var(--text-muted);
+    color: #9ca3af;
     font-size: 0.6rem;
     text-transform: uppercase;
     letter-spacing: 0.3px;
