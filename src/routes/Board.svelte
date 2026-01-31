@@ -1,6 +1,5 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
-  import Button from '../components/common/Button.svelte';
   import Modal from '../components/common/Modal.svelte';
   import { db } from '../lib/db/index.js';
   import {
@@ -208,8 +207,11 @@
 <div class="bounty-board">
   <header class="board-header">
     <h1>Bounty Board</h1>
-    <Button on:click={() => openTaskModal()}>+ New Bounty</Button>
   </header>
+
+  <button class="new-bounty-btn" on:click={() => openTaskModal()}>
+    + New Bounty
+  </button>
 
   <!-- Active Task Banner -->
   {#if activeTask}
@@ -403,12 +405,12 @@
   </form>
 
   <svelte:fragment slot="footer">
-    <Button variant="secondary" on:click={() => { showTaskModal = false; editingTask = null; }}>
+    <button class="modal-btn secondary" on:click={() => { showTaskModal = false; editingTask = null; }}>
       Cancel
-    </Button>
-    <Button on:click={handleSaveTask} disabled={!taskForm.title.trim()}>
+    </button>
+    <button class="modal-btn primary" on:click={handleSaveTask} disabled={!taskForm.title.trim()}>
       {editingTask ? 'Save Changes' : 'Create Bounty'}
-    </Button>
+    </button>
   </svelte:fragment>
 </Modal>
 
@@ -428,6 +430,29 @@
 
   .board-header h1 {
     font-size: 1.5rem;
+  }
+
+  /* New Bounty Button */
+  .new-bounty-btn {
+    width: 100%;
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+    background-color: var(--accent);
+    color: white;
+    font-size: 1.125rem;
+    font-weight: 600;
+    border: none;
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .new-bounty-btn:hover {
+    background-color: var(--accent-hover);
+  }
+
+  .new-bounty-btn:active {
+    transform: scale(0.98);
   }
 
   /* Active Task Banner */
@@ -714,6 +739,41 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: var(--spacing-md);
+  }
+
+  /* Modal Buttons */
+  .modal-btn {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .modal-btn.primary {
+    background-color: var(--accent);
+    color: white;
+    border: none;
+  }
+
+  .modal-btn.primary:hover:not(:disabled) {
+    background-color: var(--accent-hover);
+  }
+
+  .modal-btn.primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .modal-btn.secondary {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+  }
+
+  .modal-btn.secondary:hover {
+    background-color: var(--bg-hover);
   }
 
   @media (max-width: 480px) {
