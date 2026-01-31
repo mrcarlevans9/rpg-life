@@ -816,8 +816,9 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 6px var(--spacing-sm);
+    padding: 4px var(--spacing-sm);
     background: rgba(0, 0, 0, 0.4);
+    flex-shrink: 0;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   }
 
@@ -1045,7 +1046,8 @@
   .player-bar {
     background: rgba(0, 0, 0, 0.5);
     border-top: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 3px var(--spacing-sm);
+    padding: 2px var(--spacing-sm);
+    flex-shrink: 0;
   }
 
   .player-bar.bar-flash {
@@ -1138,8 +1140,9 @@
   .action-panel {
     background: var(--bg-secondary);
     border-top: 1px solid var(--border);
-    padding: 8px;
+    padding: 6px;
     position: relative;
+    flex-shrink: 0;
   }
 
   /* Combat Message Toast (inside battle arena) */
@@ -1263,7 +1266,7 @@
   .action-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 6px;
+    gap: 4px;
   }
 
   .action-grid.has-spells {
@@ -1271,13 +1274,13 @@
   }
 
   .action-btn {
-    padding: 10px 12px;
+    padding: 8px 10px;
     border: 2px solid var(--border);
     border-radius: var(--radius-md);
     background: var(--bg-primary);
     color: var(--text-primary);
     font-weight: 600;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     cursor: pointer;
     transition: all 0.15s ease;
     display: flex;
