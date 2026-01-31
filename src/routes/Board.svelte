@@ -205,6 +205,11 @@
 </script>
 
 <div class="bounty-board">
+  <!-- DEBUG: This should always show -->
+  <div style="background: red; color: white; padding: 20px; margin-bottom: 20px; font-size: 24px; text-align: center;">
+    DEBUG: If you see this red box, the component is loading!
+  </div>
+
   <header class="board-header">
     <h1>Bounty Board</h1>
   </header>
