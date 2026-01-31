@@ -324,6 +324,10 @@
 
       <!-- Main Arena: Big centered enemy -->
       <div class="battle-arena">
+        <!-- Dungeon decorations -->
+        <div class="dungeon-decor left">🔥</div>
+        <div class="dungeon-decor right">🔥</div>
+
         {#if $currentMonster}
           <div
             class="monster-display"
@@ -944,6 +948,58 @@
     justify-content: center;
     position: relative;
     min-height: 0;
+    overflow: hidden;
+  }
+
+  /* Dungeon background scene */
+  .battle-arena::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      /* Stone floor pattern */
+      linear-gradient(180deg, transparent 60%, rgba(0,0,0,0.4) 100%),
+      /* Stone wall texture */
+      repeating-linear-gradient(
+        90deg,
+        rgba(60, 60, 80, 0.3) 0px,
+        rgba(40, 40, 60, 0.3) 2px,
+        rgba(50, 50, 70, 0.2) 4px
+      ),
+      repeating-linear-gradient(
+        0deg,
+        rgba(60, 60, 80, 0.2) 0px,
+        rgba(40, 40, 60, 0.2) 20px,
+        rgba(50, 50, 70, 0.3) 40px
+      );
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Dungeon decorations (torches) */
+  .dungeon-decor {
+    position: absolute;
+    top: 20%;
+    font-size: 1.8rem;
+    z-index: 1;
+    animation: torchFlicker 1s ease-in-out infinite alternate;
+    text-shadow: 0 0 20px rgba(255, 150, 50, 0.8), 0 0 40px rgba(255, 100, 0, 0.4);
+  }
+
+  .dungeon-decor.left {
+    left: 8px;
+    animation-delay: 0s;
+  }
+
+  .dungeon-decor.right {
+    right: 8px;
+    animation-delay: 0.5s;
+  }
+
+  @keyframes torchFlicker {
+    0% { opacity: 0.7; transform: scale(1) translateY(0); }
+    50% { opacity: 0.9; transform: scale(1.05) translateY(-2px); }
+    100% { opacity: 1; transform: scale(1.1) translateY(0); }
   }
 
   .monster-display {

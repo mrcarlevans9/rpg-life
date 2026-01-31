@@ -131,21 +131,39 @@ export const MONSTERS = {
     { key: 'slime', name: 'Slime', emoji: '🟢', baseHp: 15, baseDamage: 6, goldDrop: [2, 5] },
     { key: 'rat', name: 'Giant Rat', emoji: '🐀', baseHp: 12, baseDamage: 8, goldDrop: [2, 4] },
     { key: 'bat', name: 'Cave Bat', emoji: '🦇', baseHp: 10, baseDamage: 7, goldDrop: [1, 4] },
-    { key: 'spider', name: 'Spider', emoji: '🕷️', baseHp: 14, baseDamage: 7, goldDrop: [2, 5] }
+    { key: 'spider', name: 'Spider', emoji: '🕷️', baseHp: 14, baseDamage: 7, goldDrop: [2, 5] },
+    { key: 'snake', name: 'Cave Snake', emoji: '🐍', baseHp: 11, baseDamage: 9, goldDrop: [2, 5] },
+    { key: 'beetle', name: 'Giant Beetle', emoji: '🪲', baseHp: 16, baseDamage: 5, goldDrop: [2, 4] },
+    { key: 'mushroom', name: 'Toxic Shroom', emoji: '🍄', baseHp: 13, baseDamage: 8, goldDrop: [3, 5] },
+    { key: 'wolf', name: 'Dire Wolf', emoji: '🐺', baseHp: 14, baseDamage: 8, goldDrop: [2, 5] },
+    { key: 'frog', name: 'Giant Frog', emoji: '🐸', baseHp: 13, baseDamage: 7, goldDrop: [2, 4] },
+    { key: 'crab', name: 'Cave Crab', emoji: '🦀', baseHp: 17, baseDamage: 5, goldDrop: [2, 5] }
   ],
   // Tier 2 (Floors 4-6) - Tougher fights, need strategy
   uncommon: [
     { key: 'goblin', name: 'Goblin', emoji: '👺', baseHp: 28, baseDamage: 10, goldDrop: [5, 10] },
     { key: 'skeleton', name: 'Skeleton', emoji: '💀', baseHp: 24, baseDamage: 12, goldDrop: [4, 9] },
     { key: 'zombie', name: 'Zombie', emoji: '🧟', baseHp: 35, baseDamage: 8, goldDrop: [5, 8] },
-    { key: 'ghost', name: 'Ghost', emoji: '👻', baseHp: 20, baseDamage: 14, goldDrop: [6, 11] }
+    { key: 'ghost', name: 'Ghost', emoji: '👻', baseHp: 20, baseDamage: 14, goldDrop: [6, 11] },
+    { key: 'scorpion', name: 'Giant Scorpion', emoji: '🦂', baseHp: 26, baseDamage: 13, goldDrop: [5, 10] },
+    { key: 'imp', name: 'Fire Imp', emoji: '😈', baseHp: 18, baseDamage: 15, goldDrop: [5, 9] },
+    { key: 'harpy', name: 'Harpy', emoji: '🦅', baseHp: 22, baseDamage: 13, goldDrop: [5, 10] },
+    { key: 'mimic', name: 'Mimic', emoji: '📦', baseHp: 25, baseDamage: 11, goldDrop: [8, 15] },
+    { key: 'lizard', name: 'Lizardman', emoji: '🦎', baseHp: 30, baseDamage: 10, goldDrop: [5, 10] },
+    { key: 'shade', name: 'Shadow', emoji: '👤', baseHp: 19, baseDamage: 14, goldDrop: [6, 11] }
   ],
   // Tier 3 (Floors 7-9) - Dangerous, may need potions
   rare: [
     { key: 'orc', name: 'Orc Warrior', emoji: '👹', baseHp: 45, baseDamage: 14, goldDrop: [10, 18] },
     { key: 'wraith', name: 'Wraith', emoji: '🌑', baseHp: 38, baseDamage: 18, goldDrop: [12, 20] },
     { key: 'golem', name: 'Stone Golem', emoji: '🗿', baseHp: 60, baseDamage: 12, goldDrop: [15, 22] },
-    { key: 'demon', name: 'Lesser Demon', emoji: '😈', baseHp: 42, baseDamage: 16, goldDrop: [11, 19] }
+    { key: 'demon', name: 'Lesser Demon', emoji: '👿', baseHp: 42, baseDamage: 16, goldDrop: [11, 19] },
+    { key: 'vampire', name: 'Vampire', emoji: '🧛', baseHp: 35, baseDamage: 19, goldDrop: [14, 22] },
+    { key: 'ogre', name: 'Ogre', emoji: '👹', baseHp: 55, baseDamage: 15, goldDrop: [12, 20] },
+    { key: 'banshee', name: 'Banshee', emoji: '👻', baseHp: 30, baseDamage: 20, goldDrop: [13, 21] },
+    { key: 'elemental', name: 'Fire Elemental', emoji: '🔥', baseHp: 40, baseDamage: 17, goldDrop: [14, 22] },
+    { key: 'gargoyle', name: 'Gargoyle', emoji: '🗿', baseHp: 50, baseDamage: 14, goldDrop: [11, 19] },
+    { key: 'cyclops', name: 'Cyclops', emoji: '👁️', baseHp: 58, baseDamage: 16, goldDrop: [15, 23] }
   ]
 };
 
