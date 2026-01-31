@@ -25,7 +25,12 @@ export async function initializeDB() {
       lastActiveDate: null,
       totalTasksCompleted: 0,
       totalExpeditionMinutes: 0,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      // Character inventory (syncs with cloud)
+      gold: 0,
+      healthPotions: 3,
+      customSpells: [],
+      purchasedSpellSlot: false
     });
 
     // Create default avatar
@@ -179,6 +184,40 @@ export async function initializeDB() {
     if (Object.keys(updates).length > 0) {
       await db.dungeon.update(1, updates);
       console.log('Dungeon migrated to multi-spell system');
+    }
+  }
+
+  // Migrate gold, potions, spells from dungeon to player (if not already migrated)
+  const player = await db.player.get(1);
+  const dungeonForMigration = await db.dungeon.get(1);
+  if (player && dungeonForMigration) {
+    const playerUpdates = {};
+
+    // Migrate gold if player doesn't have it or dungeon has more
+    if (player.gold === undefined || (dungeonForMigration.gold > 0 && (player.gold || 0) === 0)) {
+      playerUpdates.gold = dungeonForMigration.gold || 0;
+    }
+
+    // Migrate potions if player doesn't have it
+    if (player.healthPotions === undefined) {
+      playerUpdates.healthPotions = dungeonForMigration.healthPotions || 3;
+    }
+
+    // Migrate spells if player doesn't have them or dungeon has them and player doesn't
+    if (player.customSpells === undefined ||
+        (dungeonForMigration.customSpells?.length > 0 && dungeonForMigration.customSpells[0] &&
+         (!player.customSpells?.length || !player.customSpells[0]))) {
+      playerUpdates.customSpells = dungeonForMigration.customSpells || [];
+    }
+
+    // Migrate purchasedSpellSlot
+    if (player.purchasedSpellSlot === undefined) {
+      playerUpdates.purchasedSpellSlot = dungeonForMigration.purchasedSpellSlot || false;
+    }
+
+    if (Object.keys(playerUpdates).length > 0) {
+      await db.player.update(1, playerUpdates);
+      console.log('Migrated gold/spells from dungeon to player:', playerUpdates);
     }
   }
 }

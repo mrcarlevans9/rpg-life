@@ -32,13 +32,35 @@ export async function syncPlayer() {
 
     // If remote exists, merge (take higher values)
     if (remotePlayer) {
+      // Check if local looks like fresh defaults (just reset)
+      const localIsDefault = !localPlayer || (
+        (localPlayer.gold || 0) === 0 &&
+        (localPlayer.totalXP || 0) === 0 &&
+        (!localPlayer.customSpells || localPlayer.customSpells.length === 0 || !localPlayer.customSpells[0])
+      );
+
+      // Check if remote has real character data
+      const remoteHasCharData = (remotePlayer.gold || 0) > 0 ||
+        (remotePlayer.custom_spells && remotePlayer.custom_spells.length > 0 && remotePlayer.custom_spells[0]);
+
       const merged = {
         totalXP: Math.max(localPlayer?.totalXP || 0, remotePlayer.total_xp || 0),
         currentStreak: Math.max(localPlayer?.currentStreak || 0, remotePlayer.current_streak || 0),
         longestStreak: Math.max(localPlayer?.longestStreak || 0, remotePlayer.longest_streak || 0),
         totalTasksCompleted: Math.max(localPlayer?.totalTasksCompleted || 0, remotePlayer.total_tasks_completed || 0),
         totalExpeditionMinutes: Math.max(localPlayer?.totalExpeditionMinutes || 0, remotePlayer.total_expedition_minutes || 0),
-        lastActiveDate: localPlayer?.lastActiveDate || remotePlayer.last_active_date
+        lastActiveDate: localPlayer?.lastActiveDate || remotePlayer.last_active_date,
+        // Character inventory - restore from remote if local is default
+        gold: (localIsDefault && remoteHasCharData)
+          ? (remotePlayer.gold || 0)
+          : Math.max(localPlayer?.gold || 0, remotePlayer.gold || 0),
+        healthPotions: (localIsDefault && remoteHasCharData)
+          ? (remotePlayer.health_potions || 3)
+          : Math.max(localPlayer?.healthPotions || 0, remotePlayer.health_potions || 0),
+        customSpells: (localIsDefault && remoteHasCharData)
+          ? (remotePlayer.custom_spells || [])
+          : ((remotePlayer.custom_spells?.[0]) ? remotePlayer.custom_spells : (localPlayer?.customSpells || [])),
+        purchasedSpellSlot: remotePlayer.purchased_spell_slot || localPlayer?.purchasedSpellSlot || false
       };
 
       // Update local
@@ -53,10 +75,15 @@ export async function syncPlayer() {
           longest_streak: merged.longestStreak,
           total_tasks_completed: merged.totalTasksCompleted,
           total_expedition_minutes: merged.totalExpeditionMinutes,
-          last_active_date: merged.lastActiveDate
+          last_active_date: merged.lastActiveDate,
+          gold: merged.gold,
+          health_potions: merged.healthPotions,
+          custom_spells: merged.customSpells,
+          purchased_spell_slot: merged.purchasedSpellSlot
         })
         .eq('user_id', userId);
 
+      console.log('Player synced with gold/spells:', merged.gold, merged.customSpells?.length);
       return merged;
     }
 
@@ -80,6 +107,11 @@ export async function pushPlayerUpdate(updates) {
     if (updates.totalTasksCompleted !== undefined) remoteUpdates.total_tasks_completed = updates.totalTasksCompleted;
     if (updates.totalExpeditionMinutes !== undefined) remoteUpdates.total_expedition_minutes = updates.totalExpeditionMinutes;
     if (updates.lastActiveDate !== undefined) remoteUpdates.last_active_date = updates.lastActiveDate;
+    // Character inventory
+    if (updates.gold !== undefined) remoteUpdates.gold = updates.gold;
+    if (updates.healthPotions !== undefined) remoteUpdates.health_potions = updates.healthPotions;
+    if (updates.customSpells !== undefined) remoteUpdates.custom_spells = updates.customSpells;
+    if (updates.purchasedSpellSlot !== undefined) remoteUpdates.purchased_spell_slot = updates.purchasedSpellSlot;
 
     if (Object.keys(remoteUpdates).length > 0) {
       await supabase

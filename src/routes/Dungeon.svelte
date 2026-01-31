@@ -123,7 +123,7 @@
 
   // Get spell slots info
   $: spellSlots = getSpellSlots();
-  $: customSpells = $dungeonData?.customSpells || [];
+  $: customSpells = $playerData?.customSpells || [];
   $: playerLevel = $playerData?.level || 1;
   $: maxSpellDamage = getMaxSpellDamage(playerLevel);
 
@@ -209,7 +209,7 @@
     if (!$dungeonData) return { purchased: false, available: false, locked: false };
     const purchased = $dungeonData.upgrades?.includes(upgrade.key);
     const hasPrereq = !upgrade.requires || $dungeonData.upgrades?.includes(upgrade.requires);
-    const canAfford = $dungeonData.gold >= upgrade.cost;
+    const canAfford = $playerData?.gold || 0 >= upgrade.cost;
     return {
       purchased,
       available: !purchased && hasPrereq && canAfford,
@@ -247,12 +247,12 @@
         <div class="player-stats-grid">
           <div class="stat-item">
             <span class="stat-icon">🧪</span>
-            <span class="stat-value">{$dungeonData?.healthPotions || 0}</span>
+            <span class="stat-value">{$playerData?.healthPotions || 0}</span>
             <span class="stat-label">Potions</span>
           </div>
           <div class="stat-item">
             <span class="stat-icon">🪙</span>
-            <span class="stat-value">{$dungeonData?.gold || 0}</span>
+            <span class="stat-value">{$playerData?.gold || 0}</span>
             <span class="stat-label">Gold</span>
           </div>
           <div class="stat-item">
@@ -275,7 +275,7 @@
           <p>10 floors of danger await. Defeat the boss to claim glory!</p>
           <ul class="dungeon-info">
             <li>Start with {100 + ($dungeonData?.maxHpBonus || 0)} HP</li>
-            <li>{$dungeonData?.healthPotions || 0} health potions available</li>
+            <li>{$playerData?.healthPotions || 0} health potions available</li>
             <li>Retreat between floors to keep your gold</li>
             <li>Death means losing all gold from this run</li>
           </ul>
@@ -495,9 +495,9 @@
             <button
               class="action-btn item"
               on:click={usePotion}
-              disabled={!$dungeonData?.healthPotions || $currentRun?.playerHp >= $currentRun?.maxHp || $combatState.isAnimating}
+              disabled={!$playerData?.healthPotions || $currentRun?.playerHp >= $currentRun?.maxHp || $combatState.isAnimating}
             >
-              🧪 POTION <span class="item-count">({$dungeonData?.healthPotions || 0})</span>
+              🧪 POTION <span class="item-count">({$playerData?.healthPotions || 0})</span>
             </button>
             {#if expeditionInventory.length > 0}
               <button
@@ -859,7 +859,7 @@
       <div class="shop-modal" on:click|stopPropagation>
         <div class="shop-header">
           <h2>Dungeon Shop</h2>
-          <span class="shop-gold">🪙 {$dungeonData?.gold || 0}</span>
+          <span class="shop-gold">🪙 {$playerData?.gold || 0}</span>
           <button class="close-btn" on:click={() => showShop = false}>×</button>
         </div>
         <div class="shop-content">
@@ -983,14 +983,14 @@
               <div class="cost-header">
                 <span class="cost-icon">⚙️</span>
                 <span>Spell Modification Costs</span>
-                <span class="gold-amount">You have: <strong>{$dungeonData?.gold || 0}g</strong></span>
+                <span class="gold-amount">You have: <strong>{$playerData?.gold || 0}g</strong></span>
               </div>
               <div class="cost-items">
-                <div class="cost-item" class:affordable={($dungeonData?.gold || 0) >= currentSpellEditCost}>
+                <div class="cost-item" class:affordable={($playerData?.gold || 0) >= currentSpellEditCost}>
                   <span>Edit:</span>
                   <span class="cost-value">{currentSpellEditCost}g</span>
                 </div>
-                <div class="cost-item" class:affordable={($dungeonData?.gold || 0) >= currentSpellDeleteCost}>
+                <div class="cost-item" class:affordable={($playerData?.gold || 0) >= currentSpellDeleteCost}>
                   <span>Delete:</span>
                   <span class="cost-value">{currentSpellDeleteCost}g</span>
                 </div>
@@ -1006,7 +1006,7 @@
             <Button
               variant="primary"
               on:click={handleSaveSpell}
-              disabled={currentSpellEditCost > 0 && ($dungeonData?.gold || 0) < currentSpellEditCost}
+              disabled={currentSpellEditCost > 0 && ($playerData?.gold || 0) < currentSpellEditCost}
             >
               {#if currentSpellEditCost > 0}
                 Save ({currentSpellEditCost}g)
@@ -1018,7 +1018,7 @@
               <Button
                 variant="danger"
                 on:click={handleDeleteSpell}
-                disabled={($dungeonData?.gold || 0) < currentSpellDeleteCost}
+                disabled={($playerData?.gold || 0) < currentSpellDeleteCost}
               >
                 Delete ({currentSpellDeleteCost}g)
               </Button>
