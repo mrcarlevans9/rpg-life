@@ -948,6 +948,7 @@
     justify-content: center;
     position: relative;
     min-height: 0;
+    max-height: 45%;
     overflow: hidden;
   }
 
@@ -1203,7 +1204,7 @@
   .action-panel {
     background: var(--bg-secondary);
     border-top: 1px solid var(--border);
-    padding: 6px;
+    padding: 10px;
     position: relative;
     flex-shrink: 0;
   }
@@ -1329,7 +1330,7 @@
   .action-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 4px;
+    gap: 8px;
   }
 
   .action-grid.has-spells {
@@ -1337,13 +1338,13 @@
   }
 
   .action-btn {
-    padding: 8px 10px;
+    padding: 14px 16px;
     border: 2px solid var(--border);
     border-radius: var(--radius-md);
     background: var(--bg-primary);
     color: var(--text-primary);
     font-weight: 600;
-    font-size: 0.8rem;
+    font-size: 0.95rem;
     cursor: pointer;
     transition: all 0.15s ease;
     display: flex;
