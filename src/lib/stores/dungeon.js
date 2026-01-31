@@ -104,6 +104,11 @@ export function getSpellEditCost(slotIndex, hasExistingSpell) {
   return 15 + (slotIndex * 5); // Slot 1: 15g, Slot 2: 20g, Slot 3: 25g, etc.
 }
 
+// Get spell delete cost (costs more than editing to discourage delete+recreate exploit)
+export function getSpellDeleteCost(slotIndex) {
+  return 20 + (slotIndex * 5); // Slot 1: 20g, Slot 2: 25g, Slot 3: 30g, etc.
+}
+
 // Validate spell - returns { valid, error, suggestedManaCost }
 export function validateSpell(damage, manaCost, level = 1) {
   const requiredCost = calculateManaCost(damage);
@@ -1007,12 +1012,28 @@ export async function deleteCustomSpell(slotIndex = 0) {
   const dungeon = await db.dungeon.get(1);
   const customSpells = [...(dungeon?.customSpells || [])];
 
-  if (slotIndex < customSpells.length) {
-    customSpells[slotIndex] = null;
-    await db.dungeon.update(1, { customSpells });
+  // Check if there's actually a spell to delete
+  const existingSpell = customSpells[slotIndex];
+  const hasSpell = existingSpell !== null && existingSpell !== undefined && typeof existingSpell === 'object';
+
+  if (!hasSpell) {
+    return { success: false, error: 'No spell to delete' };
   }
 
-  return { success: true };
+  // Calculate and check delete cost
+  const deleteCost = getSpellDeleteCost(slotIndex);
+  if ((dungeon?.gold || 0) < deleteCost) {
+    return { success: false, error: `Not enough gold! Deleting this spell costs ${deleteCost} gold.` };
+  }
+
+  // Delete the spell and charge gold
+  customSpells[slotIndex] = null;
+  await db.dungeon.update(1, {
+    customSpells,
+    gold: (dungeon?.gold || 0) - deleteCost
+  });
+
+  return { success: true, goldSpent: deleteCost };
 }
 
 // Cast custom spell in combat
