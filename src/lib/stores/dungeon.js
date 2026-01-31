@@ -1,6 +1,7 @@
 import { writable, derived, get } from 'svelte/store';
 import { liveQuery } from 'dexie';
 import { db, MONSTERS, BOSSES, MONSTER_MODIFIERS, DUNGEON_UPGRADES } from '../db/index.js';
+import { playerData } from './player.js';
 
 // Create a store from a Dexie liveQuery
 function createLiveQueryStore(queryFn, defaultValue = null) {
@@ -109,6 +110,34 @@ export function validateSpell(damage, manaCost) {
   }
 
   return { valid: true, suggestedManaCost: requiredCost };
+}
+
+// ============ Spell Slot System ============
+// Base: 1 slot
+// Level bonuses: +1 at level 10, +1 at level 25, +1 at level 50
+// Shop: +1 purchasable (permanent, max 1)
+
+export function calculateSpellSlots(level, purchasedSpellSlot = false) {
+  let slots = 1; // Base slot
+
+  // Level milestones
+  if (level >= 10) slots++;
+  if (level >= 25) slots++;
+  if (level >= 50) slots++;
+
+  // Purchased slot from shop
+  if (purchasedSpellSlot) slots++;
+
+  return slots;
+}
+
+// Get current player's spell slots
+export function getSpellSlots() {
+  const player = get(playerData);
+  const dungeon = get(dungeonData);
+  const level = player?.level || 1;
+  const purchased = dungeon?.purchasedSpellSlot || false;
+  return calculateSpellSlots(level, purchased);
 }
 
 // Helper to reset combat state for new encounter
@@ -283,8 +312,8 @@ export async function startRun() {
     potionHeal: 25 + (dungeon?.potionBonus || 0),
     critBonus: dungeon?.critBonus || 0,
     defenseBonus: dungeon?.defenseBonus || 0,
-    // Store custom spell for this run
-    customSpell: dungeon?.customSpell || null
+    // Store custom spells for this run (array)
+    customSpells: dungeon?.customSpells || []
   };
 
   currentRun.set(run);
@@ -648,9 +677,15 @@ export async function awardPotions(count = 1) {
 
 // ============ Custom Spell System ============
 
-// Create or update custom spell
-export async function saveCustomSpell(spell) {
+// Create or update custom spell at a specific slot index
+export async function saveCustomSpell(spell, slotIndex = 0) {
   const { name, description, damage, manaCost } = spell;
+
+  // Check if slot is available
+  const maxSlots = getSpellSlots();
+  if (slotIndex >= maxSlots) {
+    return { success: false, error: 'Spell slot not unlocked' };
+  }
 
   // Validate the spell
   const validation = validateSpell(damage, manaCost);
@@ -667,26 +702,43 @@ export async function saveCustomSpell(spell) {
     return { success: false, error: 'Spell name must be 20 characters or less' };
   }
 
-  const customSpell = {
+  const newSpell = {
     name: name.trim(),
     description: (description || '').trim().slice(0, 100),
     damage: Math.floor(damage),
     manaCost: Math.floor(manaCost)
   };
 
-  await db.dungeon.update(1, { customSpell });
+  const dungeon = await db.dungeon.get(1);
+  const customSpells = [...(dungeon?.customSpells || [])];
 
-  return { success: true, spell: customSpell };
+  // Ensure array is large enough
+  while (customSpells.length <= slotIndex) {
+    customSpells.push(null);
+  }
+
+  customSpells[slotIndex] = newSpell;
+
+  await db.dungeon.update(1, { customSpells });
+
+  return { success: true, spell: newSpell };
 }
 
-// Delete custom spell
-export async function deleteCustomSpell() {
-  await db.dungeon.update(1, { customSpell: null });
+// Delete custom spell at a specific slot index
+export async function deleteCustomSpell(slotIndex = 0) {
+  const dungeon = await db.dungeon.get(1);
+  const customSpells = [...(dungeon?.customSpells || [])];
+
+  if (slotIndex < customSpells.length) {
+    customSpells[slotIndex] = null;
+    await db.dungeon.update(1, { customSpells });
+  }
+
   return { success: true };
 }
 
 // Cast custom spell in combat
-export async function castSpell() {
+export async function castSpell(spellIndex = 0) {
   const run = get(currentRun);
   if (!run) return false;
 
@@ -696,7 +748,7 @@ export async function castSpell() {
   const room = run.floor.rooms[run.floor.currentRoom];
   if (room.type !== 'combat' && room.type !== 'boss') return false;
 
-  const spell = run.customSpell;
+  const spell = run.customSpells?.[spellIndex];
   if (!spell) {
     addLog('error', 'No spell equipped!');
     return false;
@@ -809,6 +861,9 @@ export async function purchaseUpgrade(upgradeKey) {
   }
   if (upgrade.effect.defenseBonus) {
     updates.defenseBonus = (dungeon.defenseBonus || 0) + upgrade.effect.defenseBonus;
+  }
+  if (upgrade.effect.spellSlot) {
+    updates.purchasedSpellSlot = true;
   }
 
   await db.dungeon.update(1, updates);

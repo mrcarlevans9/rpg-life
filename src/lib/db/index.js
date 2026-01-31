@@ -106,9 +106,9 @@ export async function initializeDB() {
       defenseBonus: 0,
       // Mana system
       maxMpBonus: 0,
-      // Custom spell (null if not created yet)
-      customSpell: null
-      // customSpell structure: { name, description, damage, manaCost }
+      // Multiple spells system
+      customSpells: [], // Array of spell objects { name, description, damage, manaCost }
+      purchasedSpellSlot: false // Extra slot from shop (max 1)
     });
 
     console.log('Database initialized with default data');
@@ -146,19 +146,40 @@ export async function initializeDB() {
       critBonus: 0,
       defenseBonus: 0,
       maxMpBonus: 0,
-      customSpell: null
+      customSpells: [],
+      purchasedSpellSlot: false
     });
     console.log('Dungeon initialized');
   }
 
-  // Ensure existing dungeon has spell fields (migration for existing users)
+  // Migrate existing dungeon to multi-spell system
   const dungeon = await db.dungeon.get(1);
-  if (dungeon && dungeon.customSpell === undefined) {
-    await db.dungeon.update(1, {
-      maxMpBonus: 0,
-      customSpell: null
-    });
-    console.log('Dungeon migrated with spell system');
+  if (dungeon) {
+    const updates = {};
+
+    // Migrate old customSpell to customSpells array
+    if (dungeon.customSpells === undefined) {
+      if (dungeon.customSpell) {
+        updates.customSpells = [dungeon.customSpell];
+      } else {
+        updates.customSpells = [];
+      }
+    }
+
+    // Add purchasedSpellSlot if missing
+    if (dungeon.purchasedSpellSlot === undefined) {
+      updates.purchasedSpellSlot = false;
+    }
+
+    // Add maxMpBonus if missing (older migration)
+    if (dungeon.maxMpBonus === undefined) {
+      updates.maxMpBonus = 0;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      await db.dungeon.update(1, updates);
+      console.log('Dungeon migrated to multi-spell system');
+    }
   }
 }
 

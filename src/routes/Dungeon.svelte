@@ -19,23 +19,31 @@
     castSpell,
     saveCustomSpell,
     deleteCustomSpell,
-    calculateManaCost
+    calculateManaCost,
+    getSpellSlots
   } from '../lib/stores/dungeon.js';
   import { DUNGEON_UPGRADES } from '../lib/db/index.js';
+  import { playerData } from '../lib/stores/player.js';
 
   let showShop = false;
   let showSpellEditor = false;
 
   // Spell editor state
+  let editingSlotIndex = 0;
   let spellName = '';
   let spellDescription = '';
   let spellDamage = 15;
   let spellManaCost = 10;
   let spellError = '';
 
-  // Initialize spell editor with existing spell
-  function openSpellEditor() {
-    const existing = $dungeonData?.customSpell;
+  // Get spell slots info
+  $: spellSlots = getSpellSlots();
+  $: customSpells = $dungeonData?.customSpells || [];
+
+  // Open spell editor for a specific slot
+  function openSpellEditor(slotIndex = 0) {
+    editingSlotIndex = slotIndex;
+    const existing = customSpells[slotIndex];
     if (existing) {
       spellName = existing.name;
       spellDescription = existing.description || '';
@@ -57,14 +65,14 @@
     spellError = '';
   }
 
-  // Save the spell
+  // Save the spell to the current slot
   async function handleSaveSpell() {
     const result = await saveCustomSpell({
       name: spellName,
       description: spellDescription,
       damage: spellDamage,
       manaCost: spellManaCost
-    });
+    }, editingSlotIndex);
 
     if (result.success) {
       showSpellEditor = false;
@@ -74,9 +82,9 @@
     }
   }
 
-  // Delete the spell
+  // Delete the spell from the current slot
   async function handleDeleteSpell() {
-    await deleteCustomSpell();
+    await deleteCustomSpell(editingSlotIndex);
     showSpellEditor = false;
   }
 
@@ -171,10 +179,30 @@
         <Button variant="secondary" on:click={() => showShop = true}>
           Shop
         </Button>
-        <Button variant="secondary" on:click={openSpellEditor}>
-          {$dungeonData?.customSpell ? '✨ Edit Spell' : '✨ Create Spell'}
-        </Button>
       </div>
+
+      <!-- Spell Slots -->
+      <Card class="spell-slots-card">
+        <h3>✨ Spell Slots ({customSpells.filter(s => s).length}/{spellSlots})</h3>
+        <div class="spell-slots-grid">
+          {#each Array(spellSlots) as _, i}
+            {@const spell = customSpells[i]}
+            <button
+              class="spell-slot"
+              class:empty={!spell}
+              on:click={() => openSpellEditor(i)}
+            >
+              {#if spell}
+                <span class="slot-name">{spell.name}</span>
+                <span class="slot-stats">{spell.damage} DMG | {spell.manaCost} MP</span>
+              {:else}
+                <span class="slot-empty">+ Add Spell</span>
+              {/if}
+            </button>
+          {/each}
+        </div>
+        <p class="spell-hint">Unlock more slots at levels 10, 25, 50 or buy from shop</p>
+      </Card>
     </div>
   {/if}
 
@@ -301,7 +329,7 @@
           </div>
         {:else}
           <!-- Action Buttons -->
-          <div class="action-grid" class:has-spell={$currentRun?.customSpell}>
+          <div class="action-grid" class:has-spells={($currentRun?.customSpells || []).filter(s => s).length > 0}>
             {#if $currentMonster}
               <button
                 class="action-btn attack"
@@ -317,17 +345,19 @@
               >
                 🛡️ DEFEND
               </button>
-              {#if $currentRun?.customSpell}
-                <button
-                  class="action-btn spell"
-                  on:click={castSpell}
-                  disabled={$combatState.isAnimating || $currentRun.playerMp < $currentRun.customSpell.manaCost}
-                  title="{$currentRun.customSpell.description || ''}"
-                >
-                  ✨ {$currentRun.customSpell.name}
-                  <span class="item-count">({$currentRun.customSpell.manaCost} MP)</span>
-                </button>
-              {/if}
+              {#each ($currentRun?.customSpells || []) as spell, i}
+                {#if spell}
+                  <button
+                    class="action-btn spell"
+                    on:click={() => castSpell(i)}
+                    disabled={$combatState.isAnimating || $currentRun.playerMp < spell.manaCost}
+                    title="{spell.description || ''}"
+                  >
+                    ✨ {spell.name}
+                    <span class="item-count">({spell.manaCost} MP)</span>
+                  </button>
+                {/if}
+              {/each}
             {/if}
             <button
               class="action-btn item"
@@ -463,7 +493,7 @@
     <div class="modal-overlay" on:click={() => showSpellEditor = false} role="button" tabindex="0" on:keypress={(e) => e.key === 'Escape' && (showSpellEditor = false)}>
       <div class="spell-modal" on:click|stopPropagation role="dialog" aria-modal="true">
         <div class="spell-header">
-          <h2>✨ {$dungeonData?.customSpell ? 'Edit' : 'Create'} Your Spell</h2>
+          <h2>✨ {customSpells[editingSlotIndex] ? 'Edit' : 'Create'} Spell (Slot {editingSlotIndex + 1})</h2>
           <button class="close-btn" on:click={() => showSpellEditor = false}>×</button>
         </div>
         <div class="spell-content">
@@ -537,7 +567,7 @@
             <Button variant="primary" on:click={handleSaveSpell}>
               Save Spell
             </Button>
-            {#if $dungeonData?.customSpell}
+            {#if customSpells[editingSlotIndex]}
               <Button variant="secondary" on:click={handleDeleteSpell}>
                 Delete Spell
               </Button>
@@ -994,38 +1024,33 @@
   .action-panel {
     background: var(--bg-secondary);
     border-top: 1px solid var(--border);
-    padding: 6px;
+    padding: 8px;
   }
 
   .action-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 4px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
   }
 
-  .action-grid.has-spell {
-    grid-template-columns: 1fr 1fr 1fr;
-  }
-
-  .action-grid.has-spell .action-btn.item,
-  .action-grid.has-spell .action-btn.run {
-    grid-column: span 1;
+  .action-grid.has-spells {
+    grid-template-columns: repeat(3, 1fr);
   }
 
   .action-btn {
-    padding: 6px 8px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    border: 2px solid var(--border);
+    border-radius: var(--radius-md);
     background: var(--bg-primary);
     color: var(--text-primary);
     font-weight: 600;
-    font-size: 0.75rem;
+    font-size: 0.85rem;
     cursor: pointer;
     transition: all 0.15s ease;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 4px;
+    gap: 6px;
   }
 
   .action-btn:hover:not(:disabled) {
@@ -1067,9 +1092,9 @@
 
   .action-btn.run {
     flex-direction: column;
-    gap: 0;
-    padding: 4px;
-    font-size: 0.7rem;
+    gap: 2px;
+    padding: 8px;
+    font-size: 0.8rem;
   }
 
   .action-btn.run.safe {
@@ -1094,9 +1119,9 @@
     border-color: #8b5cf6;
     color: #8b5cf6;
     flex-direction: column;
-    gap: 0;
-    padding: 4px;
-    font-size: 0.65rem;
+    gap: 2px;
+    padding: 8px;
+    font-size: 0.75rem;
   }
 
   .action-btn.spell:hover:not(:disabled) {
@@ -1463,5 +1488,71 @@
     display: flex;
     gap: var(--spacing-md);
     justify-content: center;
+  }
+
+  /* ========== SPELL SLOTS CARD ========== */
+  :global(.spell-slots-card) {
+    padding: var(--spacing-md);
+  }
+
+  :global(.spell-slots-card) h3 {
+    text-align: center;
+    margin-bottom: var(--spacing-md);
+    color: #8b5cf6;
+  }
+
+  .spell-slots-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: var(--spacing-sm);
+  }
+
+  .spell-slot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-md);
+    background: var(--bg-secondary);
+    border: 2px dashed var(--border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-height: 70px;
+  }
+
+  .spell-slot:hover {
+    border-color: #8b5cf6;
+    background: rgba(139, 92, 246, 0.1);
+  }
+
+  .spell-slot:not(.empty) {
+    border-style: solid;
+    border-color: #8b5cf6;
+    background: rgba(139, 92, 246, 0.05);
+  }
+
+  .slot-name {
+    font-weight: 600;
+    color: #8b5cf6;
+    font-size: 0.9rem;
+  }
+
+  .slot-stats {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  .slot-empty {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+  }
+
+  .spell-hint {
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: var(--spacing-sm);
   }
 </style>
