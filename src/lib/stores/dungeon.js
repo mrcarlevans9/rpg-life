@@ -1202,13 +1202,14 @@ export async function purchaseMerchantItem(itemKey) {
 
   const item = room.merchant.items[itemIndex];
 
-  // Check gold
-  if (run.goldCollected < item.cost) {
-    return { success: false, error: 'Not enough gold' };
+  // Check run gold only (NOT bank gold!)
+  const runGold = run.goldCollected || 0;
+  if (runGold < item.cost) {
+    return { success: false, error: `Not enough gold! Need ${item.cost}, have ${runGold}` };
   }
 
-  // Deduct gold
-  run.goldCollected -= item.cost;
+  // Deduct from run gold only
+  run.goldCollected = runGold - item.cost;
 
   // Apply effect
   const effect = item.effect;
@@ -1304,13 +1305,14 @@ export async function purchaseFloorMerchantItem(itemKey) {
 
   const item = run.floorMerchant.items[itemIndex];
 
-  // Check gold
-  if (run.goldCollected < item.cost) {
-    return { success: false, error: 'Not enough gold' };
+  // Check run gold only (NOT bank gold!)
+  const runGold = run.goldCollected || 0;
+  if (runGold < item.cost) {
+    return { success: false, error: `Not enough gold! Need ${item.cost}, have ${runGold}` };
   }
 
-  // Deduct gold
-  run.goldCollected -= item.cost;
+  // Deduct from run gold only
+  run.goldCollected = runGold - item.cost;
 
   // Apply effect
   const effect = item.effect;

@@ -600,7 +600,8 @@
       </div>
 
       <div class="merchant-gold">
-        <span>Your Gold: 🪙 {$currentRun?.goldCollected || 0}</span>
+        <span class="gold-available">💰 {$currentRun?.goldCollected || 0} gold to spend</span>
+        <span class="gold-bank-info">(🏦 {$currentRun?.bankGold || 0} safe in bank)</span>
       </div>
 
       <div class="merchant-items">
@@ -744,7 +745,8 @@
       </div>
 
       <div class="merchant-gold">
-        <span>Your Gold: 🪙 {$currentRun?.goldCollected || 0}</span>
+        <span class="gold-available">💰 {$currentRun?.goldCollected || 0} gold to spend</span>
+        <span class="gold-bank-info">(🏦 {$currentRun?.bankGold || 0} safe in bank)</span>
       </div>
 
       <div class="merchant-items">
@@ -2545,12 +2547,23 @@
 
   .merchant-gold {
     text-align: center;
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: #fbbf24;
     padding: var(--spacing-sm);
     background: rgba(251, 191, 36, 0.1);
     border-radius: var(--radius-md);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .merchant-gold .gold-available {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #fbbf24;
+  }
+
+  .merchant-gold .gold-bank-info {
+    font-size: 0.75rem;
+    color: var(--text-muted);
   }
 
   .merchant-items {
