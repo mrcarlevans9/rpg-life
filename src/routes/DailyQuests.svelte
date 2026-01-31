@@ -29,9 +29,9 @@
       return false;
     });
 
-    // Also get tasks in progress
+    // Also get tasks that are active (in progress)
     const inProgressTasks = allTasks.filter(task =>
-      !task.completed && task.columnId === 'in-progress'
+      !task.completed && task.status === 'active'
     );
 
     // Combine and dedupe
@@ -132,8 +132,8 @@
       <div class="empty-quests">
         <span class="empty-icon">🎉</span>
         <h3>All Clear!</h3>
-        <p>No quests due today. Add tasks with due dates or check your projects!</p>
-        <a href="#/projects" class="link-btn">Go to Projects →</a>
+        <p>No quests due today. Add bounties with due dates from the Bounty Board!</p>
+        <a href="#/board" class="link-btn">Go to Bounty Board →</a>
       </div>
     {:else}
       <div class="quest-list">
