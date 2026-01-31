@@ -24,7 +24,9 @@
     calculateManaCost,
     getSpellSlots,
     purchaseMerchantItem,
-    leaveMerchant
+    leaveMerchant,
+    leaveFloorMerchant,
+    purchaseFloorMerchantItem
   } from '../lib/stores/dungeon.js';
   import { DUNGEON_UPGRADES } from '../lib/db/index.js';
   import { playerData } from '../lib/stores/player.js';
@@ -47,8 +49,8 @@
     diceRevealed = [];
   }
 
-  // Lock body scroll during dungeon run (check both gamePhase and currentRun for reliability)
-  $: inCombat = ($gamePhase !== 'idle' && $gamePhase !== 'victory' && $gamePhase !== 'defeat' && $gamePhase !== 'retreat') || $currentRun !== null;
+  // Lock body scroll during dungeon run (active phases + any current run)
+  $: inCombat = ['exploring', 'merchant', 'floor_merchant'].includes($gamePhase) || $currentRun !== null;
   $: if (typeof document !== 'undefined') {
     if (inCombat) {
       document.body.classList.add('no-scroll');
@@ -557,6 +559,68 @@
       <div class="merchant-actions">
         <Button variant="secondary" on:click={leaveMerchant}>
           Continue Journey
+        </Button>
+      </div>
+
+      <!-- Show temp buffs if any -->
+      {#if $currentRun?.tempBuffs && ($currentRun.tempBuffs.bonusDamage > 0 || $currentRun.tempBuffs.defenseBonus > 0 || $currentRun.tempBuffs.goldBonus > 0)}
+        <div class="active-buffs">
+          <span class="buffs-label">Active Buffs:</span>
+          {#if $currentRun.tempBuffs.bonusDamage > 0}
+            <span class="buff">💪 +{$currentRun.tempBuffs.bonusDamage} DMG</span>
+          {/if}
+          {#if $currentRun.tempBuffs.defenseBonus > 0}
+            <span class="buff">🛡️ +{$currentRun.tempBuffs.defenseBonus} DEF</span>
+          {/if}
+          {#if $currentRun.tempBuffs.goldBonus > 0}
+            <span class="buff">🍀 +{$currentRun.tempBuffs.goldBonus} Gold/kill</span>
+          {/if}
+        </div>
+      {/if}
+    </div>
+  {/if}
+
+  <!-- Floor Complete Merchant -->
+  {#if $gamePhase === 'floor_merchant'}
+    {@const merchant = $currentRun?.floorMerchant}
+    <div class="merchant-screen floor-merchant">
+      <div class="merchant-header">
+        <span class="merchant-emoji">{merchant?.emoji || '🧌'}</span>
+        <h2>Goblin Merchant</h2>
+        <p class="merchant-greeting">"{merchant?.greeting}"</p>
+        <span class="floor-complete-badge">Floor {$currentRun?.currentFloor} Complete!</span>
+      </div>
+
+      <div class="merchant-gold">
+        <span>Your Gold: 🪙 {$currentRun?.goldCollected || 0}</span>
+      </div>
+
+      <div class="merchant-items">
+        {#if merchant?.items?.length > 0}
+          {#each merchant.items as item}
+            <div class="merchant-item">
+              <div class="item-icon">{item.emoji}</div>
+              <div class="item-info">
+                <span class="item-name">{item.name}</span>
+                <span class="item-desc">{item.description}</span>
+              </div>
+              <button
+                class="item-buy"
+                disabled={$currentRun?.goldCollected < item.cost}
+                on:click={() => purchaseFloorMerchantItem(item.key)}
+              >
+                🪙 {item.cost}
+              </button>
+            </div>
+          {/each}
+        {:else}
+          <p class="no-items">"All sold out! Better luck next floor!"</p>
+        {/if}
+      </div>
+
+      <div class="merchant-actions">
+        <Button variant="primary" on:click={leaveFloorMerchant}>
+          Descend to Floor {($currentRun?.currentFloor || 0) + 1}
         </Button>
       </div>
 
@@ -2214,5 +2278,27 @@
     border-radius: var(--radius-sm);
     color: #22c55e;
     font-weight: 600;
+  }
+
+  /* Floor complete merchant styling */
+  .merchant-screen.floor-merchant {
+    background: linear-gradient(180deg, #1a3d1a 0%, #1a1a2e 50%, #16213e 100%);
+  }
+
+  .floor-complete-badge {
+    display: inline-block;
+    margin-top: var(--spacing-sm);
+    padding: 6px 16px;
+    background: linear-gradient(135deg, #22c55e, #16a34a);
+    color: white;
+    font-weight: 700;
+    font-size: 0.85rem;
+    border-radius: var(--radius-full);
+    animation: badgePulse 2s ease-in-out infinite;
+  }
+
+  @keyframes badgePulse {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 0 rgba(34, 197, 94, 0); }
+    50% { transform: scale(1.05); box-shadow: 0 0 20px rgba(34, 197, 94, 0.5); }
   }
 </style>

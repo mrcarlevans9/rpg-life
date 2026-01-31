@@ -711,22 +711,16 @@ function advanceRoom(run) {
       resetCombatState(); // Reset combat state for new monster
     }
   } else {
-    // Floor complete - advance to next floor
+    // Floor complete - show merchant before advancing to next floor
     if (run.currentFloor < 10) {
-      run.currentFloor++;
-      run.floor = generateFloor(run.currentFloor);
-
-      if (run.currentFloor === 10) {
-        addLog('boss', `FLOOR 10 - BOSS CHAMBER`);
-        addLog('boss', `${run.floor.rooms[0].monster.displayName} awaits!`);
-      } else {
-        addLog('floor', `Descending to Floor ${run.currentFloor}...`);
-        const firstRoom = run.floor.rooms[0];
-        if (firstRoom.type === 'combat') {
-          addLog('info', `A ${firstRoom.monster.displayName} blocks your path!`);
-        }
-      }
-      resetCombatState(); // Reset combat state for new floor
+      // Show end-of-floor merchant
+      run.floorMerchant = {
+        ...MERCHANT,
+        items: generateMerchantItems(),
+        greeting: "Floor cleared! Care to browse before you descend?"
+      };
+      addLog('info', `"Floor cleared! Care to browse before you descend?"`);
+      gamePhase.set('floor_merchant');
     }
   }
 
@@ -1062,6 +1056,94 @@ export function leaveMerchant() {
 
   gamePhase.set('exploring');
   advanceRoom(run);
+}
+
+// Leave the end-of-floor merchant and advance to next floor
+export function leaveFloorMerchant() {
+  const run = get(currentRun);
+  if (!run) return;
+
+  // Clear the floor merchant
+  run.floorMerchant = null;
+
+  // Advance to next floor
+  run.currentFloor++;
+  run.floor = generateFloor(run.currentFloor);
+
+  if (run.currentFloor === 10) {
+    addLog('boss', `FLOOR 10 - BOSS CHAMBER`);
+    addLog('boss', `${run.floor.rooms[0].monster.displayName} awaits!`);
+  } else {
+    addLog('floor', `Descending to Floor ${run.currentFloor}...`);
+    const firstRoom = run.floor.rooms[0];
+    if (firstRoom.type === 'combat') {
+      addLog('info', `A ${firstRoom.monster.displayName} blocks your path!`);
+    }
+  }
+  resetCombatState();
+  gamePhase.set('exploring');
+  currentRun.set(run);
+}
+
+// Purchase from the floor merchant (end of floor)
+export async function purchaseFloorMerchantItem(itemKey) {
+  const run = get(currentRun);
+  if (!run || !run.floorMerchant) return { success: false, error: 'No active merchant' };
+
+  // Find the item in the merchant's inventory
+  const itemIndex = run.floorMerchant.items.findIndex(i => i.key === itemKey);
+  if (itemIndex === -1) {
+    return { success: false, error: 'Item not available' };
+  }
+
+  const item = run.floorMerchant.items[itemIndex];
+
+  // Check gold
+  if (run.goldCollected < item.cost) {
+    return { success: false, error: 'Not enough gold' };
+  }
+
+  // Deduct gold
+  run.goldCollected -= item.cost;
+
+  // Apply effect
+  const effect = item.effect;
+
+  if (effect.heal) {
+    const oldHp = run.playerHp;
+    run.playerHp = Math.min(run.maxHp, run.playerHp + effect.heal);
+    const actualHeal = run.playerHp - oldHp;
+    addLog('heal', `${item.name} restored ${actualHeal} HP!`);
+  }
+
+  if (effect.mana) {
+    const oldMp = run.playerMp;
+    run.playerMp = Math.min(run.maxMp, run.playerMp + effect.mana);
+    const actualMana = run.playerMp - oldMp;
+    addLog('spell', `${item.name} restored ${actualMana} MP!`);
+  }
+
+  if (effect.bonusDamage) {
+    run.tempBuffs.bonusDamage += effect.bonusDamage;
+    addLog('info', `${item.name} grants +${effect.bonusDamage} damage for this run!`);
+  }
+
+  if (effect.defenseBonus) {
+    run.tempBuffs.defenseBonus += effect.defenseBonus;
+    addLog('info', `${item.name} grants +${effect.defenseBonus} defense for this run!`);
+  }
+
+  if (effect.goldBonus) {
+    run.tempBuffs.goldBonus += effect.goldBonus;
+    addLog('info', `${item.name} grants +${effect.goldBonus} gold per kill!`);
+  }
+
+  // Remove item from merchant inventory (one-time purchase)
+  run.floorMerchant.items.splice(itemIndex, 1);
+
+  currentRun.set(run);
+
+  return { success: true, item };
 }
 
 // ============ Derived Stores ============
