@@ -160,17 +160,8 @@
           </div>
         {/if}
 
-        <!-- Player Side (bottom left) -->
+        <!-- Player Side (bottom) -->
         <div class="player-side">
-          <div class="player-sprite" class:sprite-hit={$combatState.lastDamageToPlayer}>
-            <span class="sprite-emoji">🧙</span>
-            {#key $combatState.lastDamageToPlayer}
-              {#if $combatState.lastDamageToPlayer}
-                <div class="floating-damage player-dmg">-{$combatState.lastDamageToPlayer}</div>
-              {/if}
-            {/key}
-          </div>
-
           <div class="player-info-box">
             <div class="player-name-row">
               <span class="player-name">You</span>
@@ -186,7 +177,14 @@
                 ></div>
               </div>
             </div>
-            <span class="hp-numbers">{$currentRun?.playerHp}/{$currentRun?.maxHp}</span>
+            <div class="hp-numbers-row">
+              <span class="hp-numbers">{$currentRun?.playerHp}/{$currentRun?.maxHp}</span>
+              {#key $combatState.lastDamageToPlayer}
+                {#if $combatState.lastDamageToPlayer}
+                  <span class="damage-taken">-{$combatState.lastDamageToPlayer}</span>
+                {/if}
+              {/key}
+            </div>
           </div>
         </div>
 
@@ -572,7 +570,7 @@
   }
 
   /* Sprites */
-  .enemy-sprite, .player-sprite {
+  .enemy-sprite {
     position: relative;
   }
 
@@ -640,10 +638,6 @@
     z-index: 10;
   }
 
-  .floating-damage.player-dmg {
-    color: #ef4444;
-  }
-
   @keyframes floatUp {
     0% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1.3); }
     100% { opacity: 0; transform: translateX(-50%) translateY(-30px) scale(1); }
@@ -652,9 +646,8 @@
   /* Player Side (bottom) */
   .player-side {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-end;
     align-items: flex-end;
-    flex-direction: row-reverse;
   }
 
   .player-info-box {
@@ -662,7 +655,26 @@
     border: 2px solid var(--border);
     border-radius: var(--radius-md);
     padding: var(--spacing-sm) var(--spacing-md);
-    min-width: 140px;
+    min-width: 160px;
+  }
+
+  .hp-numbers-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 2px;
+  }
+
+  .damage-taken {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: #ef4444;
+    animation: damageFlash 0.5s ease-out;
+  }
+
+  @keyframes damageFlash {
+    0% { transform: scale(1.3); opacity: 1; }
+    100% { transform: scale(1); opacity: 0; }
   }
 
   .player-name-row {
