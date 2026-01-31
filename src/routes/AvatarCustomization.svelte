@@ -4,11 +4,24 @@
   import Card from '../components/common/Card.svelte';
   import Button from '../components/common/Button.svelte';
   import { avatarData, updateAvatar, getCosmeticsOfType } from '../lib/stores/avatar.js';
-  import { currentLevel } from '../lib/stores/player.js';
+  import { currentLevel, playerData } from '../lib/stores/player.js';
   import { TITLES } from '../lib/db/schema.js';
   import { showSuccess } from '../lib/stores/notifications.js';
+  import { syncPlayer } from '../lib/supabase/sync.js';
 
-  let activeTab = 'gender';
+  let activeTab = 'stats';
+  let syncing = false;
+
+  async function manualSync() {
+    syncing = true;
+    try {
+      await syncPlayer();
+      showSuccess('Synced with cloud!');
+    } catch (e) {
+      console.error('Sync failed:', e);
+    }
+    syncing = false;
+  }
   let cosmetics = {
     hairStyles: [],
     hairColors: [],
@@ -24,6 +37,7 @@
   ];
 
   const tabs = [
+    { id: 'stats', label: 'Stats', icon: '📊' },
     { id: 'gender', label: 'Body', icon: '🧍' },
     { id: 'hair', label: 'Hair', icon: '💇' },
     { id: 'color', label: 'Color', icon: '🎨' },
@@ -135,7 +149,82 @@
   </div>
 
   <div class="customization-content">
-    {#if activeTab === 'gender'}
+    {#if activeTab === 'stats'}
+      <div class="stats-section">
+        <Card>
+          <div class="stat-block">
+            <h3>💰 Bank</h3>
+            <div class="bank-gold">
+              <span class="gold-icon">🪙</span>
+              <span class="gold-value">{$playerData?.gold || 0}</span>
+              <span class="gold-label">Gold</span>
+            </div>
+          </div>
+        </Card>
+
+        <Card>
+          <div class="stat-block">
+            <h3>📦 Inventory</h3>
+            <div class="inventory-items">
+              <div class="inventory-item">
+                <span class="item-icon">🧪</span>
+                <span class="item-value">{$playerData?.healthPotions || 0}</span>
+                <span class="item-label">Health Potions</span>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        <Card>
+          <div class="stat-block">
+            <h3>✨ Spells</h3>
+            <div class="spells-list">
+              {#if $playerData?.customSpells?.length > 0}
+                {#each $playerData.customSpells as spell, i}
+                  {#if spell}
+                    <div class="spell-item">
+                      <span class="spell-name">{spell.name}</span>
+                      <span class="spell-stats">💥 {spell.damage} DMG | 💧 {spell.manaCost} MP</span>
+                    </div>
+                  {:else}
+                    <div class="spell-item empty">
+                      <span class="spell-name">Slot {i + 1}: Empty</span>
+                    </div>
+                  {/if}
+                {/each}
+              {:else}
+                <p class="no-spells">No spells created yet. Visit the Dungeon to create spells!</p>
+              {/if}
+            </div>
+          </div>
+        </Card>
+
+        <Card>
+          <div class="stat-block">
+            <h3>🏆 Dungeon Stats</h3>
+            <div class="dungeon-stats">
+              <div class="dstat">
+                <span class="dstat-icon">🏔️</span>
+                <span class="dstat-value">{$playerData?.highestFloor || 0}</span>
+                <span class="dstat-label">Best Floor</span>
+              </div>
+              <div class="dstat">
+                <span class="dstat-icon">💀</span>
+                <span class="dstat-value">{$playerData?.totalKills || 0}</span>
+                <span class="dstat-label">Monsters Slain</span>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        <div class="sync-section">
+          <Button variant="secondary" on:click={manualSync} disabled={syncing}>
+            {syncing ? '⏳ Syncing...' : '☁️ Sync with Cloud'}
+          </Button>
+          <p class="sync-hint">Use this if your stats don't match across devices</p>
+        </div>
+      </div>
+    {:else if activeTab === 'gender'}
       <div class="gender-grid">
         {#each genderOptions as option}
           <button
@@ -472,5 +561,153 @@
     align-items: center;
     justify-content: center;
     font-size: 1rem;
+  }
+
+  /* Stats Section Styles */
+  .stats-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+  }
+
+  .stat-block {
+    padding: var(--spacing-md);
+  }
+
+  .stat-block h3 {
+    margin-bottom: var(--spacing-md);
+    font-size: 1rem;
+    color: var(--text-secondary);
+  }
+
+  .bank-gold {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md);
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.05));
+    border-radius: var(--radius-md);
+  }
+
+  .bank-gold .gold-icon {
+    font-size: 2rem;
+  }
+
+  .bank-gold .gold-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #fbbf24;
+  }
+
+  .bank-gold .gold-label {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+  }
+
+  .inventory-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+  }
+
+  .inventory-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+  }
+
+  .inventory-item .item-icon {
+    font-size: 1.25rem;
+  }
+
+  .inventory-item .item-value {
+    font-weight: 600;
+    font-size: 1.1rem;
+  }
+
+  .inventory-item .item-label {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+  }
+
+  .spells-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+
+  .spell-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+    border-left: 3px solid var(--accent);
+  }
+
+  .spell-item.empty {
+    border-left-color: var(--border);
+    opacity: 0.6;
+  }
+
+  .spell-name {
+    font-weight: 500;
+  }
+
+  .spell-stats {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+
+  .no-spells {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    text-align: center;
+    padding: var(--spacing-md);
+  }
+
+  .dungeon-stats {
+    display: flex;
+    gap: var(--spacing-lg);
+  }
+
+  .dstat {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+  }
+
+  .dstat-icon {
+    font-size: 1.25rem;
+  }
+
+  .dstat-value {
+    font-weight: 600;
+    font-size: 1.1rem;
+  }
+
+  .dstat-label {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+  }
+
+  .sync-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md);
+  }
+
+  .sync-hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
   }
 </style>

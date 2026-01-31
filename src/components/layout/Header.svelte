@@ -4,6 +4,7 @@
   import StreakCounter from '../player/StreakCounter.svelte';
   import { settingsData, toggleTheme } from '../../lib/stores/settings.js';
   import { signOut, authUser } from '../../lib/stores/auth.js';
+  import { playerData } from '../../lib/stores/player.js';
 
   export let showNav = true;
 
@@ -52,6 +53,11 @@
       {/if}
     </button>
 
+    <a href="#/avatar" class="gold-display" title="View Profile">
+      <span class="gold-icon">🪙</span>
+      <span class="gold-amount">{$playerData?.gold || 0}</span>
+    </a>
+
     <div class="avatar-menu">
       <button class="avatar-btn" on:click={toggleMenu}>
         <AvatarDisplay size="sm" />
@@ -60,9 +66,14 @@
       {#if menuOpen}
         <div class="menu-overlay" on:click={closeMenu}></div>
         <div class="dropdown-menu">
+          <div class="menu-gold">
+            <span class="gold-icon">🪙</span>
+            <span>{$playerData?.gold || 0} Gold</span>
+          </div>
+          <div class="menu-divider"></div>
           <a href="#/avatar" class="menu-item" on:click={closeMenu}>
             <span class="menu-icon">👤</span>
-            Avatar
+            Profile & Spells
           </a>
           <a href="#/settings" class="menu-item" on:click={closeMenu}>
             <span class="menu-icon">⚙️</span>
@@ -139,6 +150,40 @@
   .icon-btn:hover {
     color: var(--text-primary);
     background-color: var(--bg-tertiary);
+  }
+
+  .gold-display {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.1));
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    border-radius: var(--radius-md);
+    color: #fbbf24;
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-decoration: none;
+    transition: all var(--transition-fast);
+  }
+
+  .gold-display:hover {
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.25), rgba(245, 158, 11, 0.2));
+    border-color: rgba(251, 191, 36, 0.5);
+  }
+
+  .gold-icon {
+    font-size: 1rem;
+  }
+
+  .menu-gold {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    color: #fbbf24;
+    font-weight: 600;
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.1), transparent);
   }
 
   .avatar-menu {
