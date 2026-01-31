@@ -88,32 +88,64 @@
     await loadBoard();
   }
 
-  // Manual scroll controls for mobile
-  let canScrollLeft = false;
-  let canScrollRight = false;
+  // Auto-scroll during drag
+  let lastTouchX = 0;
+  let scrollAnimationId = null;
 
-  function updateScrollState() {
-    if (!boardContainer) return;
-    canScrollLeft = boardContainer.scrollLeft > 0;
-    canScrollRight = boardContainer.scrollLeft < boardContainer.scrollWidth - boardContainer.clientWidth - 1;
+  function handleTouchMove(e) {
+    if (e.touches && e.touches[0]) {
+      lastTouchX = e.touches[0].clientX;
+    }
   }
 
-  function scrollBoard(direction) {
-    if (!boardContainer) return;
-    const scrollAmount = 320; // roughly one column width
-    boardContainer.scrollBy({ left: direction * scrollAmount, behavior: 'smooth' });
-    setTimeout(updateScrollState, 300);
+  function handlePointerMove(e) {
+    if (e.clientX !== undefined) {
+      lastTouchX = e.clientX;
+    }
   }
 
-  // Update scroll state on mount and resize
+  function autoScrollDuringDrag() {
+    if (!isDragging || !boardContainer) {
+      scrollAnimationId = null;
+      return;
+    }
+
+    const rect = boardContainer.getBoundingClientRect();
+    const threshold = 50;
+    const scrollSpeed = 6;
+
+    if (lastTouchX > 0) {
+      if (lastTouchX - rect.left < threshold && boardContainer.scrollLeft > 0) {
+        boardContainer.scrollLeft -= scrollSpeed;
+      } else if (rect.right - lastTouchX < threshold &&
+                 boardContainer.scrollLeft < boardContainer.scrollWidth - boardContainer.clientWidth) {
+        boardContainer.scrollLeft += scrollSpeed;
+      }
+    }
+
+    scrollAnimationId = requestAnimationFrame(autoScrollDuringDrag);
+  }
+
+  // Start/stop auto-scroll based on drag state
+  $: if (isDragging) {
+    if (!scrollAnimationId) {
+      scrollAnimationId = requestAnimationFrame(autoScrollDuringDrag);
+    }
+  } else {
+    if (scrollAnimationId) {
+      cancelAnimationFrame(scrollAnimationId);
+      scrollAnimationId = null;
+    }
+  }
+
   onMount(async () => {
     await loadBoard();
-    setTimeout(updateScrollState, 100);
-    window.addEventListener('resize', updateScrollState);
   });
 
   onDestroy(() => {
-    window.removeEventListener('resize', updateScrollState);
+    if (scrollAnimationId) {
+      cancelAnimationFrame(scrollAnimationId);
+    }
   });
 
   function openTaskModal(columnId = 'todo', task = null) {
@@ -251,14 +283,12 @@
       </Button>
     </header>
 
-    <div class="board-wrapper">
-      {#if canScrollLeft}
-        <button class="scroll-btn scroll-left" on:click={() => scrollBoard(-1)} aria-label="Scroll left">
-          &lsaquo;
-        </button>
-      {/if}
-
-      <div class="kanban-board" bind:this={boardContainer} on:scroll={updateScrollState}>
+    <div
+      class="kanban-board"
+      bind:this={boardContainer}
+      on:touchmove={handleTouchMove}
+      on:pointermove={handlePointerMove}
+    >
       {#each board.columns as column}
         <div class="kanban-column">
           <div class="column-header">
@@ -337,13 +367,6 @@
           </button>
         </div>
       {/each}
-    </div>
-
-      {#if canScrollRight}
-        <button class="scroll-btn scroll-right" on:click={() => scrollBoard(1)} aria-label="Scroll right">
-          &rsaquo;
-        </button>
-      {/if}
     </div>
 
     {#if getCompletedTasks().length > 0}
@@ -463,47 +486,6 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: var(--spacing-lg);
-  }
-
-  .board-wrapper {
-    position: relative;
-  }
-
-  .scroll-btn {
-    display: none;
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 40px;
-    height: 40px;
-    background-color: var(--accent);
-    color: white;
-    border-radius: var(--radius-full);
-    font-size: 1.5rem;
-    font-weight: bold;
-    z-index: 10;
-    box-shadow: var(--shadow-md);
-    opacity: 0.9;
-  }
-
-  .scroll-btn:hover {
-    opacity: 1;
-  }
-
-  .scroll-left {
-    left: 8px;
-  }
-
-  .scroll-right {
-    right: 8px;
-  }
-
-  @media (max-width: 768px) {
-    .scroll-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
   }
 
   .kanban-board {
