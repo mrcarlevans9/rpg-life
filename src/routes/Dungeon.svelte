@@ -936,7 +936,8 @@
     align-items: center;
     justify-content: center;
     position: relative;
-    min-height: 100px;
+    min-height: 80px;
+    max-height: 200px;
   }
 
   .monster-display {
@@ -947,7 +948,7 @@
   }
 
   .monster-emoji {
-    font-size: 5rem;
+    font-size: 4rem;
     display: block;
     filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.5));
     animation: monsterIdle 2s ease-in-out infinite;
