@@ -451,9 +451,13 @@
               <span class="bar-value">{$currentRun?.playerMp}/{$currentRun?.maxMp}</span>
             </div>
           </div>
-          <!-- Gold -->
+          <!-- Gold Display -->
           <div class="gold-section">
-            <span class="gold-display">🪙 {$currentRun?.goldCollected || 0}</span>
+            <div class="gold-stash">
+              <span class="gold-bank" title="Safe in bank">🏦 {$currentRun?.bankGold || 0}</span>
+              <span class="gold-divider">|</span>
+              <span class="gold-run" title="This run (at risk)">💰 +{$currentRun?.goldCollected || 0}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -588,6 +592,7 @@
   {#if $gamePhase === 'merchant'}
     {@const room = $currentRun?.floor?.rooms[$currentRun?.floor?.currentRoom]}
     {@const merchant = room?.merchant}
+    {@const totalGold = ($currentRun?.goldCollected || 0) + ($currentRun?.bankGold || 0)}
     <div class="merchant-screen">
       <div class="merchant-header">
         <span class="merchant-emoji">{merchant?.emoji || '🧌'}</span>
@@ -596,7 +601,8 @@
       </div>
 
       <div class="merchant-gold">
-        <span>Your Gold: 🪙 {$currentRun?.goldCollected || 0}</span>
+        <span class="gold-available">🪙 {totalGold} total gold</span>
+        <span class="gold-breakdown">(💰 {$currentRun?.goldCollected || 0} run + 🏦 {$currentRun?.bankGold || 0} bank)</span>
       </div>
 
       <div class="merchant-items">
@@ -610,7 +616,7 @@
               </div>
               <button
                 class="item-buy"
-                disabled={$currentRun?.goldCollected < item.cost}
+                disabled={totalGold < item.cost}
                 on:click={() => purchaseMerchantItem(item.key)}
               >
                 🪙 {item.cost}
@@ -731,6 +737,7 @@
   <!-- Floor Complete Merchant -->
   {#if $gamePhase === 'floor_merchant'}
     {@const merchant = $currentRun?.floorMerchant}
+    {@const floorTotalGold = ($currentRun?.goldCollected || 0) + ($currentRun?.bankGold || 0)}
     <div class="merchant-screen floor-merchant">
       <div class="merchant-header">
         <span class="merchant-emoji">{merchant?.emoji || '🧌'}</span>
@@ -740,7 +747,8 @@
       </div>
 
       <div class="merchant-gold">
-        <span>Your Gold: 🪙 {$currentRun?.goldCollected || 0}</span>
+        <span class="gold-available">🪙 {floorTotalGold} total gold</span>
+        <span class="gold-breakdown">(💰 {$currentRun?.goldCollected || 0} run + 🏦 {$currentRun?.bankGold || 0} bank)</span>
       </div>
 
       <div class="merchant-items">
@@ -754,7 +762,7 @@
               </div>
               <button
                 class="item-buy"
-                disabled={$currentRun?.goldCollected < item.cost}
+                disabled={floorTotalGold < item.cost}
                 on:click={() => purchaseFloorMerchantItem(item.key)}
               >
                 🪙 {item.cost}
@@ -1539,9 +1547,32 @@
     100% { transform: scale(1); }
   }
 
-  .gold-display {
-    font-size: 0.75rem;
+  .gold-section {
+    display: flex;
+    justify-content: center;
+  }
+
+  .gold-stash {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.7rem;
     font-weight: 600;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 4px 10px;
+    border-radius: 12px;
+  }
+
+  .gold-bank {
+    color: #94a3b8;
+  }
+
+  .gold-divider {
+    color: var(--text-muted);
+    opacity: 0.5;
+  }
+
+  .gold-run {
     color: #fbbf24;
   }
 
@@ -2518,12 +2549,23 @@
 
   .merchant-gold {
     text-align: center;
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: #fbbf24;
     padding: var(--spacing-sm);
     background: rgba(251, 191, 36, 0.1);
     border-radius: var(--radius-md);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .merchant-gold .gold-available {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #fbbf24;
+  }
+
+  .merchant-gold .gold-breakdown {
+    font-size: 0.7rem;
+    color: var(--text-muted);
   }
 
   .merchant-items {

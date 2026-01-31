@@ -407,6 +407,7 @@ export async function startRun() {
     playerMp: maxMp,
     maxMp,
     goldCollected: 0,
+    bankGold: dungeon?.gold || 0, // Store bank gold at start of run (safe, won't be lost)
     potionsUsed: 0,
     monstersKilled: 0,
     isDefending: false,
@@ -1201,13 +1202,25 @@ export async function purchaseMerchantItem(itemKey) {
 
   const item = room.merchant.items[itemIndex];
 
-  // Check gold
-  if (run.goldCollected < item.cost) {
-    return { success: false, error: 'Not enough gold' };
+  // Can spend both run gold and bank gold
+  const runGold = run.goldCollected || 0;
+  const bankGold = run.bankGold || 0;
+  const totalGold = runGold + bankGold;
+
+  if (totalGold < item.cost) {
+    return { success: false, error: `Not enough gold! Need ${item.cost}, have ${totalGold}` };
   }
 
-  // Deduct gold
-  run.goldCollected -= item.cost;
+  // Deduct from run gold first, then bank gold if needed
+  let remaining = item.cost;
+  if (runGold >= remaining) {
+    run.goldCollected = runGold - remaining;
+  } else {
+    // Use all run gold, then dip into bank
+    run.goldCollected = 0;
+    remaining -= runGold;
+    run.bankGold = bankGold - remaining;
+  }
 
   // Apply effect
   const effect = item.effect;
@@ -1303,13 +1316,25 @@ export async function purchaseFloorMerchantItem(itemKey) {
 
   const item = run.floorMerchant.items[itemIndex];
 
-  // Check gold
-  if (run.goldCollected < item.cost) {
-    return { success: false, error: 'Not enough gold' };
+  // Can spend both run gold and bank gold
+  const runGold = run.goldCollected || 0;
+  const bankGold = run.bankGold || 0;
+  const totalGold = runGold + bankGold;
+
+  if (totalGold < item.cost) {
+    return { success: false, error: `Not enough gold! Need ${item.cost}, have ${totalGold}` };
   }
 
-  // Deduct gold
-  run.goldCollected -= item.cost;
+  // Deduct from run gold first, then bank gold if needed
+  let remaining = item.cost;
+  if (runGold >= remaining) {
+    run.goldCollected = runGold - remaining;
+  } else {
+    // Use all run gold, then dip into bank
+    run.goldCollected = 0;
+    remaining -= runGold;
+    run.bankGold = bankGold - remaining;
+  }
 
   // Apply effect
   const effect = item.effect;
