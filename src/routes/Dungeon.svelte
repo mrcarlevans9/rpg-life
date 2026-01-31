@@ -556,7 +556,7 @@
   .dungeon-page {
     max-width: 600px;
     margin: 0 auto;
-    padding: 0 var(--spacing-md);
+    padding: 0 var(--spacing-xs);
   }
 
   .page-header {
@@ -642,10 +642,10 @@
   .battle-screen {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 180px);
-    max-height: 520px;
+    height: calc(100vh - 140px);
+    min-height: 400px;
     background: linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-md);
     overflow: hidden;
     position: relative;
   }
@@ -665,18 +665,21 @@
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    padding: var(--spacing-sm) var(--spacing-md);
-    gap: var(--spacing-sm);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    gap: var(--spacing-xs);
     background: rgba(0, 0, 0, 0.3);
     border-bottom: 2px solid rgba(255, 255, 255, 0.1);
   }
 
   .hud-box {
     background: rgba(0, 0, 0, 0.5);
-    border: 2px solid rgba(255, 255, 255, 0.2);
-    border-radius: var(--radius-md);
-    padding: var(--spacing-xs) var(--spacing-sm);
-    min-width: 110px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: var(--radius-sm);
+    padding: 4px 6px;
+    flex: 1;
+    max-width: 130px;
+    min-width: 0;
+    overflow: hidden;
   }
 
   .hud-box.empty {
@@ -684,13 +687,16 @@
   }
 
   .hud-label {
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     font-weight: 700;
     color: var(--text-primary);
-    margin-bottom: 4px;
+    margin-bottom: 2px;
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .boss-tag {
@@ -703,7 +709,7 @@
   }
 
   .hud-hp-bar {
-    height: 10px;
+    height: 8px;
     background: rgba(0, 0, 0, 0.6);
     border-radius: var(--radius-full);
     overflow: hidden;
@@ -735,9 +741,9 @@
   .hud-hp-text {
     display: flex;
     justify-content: space-between;
-    font-size: 0.625rem;
+    font-size: 0.6rem;
     color: var(--text-muted);
-    margin-top: 2px;
+    margin-top: 1px;
   }
 
   .hud-damage {
@@ -753,12 +759,12 @@
 
   /* MP Bar */
   .hud-mp-bar {
-    height: 6px;
+    height: 5px;
     background: rgba(0, 0, 0, 0.6);
     border-radius: var(--radius-full);
     overflow: hidden;
     border: 1px solid rgba(255, 255, 255, 0.2);
-    margin-top: 4px;
+    margin-top: 2px;
   }
 
   .hud-mp-fill {
@@ -774,11 +780,12 @@
   /* Floor Indicator (center) */
   .floor-indicator {
     text-align: center;
-    padding: 0 var(--spacing-sm);
+    padding: 0 4px;
+    flex: 0 0 auto;
   }
 
   .floor-number {
-    font-size: 1rem;
+    font-size: 0.875rem;
     font-weight: 800;
     color: var(--accent);
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
@@ -926,9 +933,9 @@
   /* Message Box (Pokemon-style) */
   .message-box {
     background: var(--bg-primary);
-    border-top: 3px solid var(--border);
-    padding: var(--spacing-md) var(--spacing-lg);
-    min-height: 50px;
+    border-top: 2px solid var(--border);
+    padding: var(--spacing-sm) var(--spacing-md);
+    min-height: 44px;
     display: flex;
     align-items: center;
   }
