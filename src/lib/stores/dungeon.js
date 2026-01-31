@@ -1524,23 +1524,23 @@ export function skipLootChest() {
 // ============ Derived Stores ============
 
 export const playerStats = derived(
-  [dungeonData, currentRun],
-  ([$dungeon, $run]) => {
+  [dungeonData, currentRun, playerData],
+  ([$dungeon, $run, $player]) => {
     if ($run) {
       return {
         hp: $run.playerHp,
         maxHp: $run.maxHp,
         gold: $run.goldCollected,
         floor: $run.currentFloor,
-        potions: $dungeon?.healthPotions || 0
+        potions: $player?.healthPotions || 0
       };
     }
     return {
       hp: 100 + ($dungeon?.maxHpBonus || 0),
       maxHp: 100 + ($dungeon?.maxHpBonus || 0),
-      gold: $dungeon?.gold || 0,
+      gold: $player?.gold || 0,
       floor: 0,
-      potions: $dungeon?.healthPotions || 0
+      potions: $player?.healthPotions || 0
     };
   }
 );
