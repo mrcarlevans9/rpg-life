@@ -1,17 +1,9 @@
 import Dexie from 'dexie';
 
-// Database reset version - increment to force reset on all clients
-const DB_RESET_VERSION = 3;
-const resetKey = 'rpglife_db_reset_v';
-
-// Check if we need to reset the database
-const currentResetFlag = localStorage.getItem(resetKey);
-const needsReset = currentResetFlag !== String(DB_RESET_VERSION);
-
 // Create the database instance
 export const db = new Dexie('RPGLifeDB');
 
-// Define schema first (before any operations)
+// Define the database schema
 db.version(4).stores({
   // Player profile - single row (id: 1)
   player: '++id',
