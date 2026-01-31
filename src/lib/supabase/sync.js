@@ -12,11 +12,13 @@ function getUserId() {
 // ============ Player Sync ============
 export async function syncPlayer() {
   const userId = getUserId();
+  console.log('syncPlayer called, userId:', userId);
   if (!userId) return null;
 
   try {
     // Get local player data
     const localPlayer = await db.player.get(1);
+    console.log('LOCAL player:', JSON.stringify({ gold: localPlayer?.gold, healthPotions: localPlayer?.healthPotions, customSpells: localPlayer?.customSpells }));
 
     // Try to get remote player
     const { data: remotePlayer, error } = await supabase
@@ -24,6 +26,9 @@ export async function syncPlayer() {
       .select('*')
       .eq('user_id', userId)
       .single();
+
+    console.log('REMOTE player:', JSON.stringify({ gold: remotePlayer?.gold, health_potions: remotePlayer?.health_potions, custom_spells: remotePlayer?.custom_spells }));
+    console.log('REMOTE error:', error);
 
     if (error && error.code !== 'PGRST116') {
       console.error('Error fetching remote player:', error);
@@ -88,11 +93,12 @@ export async function syncPlayer() {
         })
         .eq('user_id', userId);
 
+      console.log('MERGED result:', JSON.stringify({ gold: merged.gold, healthPotions: merged.healthPotions, customSpells: merged.customSpells }));
       console.log('Player synced:', merged.gold, 'gold,', merged.highestFloor, 'best floor');
       return merged;
     } else if (localPlayer) {
       // No remote player exists - create one!
-      console.log('No remote player found, creating one...');
+      console.log('No remote player found, creating one with gold:', localPlayer.gold);
       const { error: insertError } = await supabase.from('players').insert({
         user_id: userId,
         total_xp: localPlayer.totalXP || 0,
