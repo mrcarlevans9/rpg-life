@@ -60,7 +60,10 @@ export async function syncPlayer() {
         customSpells: (localIsDefault && remoteHasCharData)
           ? (remotePlayer.custom_spells || [])
           : ((remotePlayer.custom_spells?.[0]) ? remotePlayer.custom_spells : (localPlayer?.customSpells || [])),
-        purchasedSpellSlot: remotePlayer.purchased_spell_slot || localPlayer?.purchasedSpellSlot || false
+        purchasedSpellSlot: remotePlayer.purchased_spell_slot || localPlayer?.purchasedSpellSlot || false,
+        // Dungeon stats
+        highestFloor: Math.max(localPlayer?.highestFloor || 0, remotePlayer.highest_floor || 0),
+        totalKills: Math.max(localPlayer?.totalKills || 0, remotePlayer.total_kills || 0)
       };
 
       // Update local
@@ -79,11 +82,13 @@ export async function syncPlayer() {
           gold: merged.gold,
           health_potions: merged.healthPotions,
           custom_spells: merged.customSpells,
-          purchased_spell_slot: merged.purchasedSpellSlot
+          purchased_spell_slot: merged.purchasedSpellSlot,
+          highest_floor: merged.highestFloor,
+          total_kills: merged.totalKills
         })
         .eq('user_id', userId);
 
-      console.log('Player synced with gold/spells:', merged.gold, merged.customSpells?.length);
+      console.log('Player synced:', merged.gold, 'gold,', merged.highestFloor, 'best floor');
       return merged;
     }
 
@@ -112,6 +117,9 @@ export async function pushPlayerUpdate(updates) {
     if (updates.healthPotions !== undefined) remoteUpdates.health_potions = updates.healthPotions;
     if (updates.customSpells !== undefined) remoteUpdates.custom_spells = updates.customSpells;
     if (updates.purchasedSpellSlot !== undefined) remoteUpdates.purchased_spell_slot = updates.purchasedSpellSlot;
+    // Dungeon stats
+    if (updates.highestFloor !== undefined) remoteUpdates.highest_floor = updates.highestFloor;
+    if (updates.totalKills !== undefined) remoteUpdates.total_kills = updates.totalKills;
 
     if (Object.keys(remoteUpdates).length > 0) {
       await supabase

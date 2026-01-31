@@ -475,16 +475,23 @@ export async function collectRewards() {
   const dungeon = await db.dungeon.get(1);
   const player = await db.player.get(1);
 
-  // Add gold to PLAYER (syncs with cloud)
+  // Calculate new stats
   const newGold = (player?.gold || 0) + run.goldCollected;
-  await db.player.update(1, { gold: newGold });
-  pushPlayerUpdate({ gold: newGold });
+  const newHighestFloor = Math.max(player?.highestFloor || 0, run.currentFloor);
+  const newTotalKills = (player?.totalKills || 0) + run.monstersKilled;
 
-  // Update dungeon analytics (local stats)
+  // Update PLAYER with gold and stats (syncs with cloud)
+  const playerUpdates = {
+    gold: newGold,
+    highestFloor: newHighestFloor,
+    totalKills: newTotalKills
+  };
+  await db.player.update(1, playerUpdates);
+  pushPlayerUpdate(playerUpdates);
+
+  // Update dungeon analytics (local only - for detailed tracking)
   const dungeonUpdates = {
     totalGoldEarned: (dungeon?.totalGoldEarned || 0) + run.goldCollected,
-    highestFloor: Math.max(dungeon?.highestFloor || 0, run.currentFloor),
-    totalKills: (dungeon?.totalKills || 0) + run.monstersKilled,
     bossesDefeated: run.currentFloor === 10 && get(gamePhase) === 'victory'
       ? (dungeon?.bossesDefeated || 0) + 1
       : dungeon?.bossesDefeated || 0

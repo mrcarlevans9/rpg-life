@@ -30,7 +30,10 @@ export async function initializeDB() {
       gold: 0,
       healthPotions: 3,
       customSpells: [],
-      purchasedSpellSlot: false
+      purchasedSpellSlot: false,
+      // Dungeon stats (syncs with cloud)
+      highestFloor: 0,
+      totalKills: 0
     });
 
     // Create default avatar
@@ -215,9 +218,19 @@ export async function initializeDB() {
       playerUpdates.purchasedSpellSlot = dungeonForMigration.purchasedSpellSlot || false;
     }
 
+    // Migrate highestFloor if player doesn't have it or dungeon has higher
+    if (player.highestFloor === undefined || (dungeonForMigration.highestFloor || 0) > (player.highestFloor || 0)) {
+      playerUpdates.highestFloor = dungeonForMigration.highestFloor || 0;
+    }
+
+    // Migrate totalKills if player doesn't have it or dungeon has more
+    if (player.totalKills === undefined || (dungeonForMigration.totalKills || 0) > (player.totalKills || 0)) {
+      playerUpdates.totalKills = dungeonForMigration.totalKills || 0;
+    }
+
     if (Object.keys(playerUpdates).length > 0) {
       await db.player.update(1, playerUpdates);
-      console.log('Migrated gold/spells from dungeon to player:', playerUpdates);
+      console.log('Migrated dungeon data to player:', playerUpdates);
     }
   }
 }
