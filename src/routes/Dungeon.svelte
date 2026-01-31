@@ -327,7 +327,7 @@
         {/if}
 
         <!-- Combat Message Overlay (bottom of arena) -->
-        {#if $combatState.isAnimating && $currentMessage}
+        {#if ($combatState.isAnimating || $combatState.turn === 'player') && $currentMessage}
           <div class="combat-message-overlay">
             <div class="combat-toast" class:crit={$lastRoll?.critical}>
               {#if displayedRolls.length > 0}
