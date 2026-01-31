@@ -1,5 +1,4 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
   import Card from '../components/common/Card.svelte';
   import Button from '../components/common/Button.svelte';
   import {
@@ -10,6 +9,7 @@
     lastRoll,
     playerStats,
     currentMonster,
+    combatState,
     startRun,
     playerAttack,
     playerDefend,
@@ -145,18 +145,25 @@
   {#if $gamePhase === 'exploring'}
     <div class="combat-view">
       <!-- Player HUD -->
-      <div class="hud">
+      <div class="hud" class:player-hit={$combatState.lastDamageToPlayer} class:player-defeated={$combatState.playerDefeated}>
         <div class="hud-left">
           <div class="hp-display">
             <span class="hp-label">HP</span>
-            <div class="hp-bar-container">
+            <div class="hp-bar-container" class:hp-flash={$combatState.lastDamageToPlayer}>
               <div
-                class="hp-bar"
+                class="hp-bar player-hp-bar"
                 style="width: {($currentRun?.playerHp / $currentRun?.maxHp) * 100}%;
                        background: {getHpBarColor($currentRun?.playerHp, $currentRun?.maxHp)}"
               ></div>
+              <div class="hp-bar-shine"></div>
             </div>
             <span class="hp-text">{$currentRun?.playerHp} / {$currentRun?.maxHp}</span>
+            <!-- Player damage number -->
+            {#if $combatState.lastDamageToPlayer}
+              <div class="damage-number player-damage">
+                -{$combatState.lastDamageToPlayer}
+              </div>
+            {/if}
           </div>
         </div>
         <div class="hud-center">
@@ -177,21 +184,60 @@
       <!-- Monster Display -->
       {#if $currentMonster}
         <Card class="monster-card">
-          <div class="monster-display">
+          <div
+            class="monster-display"
+            class:monster-hit={$combatState.lastDamageToEnemy}
+            class:monster-defeated={$combatState.monsterDefeated}
+            class:monster-attacking={$combatState.enemyAction === 'attack'}
+          >
+            <!-- Damage number floating above monster -->
+            {#key $combatState.lastDamageToEnemy}
+              {#if $combatState.lastDamageToEnemy}
+                <div class="damage-number enemy-damage">
+                  -{$combatState.lastDamageToEnemy}
+                </div>
+              {/if}
+            {/key}
+
             <span class="monster-emoji">{$currentMonster.emoji}</span>
             <h3 class="monster-name">{$currentMonster.displayName}</h3>
             {#if $currentMonster.isBoss}
               <span class="boss-badge">BOSS</span>
             {/if}
-            <div class="monster-hp-bar-container">
+
+            <!-- Enhanced HP Bar -->
+            <div class="monster-hp-bar-container" class:hp-flash={$combatState.lastDamageToEnemy}>
               <div
                 class="monster-hp-bar"
                 style="width: {($currentMonster.currentHp / $currentMonster.maxHp) * 100}%"
               ></div>
+              <div class="hp-bar-shine"></div>
             </div>
             <span class="monster-hp-text">{$currentMonster.currentHp} / {$currentMonster.maxHp}</span>
+
+            <!-- Turn indicator -->
+            <div class="turn-indicator" class:enemy-turn={$combatState.turn === 'enemy'}>
+              {#if $combatState.turn === 'enemy'}
+                <span class="turn-text">Enemy Turn</span>
+              {:else if $combatState.turn === 'player' && !$combatState.isAnimating}
+                <span class="turn-text your-turn">Your Turn</span>
+              {/if}
+            </div>
           </div>
         </Card>
+      {/if}
+
+      <!-- Player attack effect overlay -->
+      {#if $combatState.playerAction === 'attack'}
+        <div class="attack-effect">
+          <div class="slash-effect"></div>
+        </div>
+      {/if}
+
+      {#if $combatState.playerAction === 'defend'}
+        <div class="defend-effect">
+          <div class="shield-effect">🛡️</div>
+        </div>
       {/if}
 
       <!-- Dice Display -->
@@ -216,23 +262,33 @@
       <!-- Action Buttons -->
       <div class="action-buttons">
         {#if $currentMonster}
-          <Button variant="danger" size="lg" on:click={playerAttack}>
-            Attack
+          <Button
+            variant="danger"
+            size="lg"
+            on:click={playerAttack}
+            disabled={$combatState.isAnimating}
+          >
+            <span class="btn-icon">⚔️</span> Attack
           </Button>
-          <Button variant="secondary" size="lg" on:click={playerDefend}>
-            Defend
+          <Button
+            variant="secondary"
+            size="lg"
+            on:click={playerDefend}
+            disabled={$combatState.isAnimating}
+          >
+            <span class="btn-icon">🛡️</span> Defend
           </Button>
         {/if}
         <Button
           variant="outline"
           on:click={usePotion}
-          disabled={!$dungeonData?.healthPotions || $currentRun?.playerHp >= $currentRun?.maxHp}
+          disabled={!$dungeonData?.healthPotions || $currentRun?.playerHp >= $currentRun?.maxHp || $combatState.isAnimating}
         >
-          Use Potion ({$dungeonData?.healthPotions || 0})
+          <span class="btn-icon">🧪</span> Potion ({$dungeonData?.healthPotions || 0})
         </Button>
         {#if canRetreat()}
-          <Button variant="warning" on:click={retreat}>
-            Retreat
+          <Button variant="warning" on:click={retreat} disabled={$combatState.isAnimating}>
+            <span class="btn-icon">🏃</span> Retreat
           </Button>
         {/if}
       </div>
@@ -512,11 +568,50 @@
     align-items: center;
     padding: var(--spacing-lg);
     gap: var(--spacing-sm);
+    position: relative;
+    transition: transform 0.1s ease;
+  }
+
+  .monster-display.monster-hit {
+    animation: monsterHit 0.4s ease-out;
+  }
+
+  .monster-display.monster-defeated {
+    animation: monsterDefeat 0.8s ease-out forwards;
+  }
+
+  .monster-display.monster-attacking {
+    animation: monsterAttackAnim 0.5s ease-out;
+  }
+
+  @keyframes monsterHit {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-8px); }
+    20%, 40%, 60%, 80% { transform: translateX(8px); }
+  }
+
+  @keyframes monsterDefeat {
+    0% { transform: scale(1); opacity: 1; filter: brightness(1); }
+    30% { transform: scale(1.1); filter: brightness(2); }
+    100% { transform: scale(0) rotate(180deg); opacity: 0; filter: brightness(0); }
+  }
+
+  @keyframes monsterAttackAnim {
+    0% { transform: translateY(0) scale(1); }
+    30% { transform: translateY(-20px) scale(1.1); }
+    60% { transform: translateY(10px) scale(0.95); }
+    100% { transform: translateY(0) scale(1); }
   }
 
   .monster-emoji {
     font-size: 4rem;
     animation: monsterBounce 1s ease-in-out infinite;
+    transition: filter 0.2s ease;
+  }
+
+  .monster-hit .monster-emoji {
+    filter: brightness(2) saturate(0);
+    animation: none;
   }
 
   @keyframes monsterBounce {
@@ -536,6 +631,12 @@
     border-radius: var(--radius-full);
     font-size: 0.75rem;
     font-weight: 700;
+    animation: bossPulse 2s ease-in-out infinite;
+  }
+
+  @keyframes bossPulse {
+    0%, 100% { box-shadow: 0 0 10px rgba(251, 191, 36, 0.5); }
+    50% { box-shadow: 0 0 20px rgba(251, 191, 36, 0.8); }
   }
 
   .monster-hp-bar-container {
@@ -544,17 +645,199 @@
     background: var(--bg-tertiary);
     border-radius: var(--radius-full);
     overflow: hidden;
+    position: relative;
+    border: 2px solid var(--border);
+  }
+
+  .monster-hp-bar-container.hp-flash {
+    animation: hpFlash 0.3s ease-out;
+  }
+
+  @keyframes hpFlash {
+    0%, 100% { border-color: var(--border); }
+    50% { border-color: var(--danger); box-shadow: 0 0 10px var(--danger); }
   }
 
   .monster-hp-bar {
     height: 100%;
-    background: var(--danger);
-    transition: width 0.3s ease;
+    background: linear-gradient(180deg, #ef4444 0%, #b91c1c 100%);
+    transition: width 0.4s ease-out;
+    position: relative;
+  }
+
+  .hp-bar-shine {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 40%;
+    background: linear-gradient(180deg, rgba(255,255,255,0.3) 0%, transparent 100%);
+    pointer-events: none;
   }
 
   .monster-hp-text {
     font-size: 0.875rem;
     color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  /* Turn Indicator */
+  .turn-indicator {
+    margin-top: var(--spacing-sm);
+    padding: var(--spacing-xs) var(--spacing-md);
+    border-radius: var(--radius-full);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .turn-text {
+    color: var(--text-muted);
+  }
+
+  .turn-text.your-turn {
+    color: var(--success);
+    animation: turnPulse 1s ease-in-out infinite;
+  }
+
+  .turn-indicator.enemy-turn .turn-text {
+    color: var(--danger);
+    animation: turnPulse 0.5s ease-in-out infinite;
+  }
+
+  @keyframes turnPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  /* Damage Numbers */
+  .damage-number {
+    position: absolute;
+    font-size: 1.5rem;
+    font-weight: 800;
+    text-shadow: 2px 2px 0 rgba(0,0,0,0.5);
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  .enemy-damage {
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #fbbf24;
+    animation: damageFloat 0.6s ease-out forwards;
+  }
+
+  .player-damage {
+    color: var(--danger);
+    animation: damageFloat 0.6s ease-out forwards;
+    margin-left: var(--spacing-sm);
+  }
+
+  @keyframes damageFloat {
+    0% {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0) scale(1.5);
+    }
+    100% {
+      opacity: 0;
+      transform: translateX(-50%) translateY(-40px) scale(1);
+    }
+  }
+
+  /* Attack Effect Overlay */
+  .attack-effect {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .slash-effect {
+    width: 200px;
+    height: 200px;
+    background: linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.8) 50%, transparent 60%);
+    animation: slashAnim 0.3s ease-out forwards;
+  }
+
+  @keyframes slashAnim {
+    0% {
+      transform: rotate(-45deg) scale(0) translateX(-100px);
+      opacity: 0;
+    }
+    50% {
+      opacity: 1;
+    }
+    100% {
+      transform: rotate(-45deg) scale(2) translateX(100px);
+      opacity: 0;
+    }
+  }
+
+  /* Defend Effect */
+  .defend-effect {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 50;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 200px;
+  }
+
+  .shield-effect {
+    font-size: 4rem;
+    animation: shieldAnim 0.5s ease-out forwards;
+  }
+
+  @keyframes shieldAnim {
+    0% {
+      transform: scale(0) rotate(-20deg);
+      opacity: 0;
+    }
+    50% {
+      transform: scale(1.2) rotate(0deg);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(1) rotate(0deg);
+      opacity: 0.7;
+    }
+  }
+
+  /* Player HUD animations */
+  .hud.player-hit {
+    animation: hudShake 0.4s ease-out;
+  }
+
+  .hud.player-defeated {
+    animation: hudDefeat 0.8s ease-out;
+  }
+
+  @keyframes hudShake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+    20%, 40%, 60%, 80% { transform: translateX(5px); }
+  }
+
+  @keyframes hudDefeat {
+    0% { filter: brightness(1); }
+    50% { filter: brightness(0.5) saturate(0); }
+    100% { filter: brightness(0.3) saturate(0); }
+  }
+
+  .player-hp-bar {
+    transition: width 0.4s ease-out;
+  }
+
+  /* Button icons */
+  .btn-icon {
+    margin-right: var(--spacing-xs);
   }
 
   /* Dice Display */

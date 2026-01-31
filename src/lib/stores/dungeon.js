@@ -39,6 +39,37 @@ export const combatLog = writable([]);
 // Dice roll result for animation
 export const lastRoll = writable(null);
 
+// Combat state for turn-based flow and animations
+export const combatState = writable({
+  turn: 'player', // 'player' | 'enemy' | 'animating'
+  isAnimating: false,
+  playerAction: null, // 'attack' | 'defend' | 'potion' | null
+  enemyAction: null, // 'attack' | null
+  lastDamageToEnemy: null,
+  lastDamageToPlayer: null,
+  monsterDefeated: false,
+  playerDefeated: false
+});
+
+// Helper to reset combat state for new encounter
+function resetCombatState() {
+  combatState.set({
+    turn: 'player',
+    isAnimating: false,
+    playerAction: null,
+    enemyAction: null,
+    lastDamageToEnemy: null,
+    lastDamageToPlayer: null,
+    monsterDefeated: false,
+    playerDefeated: false
+  });
+}
+
+// Helper to delay for animations
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 // ============ Dice Rolling ============
 
 function rollDice(count = 2, sides = 6) {
@@ -192,6 +223,7 @@ export async function startRun() {
   currentRun.set(run);
   gamePhase.set('exploring');
   combatLog.set([{ type: 'info', message: 'You enter the dungeon...' }]);
+  resetCombatState();
 
   // Update total runs
   await db.dungeon.update(1, {
@@ -257,10 +289,16 @@ export async function playerAttack() {
   const run = get(currentRun);
   if (!run) return;
 
+  const state = get(combatState);
+  if (state.isAnimating) return; // Prevent actions during animations
+
   const room = run.floor.rooms[run.floor.currentRoom];
   if (room.type !== 'combat' && room.type !== 'boss') return;
 
   const monster = room.monster;
+
+  // Start player attack animation
+  combatState.update(s => ({ ...s, isAnimating: true, playerAction: 'attack', turn: 'animating' }));
 
   // Roll 2D6 for damage
   const rolls = rollD6(2);
@@ -278,21 +316,39 @@ export async function playerAttack() {
     addLog('roll', `You rolled ${rolls[0]}+${rolls[1]} = ${total}`);
   }
 
-  // Apply damage
-  monster.currentHp -= damage;
+  lastRoll.set({ rolls, total, type: 'attack', critical: isDoubles });
+
+  // Wait for dice animation
+  await delay(400);
+
+  // Apply damage and show damage number
+  monster.currentHp = Math.max(0, monster.currentHp - damage);
+  combatState.update(s => ({ ...s, lastDamageToEnemy: damage }));
   addLog('damage', `You deal ${damage} damage to ${monster.displayName}!`);
 
-  lastRoll.set({ rolls, total, type: 'attack', critical: isDoubles });
+  currentRun.set(run);
+
+  // Wait for damage animation
+  await delay(600);
+
+  // Clear player action
+  combatState.update(s => ({ ...s, playerAction: null, lastDamageToEnemy: null }));
 
   // Clear defending status
   run.isDefending = false;
 
   // Check if monster is dead
   if (monster.currentHp <= 0) {
+    combatState.update(s => ({ ...s, monsterDefeated: true }));
+    await delay(800); // Wait for defeat animation
     await monsterDefeated(run, room, monster);
+    combatState.update(s => ({ ...s, isAnimating: false, monsterDefeated: false }));
   } else {
     // Monster counter-attacks
+    combatState.update(s => ({ ...s, turn: 'enemy' }));
+    await delay(400);
     await monsterAttack(run, monster);
+    combatState.update(s => ({ ...s, isAnimating: false, turn: 'player' }));
   }
 
   currentRun.set(run);
@@ -302,10 +358,16 @@ export async function playerDefend() {
   const run = get(currentRun);
   if (!run) return;
 
+  const state = get(combatState);
+  if (state.isAnimating) return; // Prevent actions during animations
+
   const room = run.floor.rooms[run.floor.currentRoom];
   if (room.type !== 'combat' && room.type !== 'boss') return;
 
   const monster = room.monster;
+
+  // Start defend animation
+  combatState.update(s => ({ ...s, isAnimating: true, playerAction: 'defend', turn: 'animating' }));
 
   // Roll 1D6 for defense
   const rolls = rollD6(1);
@@ -318,13 +380,21 @@ export async function playerDefend() {
 
   lastRoll.set({ rolls, total: defenseAmount, type: 'defend' });
 
+  await delay(500);
+
   // Monster attacks
+  combatState.update(s => ({ ...s, playerAction: null, turn: 'enemy' }));
+  await delay(300);
   await monsterAttack(run, monster);
 
+  combatState.update(s => ({ ...s, isAnimating: false, turn: 'player' }));
   currentRun.set(run);
 }
 
 async function monsterAttack(run, monster) {
+  // Start enemy attack animation
+  combatState.update(s => ({ ...s, enemyAction: 'attack' }));
+
   // Monster rolls 1D6 + base damage
   const roll = rollD6(1)[0];
   let damage = Math.floor(monster.damage * (roll / 3.5)); // Scale with roll
@@ -344,12 +414,26 @@ async function monsterAttack(run, monster) {
     addLog('enemy', `${monster.displayName} attacks for ${damage} damage!`);
   }
 
-  run.playerHp -= damage;
+  await delay(400);
+
+  // Show damage to player
+  if (damage > 0) {
+    combatState.update(s => ({ ...s, lastDamageToPlayer: damage }));
+  }
+
+  run.playerHp = Math.max(0, run.playerHp - damage);
+  currentRun.set(run);
+
+  await delay(500);
+
+  // Clear enemy action and damage number
+  combatState.update(s => ({ ...s, enemyAction: null, lastDamageToPlayer: null }));
 
   // Check if player is dead
   if (run.playerHp <= 0) {
-    run.playerHp = 0;
+    combatState.update(s => ({ ...s, playerDefeated: true }));
     addLog('death', 'You have been defeated...');
+    await delay(800);
     endRun(false);
   }
 }
@@ -398,6 +482,7 @@ function advanceRoom(run) {
       advanceRoom(run); // Auto-advance from shrine
     } else {
       addLog('info', `A ${nextRoom.monster.displayName} appears!`);
+      resetCombatState(); // Reset combat state for new monster
     }
   } else {
     // Floor complete - advance to next floor
@@ -415,6 +500,7 @@ function advanceRoom(run) {
           addLog('info', `A ${firstRoom.monster.displayName} blocks your path!`);
         }
       }
+      resetCombatState(); // Reset combat state for new floor
     }
   }
 
