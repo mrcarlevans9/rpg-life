@@ -28,7 +28,7 @@ export async function initializeDB() {
       createdAt: new Date().toISOString(),
       // Character inventory (syncs with cloud)
       gold: 0,
-      healthPotions: 3,
+      healthPotions: 0, // Start with 0, can buy auto-potion upgrade
       customSpells: [],
       purchasedSpellSlot: false,
       // Dungeon stats (syncs with cloud)

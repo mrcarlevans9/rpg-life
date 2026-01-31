@@ -33,7 +33,8 @@
     openLootChest,
     chooseLootChestItem,
     skipLootChest,
-    useExpeditionItem
+    useExpeditionItem,
+    getTotalPotions
   } from '../lib/stores/dungeon.js';
   import { DUNGEON_UPGRADES } from '../lib/db/index.js';
   import { playerData } from '../lib/stores/player.js';
@@ -45,6 +46,9 @@
 
   // Derived: expedition inventory items
   $: expeditionInventory = $dungeonData?.expeditionInventory || [];
+
+  // Derived: total potions available in current run (0 outside dungeon)
+  $: runPotions = $currentRun ? getTotalPotions($currentRun) : 0;
 
   // Dice rolling animation state
   let displayedRolls = [];
@@ -247,8 +251,8 @@
         <div class="player-stats-grid">
           <div class="stat-item">
             <span class="stat-icon">🧪</span>
-            <span class="stat-value">{$playerData?.healthPotions || 0}</span>
-            <span class="stat-label">Potions</span>
+            <span class="stat-value">{$dungeonData?.upgrades?.includes('auto_potion') ? 1 : 0}</span>
+            <span class="stat-label">Start Potions</span>
           </div>
           <div class="stat-item">
             <span class="stat-icon">🪙</span>
@@ -275,7 +279,7 @@
           <p>10 floors of danger await. Defeat the boss to claim glory!</p>
           <ul class="dungeon-info">
             <li>Start with {100 + ($dungeonData?.maxHpBonus || 0)} HP</li>
-            <li>{$playerData?.healthPotions || 0} health potions available</li>
+            <li>{#if $dungeonData?.upgrades?.includes('auto_potion')}Start with 1 potion <span class="upgrade-note">(Potion Satchel)</span>{:else}No starting potions - buy from merchants{/if}</li>
             <li>Retreat between floors to keep your gold</li>
             <li>Death means losing all gold from this run</li>
           </ul>
@@ -508,9 +512,9 @@
             <button
               class="action-btn item"
               on:click={usePotion}
-              disabled={!$playerData?.healthPotions || $currentRun?.playerHp >= $currentRun?.maxHp || $combatState.isAnimating}
+              disabled={runPotions <= 0 || $currentRun?.playerHp >= $currentRun?.maxHp || $combatState.isAnimating}
             >
-              🧪 POTION <span class="item-count">({$playerData?.healthPotions || 0})</span>
+              🧪 POTION <span class="item-count">({runPotions})</span>
             </button>
             {#if expeditionInventory.length > 0}
               <button
@@ -2349,6 +2353,12 @@
 
   .locked-badge {
     font-size: 1.25rem;
+  }
+
+  .upgrade-note {
+    font-size: 0.8em;
+    color: var(--success);
+    font-weight: 500;
   }
 
   /* ========== SPELL EDITOR MODAL ========== */

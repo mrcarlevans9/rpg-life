@@ -430,10 +430,13 @@ export async function startRun() {
   // Calculate max MP with upgrades
   const maxMp = BASE_MAX_MP + (dungeon?.maxMpBonus || 0);
 
-  // Get gold, potions, spells from PLAYER (syncs with cloud)
+  // Get gold, spells from PLAYER (syncs with cloud)
   const bankGold = player?.gold || 0;
-  const healthPotions = player?.healthPotions || 0;
   const customSpells = player?.customSpells || [];
+
+  // Check for auto-potion upgrade - only way to start with a potion
+  const hasAutoPotion = dungeon?.upgrades?.includes('auto_potion') || false;
+  const startingPotions = hasAutoPotion ? 1 : 0;
 
   const run = {
     currentFloor: 1,
@@ -444,7 +447,7 @@ export async function startRun() {
     maxMp,
     goldCollected: 0,
     bankGold, // From player - syncs with cloud
-    healthPotions, // Track potions for this run
+    potions: startingPotions, // All potions are temporary - gone when run ends
     potionsUsed: 0,
     monstersKilled: 0,
     isDefending: false,
@@ -915,12 +918,17 @@ function advanceRoom(run) {
 
 // ============ Potion Usage ============
 
+// Get total potions available in current run
+export function getTotalPotions(run) {
+  if (!run) return 0;
+  return run.potions || 0;
+}
+
 export async function usePotion() {
   const run = get(currentRun);
   if (!run) return false;
 
-  const player = await db.player.get(1);
-  if (!player || (player.healthPotions || 0) <= 0) {
+  if ((run.potions || 0) <= 0) {
     addLog('error', 'No health potions remaining!');
     return false;
   }
@@ -932,14 +940,9 @@ export async function usePotion() {
   const actualHeal = run.playerHp - oldHp;
 
   run.potionsUsed++;
-  run.healthPotions = (run.healthPotions || player.healthPotions) - 1;
+  run.potions--;
 
-  // Update player potions (syncs with cloud)
-  const newPotions = (player.healthPotions || 0) - 1;
-  await db.player.update(1, { healthPotions: newPotions });
-  pushPlayerUpdate({ healthPotions: newPotions });
-
-  addLog('heal', `Used health potion! +${actualHeal} HP (${newPotions} potions remaining)`);
+  addLog('heal', `Used health potion! +${actualHeal} HP (${run.potions} potions remaining)`);
 
   currentRun.set(run);
   return true;
@@ -947,13 +950,14 @@ export async function usePotion() {
 
 // ============ Potion Rewards ============
 
+// Award potions during a dungeon run (all potions are temporary)
 export async function awardPotions(count = 1) {
-  const player = await db.player.get(1);
-  if (!player) return;
+  const run = get(currentRun);
+  if (!run) return; // Can only award potions during a run
 
-  const newPotions = (player.healthPotions || 0) + count;
-  await db.player.update(1, { healthPotions: newPotions });
-  pushPlayerUpdate({ healthPotions: newPotions });
+  run.potions = (run.potions || 0) + count;
+  currentRun.set(run);
+  addLog('treasure', `Found ${count} health potion${count > 1 ? 's' : ''}!`);
 }
 
 // ============ Expedition Inventory System ============
@@ -1356,6 +1360,12 @@ export async function purchaseMerchantItem(itemKey) {
     addLog('info', `${item.name} grants +${effect.goldBonus} gold per kill!`);
   }
 
+  if (effect.addPotion) {
+    run.potions = (run.potions || 0) + effect.addPotion;
+    const totalPotions = getTotalPotions(run);
+    addLog('treasure', `Added ${effect.addPotion} potion${effect.addPotion > 1 ? 's' : ''} to inventory! (${totalPotions} total)`);
+  }
+
   // Remove item from merchant inventory (one-time purchase)
   room.merchant.items.splice(itemIndex, 1);
 
@@ -1455,6 +1465,12 @@ export async function purchaseFloorMerchantItem(itemKey) {
     addLog('info', `${item.name} grants +${effect.goldBonus} gold per kill!`);
   }
 
+  if (effect.addPotion) {
+    run.potions = (run.potions || 0) + effect.addPotion;
+    const totalPotions = getTotalPotions(run);
+    addLog('treasure', `Added ${effect.addPotion} potion${effect.addPotion > 1 ? 's' : ''} to inventory! (${totalPotions} total)`);
+  }
+
   // Remove item from merchant inventory (one-time purchase)
   run.floorMerchant.items.splice(itemIndex, 1);
 
@@ -1546,6 +1562,12 @@ export function chooseLootChestItem(itemKey) {
   if (effect.goldBonus) {
     run.tempBuffs.goldBonus += effect.goldBonus;
     addLog('info', `${item.name} grants +${effect.goldBonus} gold per kill!`);
+  }
+
+  if (effect.addPotion) {
+    run.potions = (run.potions || 0) + effect.addPotion;
+    const totalPotions = getTotalPotions(run);
+    addLog('treasure', `Found ${effect.addPotion} potion${effect.addPotion > 1 ? 's' : ''}! (${totalPotions} total)`);
   }
 
   // Mark room as completed and advance
