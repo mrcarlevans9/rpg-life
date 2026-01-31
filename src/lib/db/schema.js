@@ -184,6 +184,26 @@ export const MONSTER_MODIFIERS = [
   { key: 'giant', name: 'Giant', damageMultiplier: 1.3, hpMultiplier: 1.4, goldMultiplier: 1.5 }
 ];
 
+// Goblin Merchant - random encounter
+export const MERCHANT = {
+  name: 'Goblin Merchant',
+  emoji: '🧌',
+  greeting: "Psst! Want to buy something, adventurer?",
+  spawnChance: 0.12 // 12% chance per floor
+};
+
+// Merchant items (temporary, current run only)
+export const MERCHANT_ITEMS = [
+  { key: 'health_potion', name: 'Health Potion', emoji: '🧪', description: 'Restore 30 HP', cost: 8, effect: { heal: 30 } },
+  { key: 'mana_potion', name: 'Mana Potion', emoji: '💙', description: 'Restore 20 MP', cost: 6, effect: { mana: 20 } },
+  { key: 'strength_elixir', name: 'Strength Elixir', emoji: '💪', description: '+3 damage this run', cost: 15, effect: { bonusDamage: 3 } },
+  { key: 'iron_skin', name: 'Iron Skin Potion', emoji: '🛡️', description: '+2 defense this run', cost: 12, effect: { defenseBonus: 2 } },
+  { key: 'lucky_charm', name: 'Lucky Charm', emoji: '🍀', description: '+5 gold per kill this run', cost: 10, effect: { goldBonus: 5 } },
+  { key: 'warriors_rage', name: "Warrior's Rage", emoji: '🔥', description: '+5 damage this run', cost: 25, effect: { bonusDamage: 5 } },
+  { key: 'healers_blessing', name: "Healer's Blessing", emoji: '✨', description: 'Restore 50 HP', cost: 15, effect: { heal: 50 } },
+  { key: 'mystic_scroll', name: 'Mystic Scroll', emoji: '📜', description: 'Restore 40 MP', cost: 12, effect: { mana: 40 } }
+];
+
 // Dungeon shop upgrades
 export const DUNGEON_UPGRADES = [
   { key: 'max_hp_1', name: 'Vitality I', description: '+10 Max HP', cost: 50, effect: { maxHp: 10 } },

@@ -22,7 +22,9 @@
     saveCustomSpell,
     deleteCustomSpell,
     calculateManaCost,
-    getSpellSlots
+    getSpellSlots,
+    purchaseMerchantItem,
+    leaveMerchant
   } from '../lib/stores/dungeon.js';
   import { DUNGEON_UPGRADES } from '../lib/db/index.js';
   import { playerData } from '../lib/stores/player.js';
@@ -45,8 +47,8 @@
     diceRevealed = [];
   }
 
-  // Lock body scroll during combat (check both gamePhase and currentRun for reliability)
-  $: inCombat = $gamePhase !== 'idle' || $currentRun !== null;
+  // Lock body scroll during dungeon run (check both gamePhase and currentRun for reliability)
+  $: inCombat = ($gamePhase !== 'idle' && $gamePhase !== 'victory' && $gamePhase !== 'defeat' && $gamePhase !== 'retreat') || $currentRun !== null;
   $: if (typeof document !== 'undefined') {
     if (inCombat) {
       document.body.classList.add('no-scroll');
@@ -289,7 +291,7 @@
           <span class="floor-number">F{$currentRun?.currentFloor}</span>
           <div class="room-enemies">
             {#each $currentRun?.floor?.rooms || [] as room, i}
-              {#if room.type === 'combat' || room.type === 'boss'}
+              {#if room.type === 'combat' || room.type === 'boss' || room.type === 'merchant'}
                 <span
                   class="enemy-marker"
                   class:active={i === $currentRun?.floor?.currentRoom}
@@ -298,7 +300,9 @@
                   {#if room.completed}
                     <span class="defeated-x">✕</span>
                   {/if}
-                  <span class="enemy-icon" class:faded={room.completed}>{room.type === 'boss' ? '👑' : '⚔️'}</span>
+                  <span class="enemy-icon" class:faded={room.completed}>
+                    {#if room.type === 'boss'}👑{:else if room.type === 'merchant'}🛒{:else}⚔️{/if}
+                  </span>
                 </span>
               {/if}
             {/each}
@@ -509,6 +513,68 @@
             </div>
           {/if}
       </div>
+    </div>
+  {/if}
+
+  <!-- Merchant Encounter -->
+  {#if $gamePhase === 'merchant'}
+    {@const room = $currentRun?.floor?.rooms[$currentRun?.floor?.currentRoom]}
+    {@const merchant = room?.merchant}
+    <div class="merchant-screen">
+      <div class="merchant-header">
+        <span class="merchant-emoji">{merchant?.emoji || '🧌'}</span>
+        <h2>Goblin Merchant</h2>
+        <p class="merchant-greeting">"{merchant?.greeting}"</p>
+      </div>
+
+      <div class="merchant-gold">
+        <span>Your Gold: 🪙 {$currentRun?.goldCollected || 0}</span>
+      </div>
+
+      <div class="merchant-items">
+        {#if merchant?.items?.length > 0}
+          {#each merchant.items as item}
+            <div class="merchant-item">
+              <div class="item-icon">{item.emoji}</div>
+              <div class="item-info">
+                <span class="item-name">{item.name}</span>
+                <span class="item-desc">{item.description}</span>
+              </div>
+              <button
+                class="item-buy"
+                disabled={$currentRun?.goldCollected < item.cost}
+                on:click={() => purchaseMerchantItem(item.key)}
+              >
+                🪙 {item.cost}
+              </button>
+            </div>
+          {/each}
+        {:else}
+          <p class="no-items">"Sold out! Come back next time!"</p>
+        {/if}
+      </div>
+
+      <div class="merchant-actions">
+        <Button variant="secondary" on:click={leaveMerchant}>
+          Continue Journey
+        </Button>
+      </div>
+
+      <!-- Show temp buffs if any -->
+      {#if $currentRun?.tempBuffs && ($currentRun.tempBuffs.bonusDamage > 0 || $currentRun.tempBuffs.defenseBonus > 0 || $currentRun.tempBuffs.goldBonus > 0)}
+        <div class="active-buffs">
+          <span class="buffs-label">Active Buffs:</span>
+          {#if $currentRun.tempBuffs.bonusDamage > 0}
+            <span class="buff">💪 +{$currentRun.tempBuffs.bonusDamage} DMG</span>
+          {/if}
+          {#if $currentRun.tempBuffs.defenseBonus > 0}
+            <span class="buff">🛡️ +{$currentRun.tempBuffs.defenseBonus} DEF</span>
+          {/if}
+          {#if $currentRun.tempBuffs.goldBonus > 0}
+            <span class="buff">🍀 +{$currentRun.tempBuffs.goldBonus} Gold/kill</span>
+          {/if}
+        </div>
+      {/if}
     </div>
   {/if}
 
@@ -1990,5 +2056,163 @@
     font-size: 0.75rem;
     color: var(--text-muted);
     margin-top: var(--spacing-sm);
+  }
+
+  /* ========== MERCHANT ENCOUNTER ========== */
+  .merchant-screen {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    padding: var(--spacing-lg);
+    background: linear-gradient(180deg, #2d1b0e 0%, #1a1a2e 50%, #16213e 100%);
+    border-radius: var(--radius-md);
+    min-height: 400px;
+  }
+
+  .merchant-header {
+    text-align: center;
+    padding: var(--spacing-md);
+  }
+
+  .merchant-emoji {
+    font-size: 4rem;
+    display: block;
+    animation: merchantBobble 2s ease-in-out infinite;
+  }
+
+  @keyframes merchantBobble {
+    0%, 100% { transform: translateY(0) rotate(-2deg); }
+    50% { transform: translateY(-8px) rotate(2deg); }
+  }
+
+  .merchant-header h2 {
+    color: #fbbf24;
+    margin: var(--spacing-sm) 0;
+  }
+
+  .merchant-greeting {
+    color: var(--text-muted);
+    font-style: italic;
+    font-size: 0.9rem;
+  }
+
+  .merchant-gold {
+    text-align: center;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #fbbf24;
+    padding: var(--spacing-sm);
+    background: rgba(251, 191, 36, 0.1);
+    border-radius: var(--radius-md);
+  }
+
+  .merchant-items {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  .merchant-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    border-radius: var(--radius-md);
+    transition: all 0.2s ease;
+  }
+
+  .merchant-item:hover {
+    border-color: #fbbf24;
+    background: rgba(251, 191, 36, 0.1);
+  }
+
+  .item-icon {
+    font-size: 1.75rem;
+    min-width: 40px;
+    text-align: center;
+  }
+
+  .item-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .item-name {
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .item-desc {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+
+  .item-buy {
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    border: none;
+    border-radius: var(--radius-md);
+    color: #1a1a1a;
+    font-weight: 700;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .item-buy:hover:not(:disabled) {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(251, 191, 36, 0.4);
+  }
+
+  .item-buy:disabled {
+    background: var(--bg-tertiary);
+    color: var(--text-muted);
+    cursor: not-allowed;
+  }
+
+  .no-items {
+    text-align: center;
+    color: var(--text-muted);
+    font-style: italic;
+    padding: var(--spacing-lg);
+  }
+
+  .merchant-actions {
+    display: flex;
+    justify-content: center;
+    padding-top: var(--spacing-md);
+  }
+
+  .active-buffs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm);
+    background: rgba(34, 197, 94, 0.1);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    border-radius: var(--radius-md);
+  }
+
+  .buffs-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  .buff {
+    font-size: 0.8rem;
+    padding: 4px 8px;
+    background: rgba(34, 197, 94, 0.2);
+    border-radius: var(--radius-sm);
+    color: #22c55e;
+    font-weight: 600;
   }
 </style>
