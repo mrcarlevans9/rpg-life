@@ -30,6 +30,52 @@
   let showSpellEditor = false;
   let showSpellMenu = false;
 
+  // Dice rolling animation state
+  let displayedRolls = [];
+  let diceRevealed = [];
+  let rollAnimationId = 0;
+
+  // Watch for new rolls and animate dice
+  $: if ($lastRoll && $lastRoll.rolls.length > 0) {
+    animateDiceRoll($lastRoll.rolls);
+  }
+
+  function animateDiceRoll(finalRolls) {
+    const currentAnimId = ++rollAnimationId;
+    const numDice = finalRolls.length;
+
+    // Initialize with random values, all unrevealed
+    displayedRolls = finalRolls.map(() => Math.ceil(Math.random() * 6));
+    diceRevealed = finalRolls.map(() => false);
+
+    // Rapidly cycle through random numbers
+    const rollInterval = setInterval(() => {
+      if (rollAnimationId !== currentAnimId) {
+        clearInterval(rollInterval);
+        return;
+      }
+      displayedRolls = displayedRolls.map((_, i) =>
+        diceRevealed[i] ? finalRolls[i] : Math.ceil(Math.random() * 6)
+      );
+    }, 50);
+
+    // Reveal each die sequentially
+    finalRolls.forEach((finalValue, index) => {
+      setTimeout(() => {
+        if (rollAnimationId !== currentAnimId) return;
+        diceRevealed[index] = true;
+        displayedRolls[index] = finalValue;
+        diceRevealed = [...diceRevealed];
+        displayedRolls = [...displayedRolls];
+
+        // Clear interval after last die is revealed
+        if (index === numDice - 1) {
+          clearInterval(rollInterval);
+        }
+      }, 200 + index * 250); // Stagger each die reveal by 250ms
+    });
+  }
+
   // Spell editor state
   let editingSlotIndex = 0;
   let spellName = '';
@@ -284,10 +330,10 @@
         {#if $combatState.isAnimating && $currentMessage}
           <div class="combat-message-overlay">
             <div class="combat-toast" class:crit={$lastRoll?.critical}>
-              {#if $lastRoll && $lastRoll.rolls.length > 0}
+              {#if displayedRolls.length > 0}
                 <span class="toast-dice">
-                  {#each $lastRoll.rolls as roll, i}
-                    <span class="toast-die">{roll}</span>{#if i < $lastRoll.rolls.length - 1}<span class="toast-plus">+</span>{/if}
+                  {#each displayedRolls as roll, i}
+                    <span class="toast-die" class:rolling={!diceRevealed[i]} class:revealed={diceRevealed[i]}>{roll}</span>{#if i < displayedRolls.length - 1}<span class="toast-plus">+</span>{/if}
                   {/each}
                 </span>
                 <span class="toast-arrow">→</span>
@@ -1128,6 +1174,30 @@
     background: #fbbf24;
     border-color: #fbbf24;
     color: #1a1a1a;
+  }
+
+  .toast-die.rolling {
+    animation: diceRoll 0.1s infinite;
+    opacity: 0.7;
+    color: var(--text-muted);
+  }
+
+  .toast-die.revealed {
+    animation: diceReveal 0.3s ease-out;
+    opacity: 1;
+  }
+
+  @keyframes diceRoll {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    25% { transform: translateY(-2px) rotate(-3deg); }
+    50% { transform: translateY(0) rotate(0deg); }
+    75% { transform: translateY(2px) rotate(3deg); }
+  }
+
+  @keyframes diceReveal {
+    0% { transform: scale(1.3) rotate(-10deg); opacity: 0.5; }
+    50% { transform: scale(1.1) rotate(5deg); }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
   }
 
   .toast-plus {
