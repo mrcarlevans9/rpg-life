@@ -76,9 +76,9 @@
         <span class="action-label">Start Expedition</span>
       </a>
 
-      <a href="#/projects" class="action-card">
+      <a href="#/board" class="action-card">
         <span class="action-icon">📋</span>
-        <span class="action-label">Manage Projects</span>
+        <span class="action-label">Task Board</span>
       </a>
 
       <a href="#/achievements" class="action-card">
