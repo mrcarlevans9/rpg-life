@@ -303,7 +303,7 @@
                     <span class="defeated-x">✕</span>
                   {/if}
                   <span class="enemy-icon" class:faded={room.completed}>
-                    {#if room.type === 'boss'}👑{:else if room.type === 'merchant'}🛒{:else}⚔️{/if}
+                    {#if room.type === 'boss'}👑{:else if room.type === 'merchant'}💰{:else}☠️{/if}
                   </span>
                 </span>
               {/if}
