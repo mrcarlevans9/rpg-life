@@ -500,6 +500,144 @@ export async function pushSettingsUpdate(updates) {
   }
 }
 
+// ============ Dungeon Sync ============
+export async function syncDungeon() {
+  const userId = getUserId();
+  if (!userId) return null;
+
+  try {
+    // Get local dungeon data
+    const localDungeon = await db.dungeon.get(1);
+
+    // Try to get remote dungeon
+    const { data: remoteDungeon, error } = await supabase
+      .from('dungeon')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('Error fetching remote dungeon:', error);
+      return localDungeon;
+    }
+
+    // If remote exists, merge (take higher/better values)
+    if (remoteDungeon) {
+      const merged = {
+        healthPotions: Math.max(localDungeon?.healthPotions || 0, remoteDungeon.health_potions || 0),
+        gold: Math.max(localDungeon?.gold || 0, remoteDungeon.gold || 0),
+        totalGoldEarned: Math.max(localDungeon?.totalGoldEarned || 0, remoteDungeon.total_gold_earned || 0),
+        highestFloor: Math.max(localDungeon?.highestFloor || 0, remoteDungeon.highest_floor || 0),
+        totalRuns: Math.max(localDungeon?.totalRuns || 0, remoteDungeon.total_runs || 0),
+        totalKills: Math.max(localDungeon?.totalKills || 0, remoteDungeon.total_kills || 0),
+        bossesDefeated: Math.max(localDungeon?.bossesDefeated || 0, remoteDungeon.bosses_defeated || 0),
+        upgrades: remoteDungeon.upgrades || localDungeon?.upgrades || [],
+        maxHpBonus: Math.max(localDungeon?.maxHpBonus || 0, remoteDungeon.max_hp_bonus || 0),
+        bonusDamage: Math.max(localDungeon?.bonusDamage || 0, remoteDungeon.bonus_damage || 0),
+        potionBonus: Math.max(localDungeon?.potionBonus || 0, remoteDungeon.potion_bonus || 0),
+        critBonus: Math.max(localDungeon?.critBonus || 0, remoteDungeon.crit_bonus || 0),
+        defenseBonus: Math.max(localDungeon?.defenseBonus || 0, remoteDungeon.defense_bonus || 0),
+        maxMpBonus: Math.max(localDungeon?.maxMpBonus || 0, remoteDungeon.max_mp_bonus || 0),
+        customSpells: remoteDungeon.custom_spells || localDungeon?.customSpells || [],
+        purchasedSpellSlot: remoteDungeon.purchased_spell_slot || localDungeon?.purchasedSpellSlot || false
+      };
+
+      // Update local
+      await db.dungeon.update(1, merged);
+
+      // Update remote with merged data
+      await supabase
+        .from('dungeon')
+        .update({
+          health_potions: merged.healthPotions,
+          gold: merged.gold,
+          total_gold_earned: merged.totalGoldEarned,
+          highest_floor: merged.highestFloor,
+          total_runs: merged.totalRuns,
+          total_kills: merged.totalKills,
+          bosses_defeated: merged.bossesDefeated,
+          upgrades: merged.upgrades,
+          max_hp_bonus: merged.maxHpBonus,
+          bonus_damage: merged.bonusDamage,
+          potion_bonus: merged.potionBonus,
+          crit_bonus: merged.critBonus,
+          defense_bonus: merged.defenseBonus,
+          max_mp_bonus: merged.maxMpBonus,
+          custom_spells: merged.customSpells,
+          purchased_spell_slot: merged.purchasedSpellSlot
+        })
+        .eq('user_id', userId);
+
+      console.log('Dungeon data synced and merged');
+      return merged;
+    } else if (localDungeon) {
+      // No remote data, push local to remote
+      await supabase.from('dungeon').insert({
+        user_id: userId,
+        health_potions: localDungeon.healthPotions || 0,
+        gold: localDungeon.gold || 0,
+        total_gold_earned: localDungeon.totalGoldEarned || 0,
+        highest_floor: localDungeon.highestFloor || 0,
+        total_runs: localDungeon.totalRuns || 0,
+        total_kills: localDungeon.totalKills || 0,
+        bosses_defeated: localDungeon.bossesDefeated || 0,
+        upgrades: localDungeon.upgrades || [],
+        max_hp_bonus: localDungeon.maxHpBonus || 0,
+        bonus_damage: localDungeon.bonusDamage || 0,
+        potion_bonus: localDungeon.potionBonus || 0,
+        crit_bonus: localDungeon.critBonus || 0,
+        defense_bonus: localDungeon.defenseBonus || 0,
+        max_mp_bonus: localDungeon.maxMpBonus || 0,
+        custom_spells: localDungeon.customSpells || [],
+        purchased_spell_slot: localDungeon.purchasedSpellSlot || false
+      });
+      console.log('Dungeon data pushed to remote');
+    }
+
+    return localDungeon;
+  } catch (error) {
+    console.error('Sync dungeon error:', error);
+    return null;
+  }
+}
+
+export async function pushDungeonUpdate(updates) {
+  const userId = getUserId();
+  if (!userId) return;
+
+  try {
+    const remoteUpdates = {};
+    if (updates.healthPotions !== undefined) remoteUpdates.health_potions = updates.healthPotions;
+    if (updates.gold !== undefined) remoteUpdates.gold = updates.gold;
+    if (updates.totalGoldEarned !== undefined) remoteUpdates.total_gold_earned = updates.totalGoldEarned;
+    if (updates.highestFloor !== undefined) remoteUpdates.highest_floor = updates.highestFloor;
+    if (updates.totalRuns !== undefined) remoteUpdates.total_runs = updates.totalRuns;
+    if (updates.totalKills !== undefined) remoteUpdates.total_kills = updates.totalKills;
+    if (updates.bossesDefeated !== undefined) remoteUpdates.bosses_defeated = updates.bossesDefeated;
+    if (updates.upgrades !== undefined) remoteUpdates.upgrades = updates.upgrades;
+    if (updates.maxHpBonus !== undefined) remoteUpdates.max_hp_bonus = updates.maxHpBonus;
+    if (updates.bonusDamage !== undefined) remoteUpdates.bonus_damage = updates.bonusDamage;
+    if (updates.potionBonus !== undefined) remoteUpdates.potion_bonus = updates.potionBonus;
+    if (updates.critBonus !== undefined) remoteUpdates.crit_bonus = updates.critBonus;
+    if (updates.defenseBonus !== undefined) remoteUpdates.defense_bonus = updates.defenseBonus;
+    if (updates.maxMpBonus !== undefined) remoteUpdates.max_mp_bonus = updates.maxMpBonus;
+    if (updates.customSpells !== undefined) remoteUpdates.custom_spells = updates.customSpells;
+    if (updates.purchasedSpellSlot !== undefined) remoteUpdates.purchased_spell_slot = updates.purchasedSpellSlot;
+
+    if (Object.keys(remoteUpdates).length > 0) {
+      // Upsert to handle case where row doesn't exist yet
+      await supabase
+        .from('dungeon')
+        .upsert({
+          user_id: userId,
+          ...remoteUpdates
+        }, { onConflict: 'user_id' });
+    }
+  } catch (error) {
+    console.error('Push dungeon update error:', error);
+  }
+}
+
 // ============ Full Sync ============
 export async function fullSync() {
   const userId = getUserId();
@@ -516,6 +654,7 @@ export async function fullSync() {
     await syncSettings();
     await syncBoard();
     await syncTasks();
+    await syncDungeon();
     console.log('Full sync complete');
   } catch (error) {
     console.error('Full sync error:', error);

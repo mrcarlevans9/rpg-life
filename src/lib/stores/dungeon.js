@@ -2,6 +2,7 @@ import { writable, derived, get } from 'svelte/store';
 import { liveQuery } from 'dexie';
 import { db, MONSTERS, BOSSES, MONSTER_MODIFIERS, DUNGEON_UPGRADES, MERCHANT, MERCHANT_ITEMS } from '../db/index.js';
 import { playerData } from './player.js';
+import { pushDungeonUpdate } from '../supabase/sync.js';
 
 // Create a store from a Dexie liveQuery
 function createLiveQueryStore(queryFn, defaultValue = null) {
@@ -441,9 +442,11 @@ export async function startRun() {
   resetCombatState();
 
   // Update total runs
-  await db.dungeon.update(1, {
-    totalRuns: (dungeon?.totalRuns || 0) + 1
-  });
+  const runUpdate = { totalRuns: (dungeon?.totalRuns || 0) + 1 };
+  await db.dungeon.update(1, runUpdate);
+
+  // Sync to cloud
+  pushDungeonUpdate(runUpdate);
 
   return run;
 }
@@ -466,7 +469,7 @@ export async function collectRewards() {
   const dungeon = await db.dungeon.get(1);
 
   // Add gold to persistent storage
-  await db.dungeon.update(1, {
+  const rewardUpdates = {
     gold: (dungeon?.gold || 0) + run.goldCollected,
     totalGoldEarned: (dungeon?.totalGoldEarned || 0) + run.goldCollected,
     highestFloor: Math.max(dungeon?.highestFloor || 0, run.currentFloor),
@@ -474,7 +477,11 @@ export async function collectRewards() {
     bossesDefeated: run.currentFloor === 10 && get(gamePhase) === 'victory'
       ? (dungeon?.bossesDefeated || 0) + 1
       : dungeon?.bossesDefeated || 0
-  });
+  };
+  await db.dungeon.update(1, rewardUpdates);
+
+  // Sync to cloud
+  pushDungeonUpdate(rewardUpdates);
 
   // Reset run and unlock scroll
   if (typeof document !== 'undefined') {
@@ -1005,6 +1012,9 @@ export async function saveCustomSpell(spell, slotIndex = 0) {
 
   await db.dungeon.update(1, updateData);
 
+  // Sync to cloud
+  pushDungeonUpdate(updateData);
+
   return { success: true, spell: newSpell, goldSpent: editCost };
 }
 
@@ -1029,10 +1039,14 @@ export async function deleteCustomSpell(slotIndex = 0) {
 
   // Delete the spell and charge gold
   customSpells[slotIndex] = null;
-  await db.dungeon.update(1, {
+  const deleteUpdates = {
     customSpells,
     gold: (dungeon?.gold || 0) - deleteCost
-  });
+  };
+  await db.dungeon.update(1, deleteUpdates);
+
+  // Sync to cloud
+  pushDungeonUpdate(deleteUpdates);
 
   return { success: true, goldSpent: deleteCost };
 }
@@ -1179,6 +1193,9 @@ export async function purchaseUpgrade(upgradeKey) {
   }
 
   await db.dungeon.update(1, updates);
+
+  // Sync to cloud
+  pushDungeonUpdate(updates);
 
   return { success: true, upgrade };
 }
