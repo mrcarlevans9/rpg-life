@@ -279,6 +279,25 @@
         {#if $combatState.playerAction === 'defend'}
           <div class="battle-effect shield">🛡️</div>
         {/if}
+
+        <!-- Combat Message Overlay (bottom of arena) -->
+        {#if $combatState.isAnimating && $currentMessage}
+          <div class="combat-message-overlay">
+            <div class="combat-message-box">
+              <p class="combat-message">{$currentMessage}</p>
+              {#if $lastRoll}
+                <div class="dice-row">
+                  {#each $lastRoll.rolls as roll}
+                    <span class="mini-die" class:crit={$lastRoll.critical}>{roll}</span>
+                  {/each}
+                  {#if $lastRoll.critical}
+                    <span class="crit-badge">CRIT!</span>
+                  {/if}
+                </div>
+              {/if}
+            </div>
+          </div>
+        {/if}
       </div>
 
       <!-- Player Stats Bar (below arena) -->
@@ -322,25 +341,6 @@
 
       <!-- Action Panel -->
       <div class="action-panel">
-        <!-- Combat Message Overlay -->
-        {#if $combatState.isAnimating && $currentMessage}
-          <div class="combat-overlay">
-            <div class="combat-message-box">
-              <p class="combat-message">{$currentMessage}</p>
-              {#if $lastRoll}
-                <div class="dice-row">
-                  {#each $lastRoll.rolls as roll}
-                    <span class="mini-die" class:crit={$lastRoll.critical}>{roll}</span>
-                  {/each}
-                  {#if $lastRoll.critical}
-                    <span class="crit-badge">CRIT!</span>
-                  {/if}
-                </div>
-              {/if}
-            </div>
-          </div>
-        {/if}
-
         <!-- Action Buttons -->
           <div class="action-grid" class:has-spells={($currentRun?.customSpells || []).filter(s => s).length > 0}>
             {#if $currentMonster}
@@ -1067,36 +1067,30 @@
     position: relative;
   }
 
-  /* Combat Message Overlay */
-  .combat-overlay {
+  /* Combat Message Overlay (inside battle arena) */
+  .combat-message-overlay {
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.85);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 50;
-    padding: 8px;
+    bottom: 8px;
+    left: 8px;
+    right: 8px;
+    z-index: 30;
+    pointer-events: none;
   }
 
   .combat-message-box {
-    background: linear-gradient(180deg, #1a1a2e 0%, #0f0f1a 100%);
+    background: linear-gradient(180deg, rgba(26, 26, 46, 0.95) 0%, rgba(15, 15, 26, 0.95) 100%);
     border: 2px solid var(--accent);
     border-radius: var(--radius-md);
-    padding: 12px 16px;
-    width: 100%;
+    padding: 10px 14px;
     text-align: center;
-    box-shadow: 0 4px 20px rgba(99, 102, 241, 0.3);
-    animation: messageSlideIn 0.2s ease-out;
+    box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
+    animation: messageSlideUp 0.25s ease-out;
   }
 
-  @keyframes messageSlideIn {
+  @keyframes messageSlideUp {
     from {
       opacity: 0;
-      transform: translateY(10px);
+      transform: translateY(20px);
     }
     to {
       opacity: 1;
@@ -1106,16 +1100,17 @@
 
   .combat-message {
     color: var(--text-primary);
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     font-weight: 500;
-    margin: 0 0 8px 0;
-    line-height: 1.4;
+    margin: 0;
+    line-height: 1.3;
   }
 
   .combat-message-box .dice-row {
     justify-content: center;
-    padding: 4px 0 0 0;
+    padding: 6px 0 0 0;
     background: none;
+    margin-top: 4px;
   }
 
   .action-grid {
