@@ -15,6 +15,7 @@
     usePotion,
     collectRewards,
     retreat,
+    emergencyRetreat,
     purchaseUpgrade,
     castSpell,
     saveCustomSpell,
@@ -335,12 +336,24 @@
               🧪 POTION <span class="item-count">({$dungeonData?.healthPotions || 0})</span>
             </button>
             {#if canRetreat()}
+              <!-- Safe retreat - floor complete, keep all gold -->
               <button
-                class="action-btn run"
+                class="action-btn run safe"
                 on:click={retreat}
                 disabled={$combatState.isAnimating}
               >
-                🏃 RUN
+                🚪 LEAVE
+                <span class="item-count">(safe)</span>
+              </button>
+            {:else if $currentMonster}
+              <!-- Emergency retreat - in combat, lose half gold -->
+              <button
+                class="action-btn run danger"
+                on:click={emergencyRetreat}
+                disabled={$combatState.isAnimating}
+              >
+                🏃 FLEE
+                <span class="item-count">(½ gold)</span>
               </button>
             {:else}
               <div class="action-btn placeholder">
@@ -1003,12 +1016,28 @@
   }
 
   .action-btn.run {
-    border-color: #f59e0b;
-    color: #f59e0b;
+    flex-direction: column;
+    gap: 0;
+    padding: var(--spacing-xs);
+    font-size: 0.75rem;
   }
 
-  .action-btn.run:hover:not(:disabled) {
-    background: rgba(245, 158, 11, 0.1);
+  .action-btn.run.safe {
+    border-color: #22c55e;
+    color: #22c55e;
+  }
+
+  .action-btn.run.safe:hover:not(:disabled) {
+    background: rgba(34, 197, 94, 0.1);
+  }
+
+  .action-btn.run.danger {
+    border-color: #ef4444;
+    color: #ef4444;
+  }
+
+  .action-btn.run.danger:hover:not(:disabled) {
+    background: rgba(239, 68, 68, 0.1);
   }
 
   .action-btn.spell {

@@ -334,15 +334,41 @@ export async function collectRewards() {
   combatLog.set([]);
 }
 
+// Safe retreat - after completing a floor, keep all gold
 export async function retreat() {
   const run = get(currentRun);
   if (!run) return;
 
-  // Can only retreat between floors (after completing current floor)
   gamePhase.set('retreat');
-  addLog('info', `You retreat with ${run.goldCollected} gold!`);
+  addLog('info', `You safely retreat with ${run.goldCollected} gold!`);
 
-  // Collect rewards on retreat
+  // Collect full rewards on safe retreat
+  await collectRewards();
+}
+
+// Emergency retreat - can use anytime, but lose half your gold
+export async function emergencyRetreat() {
+  const run = get(currentRun);
+  if (!run) return;
+
+  // Calculate gold penalty
+  const goldLost = Math.floor(run.goldCollected / 2);
+  const goldKept = run.goldCollected - goldLost;
+
+  // Update run with reduced gold
+  run.goldCollected = goldKept;
+  currentRun.set(run);
+
+  gamePhase.set('retreat');
+
+  if (goldLost > 0) {
+    addLog('warning', `Emergency retreat! You lost ${goldLost} gold in your haste!`);
+    addLog('info', `You escape with ${goldKept} gold.`);
+  } else {
+    addLog('info', `You flee the dungeon!`);
+  }
+
+  // Collect reduced rewards
   await collectRewards();
 }
 
