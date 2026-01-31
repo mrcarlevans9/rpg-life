@@ -235,17 +235,7 @@ export const DUNGEON_UPGRADES = [
   { key: 'crit_chance', name: 'Lucky Strike', description: '+10% Critical Chance', cost: 250, effect: { critBonus: 10 } },
   { key: 'defense_1', name: 'Fortitude I', description: 'Defend blocks +2 damage', cost: 100, effect: { defenseBonus: 2 } },
   { key: 'spell_slot', name: 'Arcane Tome', description: '+1 Spell Slot (permanent)', cost: 500, effect: { spellSlot: 1 } },
-  { key: 'auto_potion', name: 'Potion Satchel', description: 'Start each run with 1 potion', cost: 200, effect: { autoPotion: true } }
+  { key: 'auto_potion', name: 'Potion Satchel', description: 'Start each run with 1 potion (permanent)', cost: 500, effect: { autoPotion: true } }
 ];
-
-// Calculate max potions player can carry based on level
-// Level 1-4: 1 potion, Level 5-9: 2 potions, Level 10-19: 3 potions, etc.
-export function getMaxPotions(level) {
-  if (level < 5) return 1;
-  if (level < 10) return 2;
-  if (level < 20) return 3;
-  if (level < 30) return 4;
-  return 5; // Max 5 at level 30+
-}
 
 export default db;

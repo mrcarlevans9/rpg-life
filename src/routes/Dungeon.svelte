@@ -34,12 +34,9 @@
     chooseLootChestItem,
     skipLootChest,
     useExpeditionItem,
-    getTotalPotions,
-    purchaseBankPotion,
-    getBankPotionCost
+    getTotalPotions
   } from '../lib/stores/dungeon.js';
-  import { DUNGEON_UPGRADES, getMaxPotions } from '../lib/db/index.js';
-  import { xpProgress } from '../lib/stores/player.js';
+  import { DUNGEON_UPGRADES } from '../lib/db/index.js';
   import { playerData } from '../lib/stores/player.js';
 
   let showShop = false;
@@ -50,20 +47,8 @@
   // Derived: expedition inventory items
   $: expeditionInventory = $dungeonData?.expeditionInventory || [];
 
-  // Derived: total potions available in current run
-  $: runPotions = $currentRun ? getTotalPotions($currentRun) : ($playerData?.healthPotions || 0);
-
-  // Derived: max potions based on level
-  $: maxBankPotions = getMaxPotions($xpProgress?.level || 1);
-  $: canBuyBankPotion = ($playerData?.healthPotions || 0) < maxBankPotions && ($playerData?.gold || 0) >= getBankPotionCost();
-
-  // Handle buying a bank potion
-  async function handleBuyBankPotion() {
-    const result = await purchaseBankPotion();
-    if (!result.success) {
-      console.error('Failed to buy potion:', result.error);
-    }
-  }
+  // Derived: total potions available in current run (0 outside dungeon)
+  $: runPotions = $currentRun ? getTotalPotions($currentRun) : 0;
 
   // Dice rolling animation state
   let displayedRolls = [];
@@ -266,8 +251,8 @@
         <div class="player-stats-grid">
           <div class="stat-item">
             <span class="stat-icon">🧪</span>
-            <span class="stat-value">{$playerData?.healthPotions || 0}</span>
-            <span class="stat-label">Potions</span>
+            <span class="stat-value">{$dungeonData?.upgrades?.includes('auto_potion') ? 1 : 0}</span>
+            <span class="stat-label">Start Potions</span>
           </div>
           <div class="stat-item">
             <span class="stat-icon">🪙</span>
@@ -294,7 +279,7 @@
           <p>10 floors of danger await. Defeat the boss to claim glory!</p>
           <ul class="dungeon-info">
             <li>Start with {100 + ($dungeonData?.maxHpBonus || 0)} HP</li>
-            <li>{($playerData?.healthPotions || 0) + ($dungeonData?.upgrades?.includes('auto_potion') ? 1 : 0)} health potions available{#if $dungeonData?.upgrades?.includes('auto_potion')} <span class="upgrade-note">(+1 from Potion Satchel)</span>{/if}</li>
+            <li>{#if $dungeonData?.upgrades?.includes('auto_potion')}Start with 1 potion <span class="upgrade-note">(Potion Satchel)</span>{:else}No starting potions - buy from merchants{/if}</li>
             <li>Retreat between floors to keep your gold</li>
             <li>Death means losing all gold from this run</li>
           </ul>
@@ -900,36 +885,6 @@
           <button class="close-btn" on:click={() => showShop = false}>×</button>
         </div>
         <div class="shop-content">
-          <!-- Consumables Section -->
-          <div class="shop-section">
-            <h3 class="section-title">🧪 Consumables</h3>
-            <div class="upgrade-item consumable">
-              <div class="upgrade-info">
-                <h4>Health Potion</h4>
-                <p>Add 1 potion to your inventory ({$playerData?.healthPotions || 0}/{maxBankPotions})</p>
-              </div>
-              <div class="upgrade-action">
-                {#if ($playerData?.healthPotions || 0) >= maxBankPotions}
-                  <span class="purchased-badge">Full</span>
-                {:else}
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    disabled={!canBuyBankPotion}
-                    on:click={handleBuyBankPotion}
-                  >
-                    🪙 {getBankPotionCost()}
-                  </Button>
-                {/if}
-              </div>
-            </div>
-            <p class="capacity-note">Max capacity increases with level (Lv5: 2, Lv10: 3, Lv20: 4, Lv30: 5)</p>
-          </div>
-
-          <!-- Upgrades Section -->
-          <div class="shop-section">
-            <h3 class="section-title">⚔️ Permanent Upgrades</h3>
-          </div>
           {#each DUNGEON_UPGRADES as upgrade}
             {@const status = getUpgradeStatus(upgrade)}
             <div class="upgrade-item" class:purchased={status.purchased} class:locked={status.locked}>
@@ -2398,32 +2353,6 @@
 
   .locked-badge {
     font-size: 1.25rem;
-  }
-
-  .shop-section {
-    margin-bottom: var(--spacing-sm);
-  }
-
-  .section-title {
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: var(--text-muted);
-    margin-bottom: var(--spacing-sm);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  .upgrade-item.consumable {
-    background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(16, 185, 129, 0.05));
-    border-color: rgba(34, 197, 94, 0.3);
-  }
-
-  .capacity-note {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    text-align: center;
-    margin-top: var(--spacing-xs);
-    margin-bottom: var(--spacing-md);
   }
 
   .upgrade-note {

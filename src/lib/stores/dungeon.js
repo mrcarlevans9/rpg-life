@@ -1,8 +1,7 @@
 import { writable, derived, get } from 'svelte/store';
 import { liveQuery } from 'dexie';
-import { db, MONSTERS, BOSSES, MONSTER_MODIFIERS, DUNGEON_UPGRADES, MERCHANT, MERCHANT_ITEMS, getMaxPotions } from '../db/index.js';
+import { db, MONSTERS, BOSSES, MONSTER_MODIFIERS, DUNGEON_UPGRADES, MERCHANT, MERCHANT_ITEMS } from '../db/index.js';
 import { playerData } from './player.js';
-import { calculateLevel } from '../services/xpService.js';
 import { pushDungeonUpdate, pushPlayerUpdate } from '../supabase/sync.js';
 
 // Create a store from a Dexie liveQuery
@@ -433,10 +432,9 @@ export async function startRun() {
 
   // Get gold, spells from PLAYER (syncs with cloud)
   const bankGold = player?.gold || 0;
-  const bankPotions = player?.healthPotions || 0; // Potions in permanent inventory
   const customSpells = player?.customSpells || [];
 
-  // Check for auto-potion upgrade
+  // Check for auto-potion upgrade - only way to start with a potion
   const hasAutoPotion = dungeon?.upgrades?.includes('auto_potion') || false;
   const startingPotions = hasAutoPotion ? 1 : 0;
 
@@ -449,8 +447,7 @@ export async function startRun() {
     maxMp,
     goldCollected: 0,
     bankGold, // From player - syncs with cloud
-    bankPotions, // Potions in permanent inventory (respects max capacity)
-    dungeonPotions: startingPotions, // Potions gained this run (can exceed max)
+    potions: startingPotions, // All potions are temporary - gone when run ends
     potionsUsed: 0,
     monstersKilled: 0,
     isDefending: false,
@@ -924,41 +921,28 @@ function advanceRoom(run) {
 // Get total potions available in current run
 export function getTotalPotions(run) {
   if (!run) return 0;
-  return (run.dungeonPotions || 0) + (run.bankPotions || 0);
+  return run.potions || 0;
 }
 
 export async function usePotion() {
   const run = get(currentRun);
   if (!run) return false;
 
-  const totalPotions = getTotalPotions(run);
-  if (totalPotions <= 0) {
+  if ((run.potions || 0) <= 0) {
     addLog('error', 'No health potions remaining!');
     return false;
   }
 
-  // Use potion - prioritize dungeon potions first (they don't persist)
+  // Use potion
   const healAmount = run.potionHeal;
   const oldHp = run.playerHp;
   run.playerHp = Math.min(run.maxHp, run.playerHp + healAmount);
   const actualHeal = run.playerHp - oldHp;
 
   run.potionsUsed++;
+  run.potions--;
 
-  // Use dungeon potions first, then bank potions
-  if ((run.dungeonPotions || 0) > 0) {
-    run.dungeonPotions--;
-  } else {
-    run.bankPotions--;
-    // Update player's permanent potions (syncs with cloud)
-    const player = await db.player.get(1);
-    const newBankPotions = Math.max(0, (player?.healthPotions || 0) - 1);
-    await db.player.update(1, { healthPotions: newBankPotions });
-    pushPlayerUpdate({ healthPotions: newBankPotions });
-  }
-
-  const remaining = getTotalPotions(run);
-  addLog('heal', `Used health potion! +${actualHeal} HP (${remaining} potions remaining)`);
+  addLog('heal', `Used health potion! +${actualHeal} HP (${run.potions} potions remaining)`);
 
   currentRun.set(run);
   return true;
@@ -966,29 +950,14 @@ export async function usePotion() {
 
 // ============ Potion Rewards ============
 
-// Award potions - in dungeon goes to dungeon inventory (no limit), otherwise bank (respects max)
+// Award potions during a dungeon run (all potions are temporary)
 export async function awardPotions(count = 1) {
   const run = get(currentRun);
-  const player = await db.player.get(1);
-  if (!player) return;
+  if (!run) return; // Can only award potions during a run
 
-  if (run) {
-    // In dungeon - add to dungeon potions (can exceed max capacity)
-    run.dungeonPotions = (run.dungeonPotions || 0) + count;
-    currentRun.set(run);
-    addLog('treasure', `Found ${count} health potion${count > 1 ? 's' : ''}!`);
-  } else {
-    // Outside dungeon - add to bank (respects max capacity)
-    const level = calculateLevel(player.totalXP || 0);
-    const maxPotions = getMaxPotions(level);
-    const currentPotions = player.healthPotions || 0;
-    const newPotions = Math.min(maxPotions, currentPotions + count);
-
-    if (newPotions > currentPotions) {
-      await db.player.update(1, { healthPotions: newPotions });
-      pushPlayerUpdate({ healthPotions: newPotions });
-    }
-  }
+  run.potions = (run.potions || 0) + count;
+  currentRun.set(run);
+  addLog('treasure', `Found ${count} health potion${count > 1 ? 's' : ''}!`);
 }
 
 // ============ Expedition Inventory System ============
@@ -1320,44 +1289,6 @@ export async function purchaseUpgrade(upgradeKey) {
   return { success: true, upgrade };
 }
 
-// Buy a potion for permanent inventory (bank)
-const BANK_POTION_COST = 15;
-
-export async function purchaseBankPotion() {
-  const player = await db.player.get(1);
-  if (!player) return { success: false, error: 'No player data' };
-
-  const playerGold = player.gold || 0;
-  if (playerGold < BANK_POTION_COST) {
-    return { success: false, error: 'Not enough gold' };
-  }
-
-  // Check max capacity
-  const level = calculateLevel(player.totalXP || 0);
-  const maxPotions = getMaxPotions(level);
-  const currentPotions = player.healthPotions || 0;
-
-  if (currentPotions >= maxPotions) {
-    return { success: false, error: `Already at max capacity (${maxPotions})` };
-  }
-
-  // Deduct gold and add potion
-  const newGold = playerGold - BANK_POTION_COST;
-  const newPotions = currentPotions + 1;
-
-  await db.player.update(1, {
-    gold: newGold,
-    healthPotions: newPotions
-  });
-  pushPlayerUpdate({ gold: newGold, healthPotions: newPotions });
-
-  return { success: true, newPotions, maxPotions };
-}
-
-export function getBankPotionCost() {
-  return BANK_POTION_COST;
-}
-
 // ============ Merchant Functions ============
 
 export async function purchaseMerchantItem(itemKey) {
@@ -1430,7 +1361,7 @@ export async function purchaseMerchantItem(itemKey) {
   }
 
   if (effect.addPotion) {
-    run.dungeonPotions = (run.dungeonPotions || 0) + effect.addPotion;
+    run.potions = (run.potions || 0) + effect.addPotion;
     const totalPotions = getTotalPotions(run);
     addLog('treasure', `Added ${effect.addPotion} potion${effect.addPotion > 1 ? 's' : ''} to inventory! (${totalPotions} total)`);
   }
@@ -1535,7 +1466,7 @@ export async function purchaseFloorMerchantItem(itemKey) {
   }
 
   if (effect.addPotion) {
-    run.dungeonPotions = (run.dungeonPotions || 0) + effect.addPotion;
+    run.potions = (run.potions || 0) + effect.addPotion;
     const totalPotions = getTotalPotions(run);
     addLog('treasure', `Added ${effect.addPotion} potion${effect.addPotion > 1 ? 's' : ''} to inventory! (${totalPotions} total)`);
   }
@@ -1634,7 +1565,7 @@ export function chooseLootChestItem(itemKey) {
   }
 
   if (effect.addPotion) {
-    run.dungeonPotions = (run.dungeonPotions || 0) + effect.addPotion;
+    run.potions = (run.potions || 0) + effect.addPotion;
     const totalPotions = getTotalPotions(run);
     addLog('treasure', `Found ${effect.addPotion} potion${effect.addPotion > 1 ? 's' : ''}! (${totalPotions} total)`);
   }
