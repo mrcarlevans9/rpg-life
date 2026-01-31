@@ -167,14 +167,31 @@ export const MONSTERS = {
   ]
 };
 
-// Dungeon boss definitions (Floor 10) - Epic fights requiring strategy and potions
-export const BOSSES = [
-  { key: 'dragon', name: 'Ancient Dragon', emoji: '🐉', baseHp: 120, baseDamage: 18, goldDrop: [50, 80], special: 'Fire Breath' },
-  { key: 'lich', name: 'Lich King', emoji: '☠️', baseHp: 100, baseDamage: 22, goldDrop: [45, 75], special: 'Soul Drain' },
-  { key: 'demon_lord', name: 'Demon Lord', emoji: '👿', baseHp: 110, baseDamage: 20, goldDrop: [55, 85], special: 'Hellfire' },
-  { key: 'hydra', name: 'Hydra', emoji: '🐍', baseHp: 140, baseDamage: 16, goldDrop: [60, 90], special: 'Multi-Strike' },
-  { key: 'titan', name: 'Fallen Titan', emoji: '🦾', baseHp: 150, baseDamage: 17, goldDrop: [65, 95], special: 'Ground Slam' }
-];
+// Dungeon boss definitions - Mini-bosses appear on floors with special rooms, Major bosses on floor 10+
+export const BOSSES = {
+  // Mini-bosses (appear when floor has chest/merchant, or every 3rd floor)
+  mini: [
+    { key: 'troll', name: 'Cave Troll', emoji: '🧌', baseHp: 65, baseDamage: 14, goldDrop: [25, 40], special: 'Regenerate', specialDesc: 'Heals 5 HP each turn' },
+    { key: 'dark_knight', name: 'Dark Knight', emoji: '🖤', baseHp: 55, baseDamage: 16, goldDrop: [20, 35], special: 'Shield Bash', specialDesc: 'Reduces your damage by 2 for 2 turns' },
+    { key: 'witch', name: 'Swamp Witch', emoji: '🧙‍♀️', baseHp: 45, baseDamage: 18, goldDrop: [22, 38], special: 'Hex', specialDesc: 'Curses you to take +3 damage' },
+    { key: 'werewolf', name: 'Werewolf', emoji: '🐺', baseHp: 60, baseDamage: 15, goldDrop: [23, 37], special: 'Frenzy', specialDesc: 'Attacks twice when below 50% HP' },
+    { key: 'necromancer', name: 'Necromancer', emoji: '💀', baseHp: 40, baseDamage: 14, goldDrop: [25, 40], special: 'Summon', specialDesc: 'Summons a skeleton ally' },
+    { key: 'minotaur', name: 'Minotaur', emoji: '🐂', baseHp: 70, baseDamage: 13, goldDrop: [24, 38], special: 'Charge', specialDesc: 'Next attack deals double damage' },
+    { key: 'medusa', name: 'Medusa', emoji: '🐍', baseHp: 50, baseDamage: 17, goldDrop: [26, 42], special: 'Petrify', specialDesc: 'Stuns you for 1 turn' },
+    { key: 'giant', name: 'Hill Giant', emoji: '👤', baseHp: 80, baseDamage: 12, goldDrop: [22, 36], special: 'Stomp', specialDesc: 'Deals damage to your MP too' }
+  ],
+  // Major bosses (Floor 10, 20, etc.) - Epic fights
+  major: [
+    { key: 'dragon', name: 'Ancient Dragon', emoji: '🐉', baseHp: 150, baseDamage: 20, goldDrop: [60, 100], special: 'Fire Breath', specialDesc: 'Deals 25 damage, ignores defense' },
+    { key: 'lich', name: 'Lich King', emoji: '☠️', baseHp: 120, baseDamage: 24, goldDrop: [55, 95], special: 'Soul Drain', specialDesc: 'Steals 15 HP from you' },
+    { key: 'demon_lord', name: 'Demon Lord', emoji: '👿', baseHp: 140, baseDamage: 22, goldDrop: [65, 105], special: 'Hellfire', specialDesc: 'Burns for 8 damage over 3 turns' },
+    { key: 'hydra', name: 'Hydra', emoji: '🐲', baseHp: 180, baseDamage: 16, goldDrop: [70, 110], special: 'Multi-Strike', specialDesc: 'Attacks 3 times for 8 damage each' },
+    { key: 'titan', name: 'Fallen Titan', emoji: '🗿', baseHp: 200, baseDamage: 18, goldDrop: [75, 120], special: 'Ground Slam', specialDesc: 'Stuns and deals 20 damage' },
+    { key: 'phoenix', name: 'Dark Phoenix', emoji: '🔥', baseHp: 130, baseDamage: 21, goldDrop: [60, 100], special: 'Rebirth', specialDesc: 'Revives once with 50% HP' },
+    { key: 'kraken', name: 'Kraken', emoji: '🦑', baseHp: 170, baseDamage: 19, goldDrop: [65, 105], special: 'Tentacle Grab', specialDesc: 'Immobilizes and deals 12 damage per turn' },
+    { key: 'beholder', name: 'Beholder', emoji: '👁️', baseHp: 110, baseDamage: 25, goldDrop: [70, 110], special: 'Death Ray', specialDesc: 'Chance to deal 40 damage' }
+  ]
+};
 
 // Monster modifiers (randomly applied)
 export const MONSTER_MODIFIERS = [
