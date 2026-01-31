@@ -1,5 +1,22 @@
 import Dexie from 'dexie';
 
+// Database reset flag - set to true to force fresh start
+const DB_RESET_VERSION = 1; // Increment this to force a reset
+
+// Check if we need to reset the database
+const resetKey = 'rpglife_db_reset_v';
+const currentResetFlag = localStorage.getItem(resetKey);
+if (currentResetFlag !== String(DB_RESET_VERSION)) {
+  // Delete the old database to force a fresh start
+  Dexie.delete('RPGLifeDB').then(() => {
+    console.log('Database reset for migration');
+    localStorage.setItem(resetKey, String(DB_RESET_VERSION));
+  }).catch(err => {
+    console.error('Failed to reset database:', err);
+  });
+  localStorage.setItem(resetKey, String(DB_RESET_VERSION));
+}
+
 export const db = new Dexie('RPGLifeDB');
 
 db.version(3).stores({
