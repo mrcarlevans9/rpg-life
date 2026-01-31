@@ -1,4 +1,4 @@
-import { db, ACHIEVEMENTS, UNLOCKABLES, TITLES, MONSTERS, BOSSES, MONSTER_MODIFIERS, DUNGEON_UPGRADES, MERCHANT, MERCHANT_ITEMS } from './schema.js';
+import { db, ACHIEVEMENTS, UNLOCKABLES, TITLES, MONSTERS, BOSSES, MONSTER_MODIFIERS, DUNGEON_UPGRADES, MERCHANT, MERCHANT_ITEMS, getMaxPotions } from './schema.js';
 
 // Initialize database with default data
 export async function initializeDB() {
@@ -28,7 +28,7 @@ export async function initializeDB() {
       createdAt: new Date().toISOString(),
       // Character inventory (syncs with cloud)
       gold: 0,
-      healthPotions: 3,
+      healthPotions: 0, // Start with 0, can buy auto-potion upgrade
       customSpells: [],
       purchasedSpellSlot: false,
       // Dungeon stats (syncs with cloud)
@@ -236,4 +236,4 @@ export async function initializeDB() {
 }
 
 // Export db and constants
-export { db, ACHIEVEMENTS, UNLOCKABLES, TITLES, MONSTERS, BOSSES, MONSTER_MODIFIERS, DUNGEON_UPGRADES, MERCHANT, MERCHANT_ITEMS };
+export { db, ACHIEVEMENTS, UNLOCKABLES, TITLES, MONSTERS, BOSSES, MONSTER_MODIFIERS, DUNGEON_UPGRADES, MERCHANT, MERCHANT_ITEMS, getMaxPotions };

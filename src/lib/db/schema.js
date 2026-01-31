@@ -211,7 +211,8 @@ export const MERCHANT = {
 
 // Merchant items (temporary, current run only)
 export const MERCHANT_ITEMS = [
-  { key: 'health_potion', name: 'Health Potion', emoji: '🧪', description: 'Restore 30 HP', cost: 8, effect: { heal: 30 } },
+  { key: 'health_potion', name: 'Health Potion', emoji: '🧪', description: 'Restore 30 HP instantly', cost: 8, effect: { heal: 30 } },
+  { key: 'bottled_potion', name: 'Bottled Potion', emoji: '🍶', description: 'Add 1 potion to inventory', cost: 12, effect: { addPotion: 1 } },
   { key: 'mana_potion', name: 'Mana Potion', emoji: '💙', description: 'Restore 20 MP', cost: 6, effect: { mana: 20 } },
   { key: 'strength_elixir', name: 'Strength Elixir', emoji: '💪', description: '+3 damage this run', cost: 15, effect: { bonusDamage: 3 } },
   { key: 'iron_skin', name: 'Iron Skin Potion', emoji: '🛡️', description: '+2 defense this run', cost: 12, effect: { defenseBonus: 2 } },
@@ -233,7 +234,18 @@ export const DUNGEON_UPGRADES = [
   { key: 'potion_power_2', name: 'Alchemy II', description: 'Potions heal +10 HP', cost: 300, effect: { potionBonus: 10 }, requires: 'potion_power_1' },
   { key: 'crit_chance', name: 'Lucky Strike', description: '+10% Critical Chance', cost: 250, effect: { critBonus: 10 } },
   { key: 'defense_1', name: 'Fortitude I', description: 'Defend blocks +2 damage', cost: 100, effect: { defenseBonus: 2 } },
-  { key: 'spell_slot', name: 'Arcane Tome', description: '+1 Spell Slot (permanent)', cost: 500, effect: { spellSlot: 1 } }
+  { key: 'spell_slot', name: 'Arcane Tome', description: '+1 Spell Slot (permanent)', cost: 500, effect: { spellSlot: 1 } },
+  { key: 'auto_potion', name: 'Potion Satchel', description: 'Start each run with 1 potion', cost: 200, effect: { autoPotion: true } }
 ];
+
+// Calculate max potions player can carry based on level
+// Level 1-4: 1 potion, Level 5-9: 2 potions, Level 10-19: 3 potions, etc.
+export function getMaxPotions(level) {
+  if (level < 5) return 1;
+  if (level < 10) return 2;
+  if (level < 20) return 3;
+  if (level < 30) return 4;
+  return 5; // Max 5 at level 30+
+}
 
 export default db;
