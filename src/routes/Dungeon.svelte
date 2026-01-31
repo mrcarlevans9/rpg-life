@@ -116,77 +116,86 @@
     </div>
   {/if}
 
-  <!-- Combat State - Pokemon-style compact layout -->
+  <!-- Combat State - Knights of Pen and Paper style -->
   {#if $gamePhase === 'exploring'}
     <div class="battle-screen" class:screen-shake={$combatState.lastDamageToPlayer}>
-      <!-- Battle Arena -->
-      <div class="battle-arena">
-        <!-- Enemy Side (top right) -->
-        {#if $currentMonster}
-          <div class="enemy-side">
-            <div class="enemy-info-box">
-              <div class="enemy-name-row">
-                <span class="enemy-name">{$currentMonster.displayName}</span>
-                {#if $currentMonster.isBoss}
-                  <span class="boss-tag">BOSS</span>
-                {/if}
-              </div>
-              <div class="enemy-hp-row">
-                <span class="hp-label">HP</span>
-                <div class="hp-bar-wrapper" class:hp-flash={$combatState.lastDamageToEnemy}>
-                  <div
-                    class="hp-bar-fill enemy-hp"
-                    style="width: {($currentMonster.currentHp / $currentMonster.maxHp) * 100}%"
-                  ></div>
-                </div>
-              </div>
-              <span class="hp-numbers">{$currentMonster.currentHp}/{$currentMonster.maxHp}</span>
-            </div>
-
-            <!-- Enemy sprite -->
+      <!-- Top HUD: Player HP left, Floor center, Enemy HP right -->
+      <div class="battle-hud">
+        <!-- Player HP -->
+        <div class="hud-box player-hud">
+          <div class="hud-label">YOU</div>
+          <div class="hud-hp-bar" class:hp-flash={$combatState.lastDamageToPlayer}>
             <div
-              class="enemy-sprite"
-              class:sprite-hit={$combatState.lastDamageToEnemy}
-              class:sprite-attack={$combatState.enemyAction === 'attack'}
-              class:sprite-defeated={$combatState.monsterDefeated}
-            >
-              <span class="sprite-emoji">{$currentMonster.emoji}</span>
-              {#key $combatState.lastDamageToEnemy}
-                {#if $combatState.lastDamageToEnemy}
-                  <div class="floating-damage">-{$combatState.lastDamageToEnemy}</div>
-                {/if}
-              {/key}
-            </div>
+              class="hud-hp-fill player-hp"
+              style="width: {($currentRun?.playerHp / $currentRun?.maxHp) * 100}%;
+                     background: {getHpBarColor($currentRun?.playerHp, $currentRun?.maxHp)}"
+            ></div>
           </div>
-        {/if}
-
-        <!-- Player Side (bottom) -->
-        <div class="player-side">
-          <div class="player-info-box">
-            <div class="player-name-row">
-              <span class="player-name">You</span>
-              <span class="floor-tag">F{$currentRun?.currentFloor}</span>
-            </div>
-            <div class="player-hp-row">
-              <span class="hp-label">HP</span>
-              <div class="hp-bar-wrapper" class:hp-flash={$combatState.lastDamageToPlayer}>
-                <div
-                  class="hp-bar-fill player-hp"
-                  style="width: {($currentRun?.playerHp / $currentRun?.maxHp) * 100}%;
-                         background: {getHpBarColor($currentRun?.playerHp, $currentRun?.maxHp)}"
-                ></div>
-              </div>
-            </div>
-            <div class="hp-numbers-row">
-              <span class="hp-numbers">{$currentRun?.playerHp}/{$currentRun?.maxHp}</span>
-              {#key $combatState.lastDamageToPlayer}
-                {#if $combatState.lastDamageToPlayer}
-                  <span class="damage-taken">-{$combatState.lastDamageToPlayer}</span>
-                {/if}
-              {/key}
-            </div>
+          <div class="hud-hp-text">
+            <span>{$currentRun?.playerHp}/{$currentRun?.maxHp}</span>
+            {#key $combatState.lastDamageToPlayer}
+              {#if $combatState.lastDamageToPlayer}
+                <span class="hud-damage">-{$combatState.lastDamageToPlayer}</span>
+              {/if}
+            {/key}
           </div>
         </div>
+
+        <!-- Floor indicator -->
+        <div class="floor-indicator">
+          <span class="floor-number">F{$currentRun?.currentFloor}</span>
+          <div class="room-dots">
+            {#each $currentRun?.floor?.rooms || [] as room, i}
+              <span
+                class="dot"
+                class:active={i === $currentRun?.floor?.currentRoom}
+                class:done={room.completed}
+              ></span>
+            {/each}
+          </div>
+        </div>
+
+        <!-- Enemy HP -->
+        {#if $currentMonster}
+          <div class="hud-box enemy-hud">
+            <div class="hud-label">
+              {$currentMonster.displayName}
+              {#if $currentMonster.isBoss}
+                <span class="boss-tag">BOSS</span>
+              {/if}
+            </div>
+            <div class="hud-hp-bar" class:hp-flash={$combatState.lastDamageToEnemy}>
+              <div
+                class="hud-hp-fill enemy-hp"
+                style="width: {($currentMonster.currentHp / $currentMonster.maxHp) * 100}%"
+              ></div>
+            </div>
+            <div class="hud-hp-text">
+              <span>{$currentMonster.currentHp}/{$currentMonster.maxHp}</span>
+            </div>
+          </div>
+        {:else}
+          <div class="hud-box enemy-hud empty"></div>
+        {/if}
+      </div>
+
+      <!-- Main Arena: Big centered enemy -->
+      <div class="battle-arena">
+        {#if $currentMonster}
+          <div
+            class="monster-display"
+            class:sprite-hit={$combatState.lastDamageToEnemy}
+            class:sprite-attack={$combatState.enemyAction === 'attack'}
+            class:sprite-defeated={$combatState.monsterDefeated}
+          >
+            <span class="monster-emoji">{$currentMonster.emoji}</span>
+            {#key $combatState.lastDamageToEnemy}
+              {#if $combatState.lastDamageToEnemy}
+                <div class="floating-damage">-{$combatState.lastDamageToEnemy}</div>
+              {/if}
+            {/key}
+          </div>
+        {/if}
 
         <!-- Visual Effects -->
         {#if $combatState.playerAction === 'attack'}
@@ -255,17 +264,6 @@
             {/if}
           </div>
         {/if}
-      </div>
-
-      <!-- Room Progress (minimal) -->
-      <div class="room-dots">
-        {#each $currentRun?.floor?.rooms || [] as room, i}
-          <span
-            class="dot"
-            class:active={i === $currentRun?.floor?.currentRoom}
-            class:done={room.completed}
-          ></span>
-        {/each}
       </div>
     </div>
   {/if}
@@ -451,13 +449,13 @@
     justify-content: center;
   }
 
-  /* ========== POKEMON-STYLE BATTLE SCREEN ========== */
+  /* ========== KNIGHTS OF PEN AND PAPER STYLE ========== */
   .battle-screen {
     display: flex;
     flex-direction: column;
     height: calc(100vh - 180px);
-    max-height: 500px;
-    background: linear-gradient(180deg, var(--bg-tertiary) 0%, var(--bg-secondary) 100%);
+    max-height: 520px;
+    background: linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
     border-radius: var(--radius-lg);
     overflow: hidden;
     position: relative;
@@ -473,229 +471,213 @@
     40%, 80% { transform: translateX(4px); }
   }
 
-  /* Battle Arena */
-  .battle-arena {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    padding: var(--spacing-md);
-    position: relative;
-    min-height: 200px;
-  }
-
-  /* Enemy Side (top) */
-  .enemy-side {
+  /* ===== TOP HUD ===== */
+  .battle-hud {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-  }
-
-  .enemy-info-box {
-    background: var(--bg-primary);
-    border: 2px solid var(--border);
-    border-radius: var(--radius-md);
     padding: var(--spacing-sm) var(--spacing-md);
-    min-width: 140px;
+    gap: var(--spacing-sm);
+    background: rgba(0, 0, 0, 0.3);
+    border-bottom: 2px solid rgba(255, 255, 255, 0.1);
   }
 
-  .enemy-name-row {
+  .hud-box {
+    background: rgba(0, 0, 0, 0.5);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    min-width: 110px;
+  }
+
+  .hud-box.empty {
+    opacity: 0;
+  }
+
+  .hud-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 4px;
     display: flex;
     align-items: center;
-    gap: var(--spacing-xs);
-    margin-bottom: 4px;
-  }
-
-  .enemy-name {
-    font-weight: 700;
-    font-size: 0.875rem;
+    gap: 4px;
   }
 
   .boss-tag {
     background: linear-gradient(135deg, #fbbf24, #f59e0b);
     color: #1a1a1a;
     font-size: 0.5rem;
-    padding: 2px 4px;
+    padding: 1px 4px;
     border-radius: var(--radius-sm);
     font-weight: 700;
   }
 
-  .enemy-hp-row, .player-hp-row {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-xs);
-  }
-
-  .hp-label {
-    font-size: 0.625rem;
-    font-weight: 600;
-    color: var(--text-muted);
-  }
-
-  .hp-bar-wrapper {
-    flex: 1;
-    height: 8px;
-    background: var(--bg-tertiary);
+  .hud-hp-bar {
+    height: 10px;
+    background: rgba(0, 0, 0, 0.6);
     border-radius: var(--radius-full);
     overflow: hidden;
-    border: 1px solid var(--border);
+    border: 1px solid rgba(255, 255, 255, 0.2);
   }
 
-  .hp-bar-wrapper.hp-flash {
+  .hud-hp-bar.hp-flash {
     animation: hpFlash 0.3s ease-out;
   }
 
   @keyframes hpFlash {
-    0%, 100% { border-color: var(--border); }
-    50% { border-color: #ef4444; box-shadow: 0 0 8px #ef4444; }
+    0%, 100% { border-color: rgba(255, 255, 255, 0.2); }
+    50% { border-color: #ef4444; box-shadow: 0 0 10px #ef4444; }
   }
 
-  .hp-bar-fill {
+  .hud-hp-fill {
     height: 100%;
     transition: width 0.4s ease-out;
   }
 
-  .hp-bar-fill.enemy-hp {
-    background: linear-gradient(90deg, #ef4444, #dc2626);
-  }
-
-  .hp-bar-fill.player-hp {
+  .hud-hp-fill.player-hp {
     background: linear-gradient(90deg, #22c55e, #16a34a);
   }
 
-  .hp-numbers {
+  .hud-hp-fill.enemy-hp {
+    background: linear-gradient(90deg, #ef4444, #dc2626);
+  }
+
+  .hud-hp-text {
+    display: flex;
+    justify-content: space-between;
     font-size: 0.625rem;
     color: var(--text-muted);
     margin-top: 2px;
   }
 
-  /* Sprites */
-  .enemy-sprite {
+  .hud-damage {
+    color: #ef4444;
+    font-weight: 700;
+    animation: hudDamageFlash 0.5s ease-out;
+  }
+
+  @keyframes hudDamageFlash {
+    0% { transform: scale(1.3); }
+    100% { transform: scale(1); }
+  }
+
+  /* Floor Indicator (center) */
+  .floor-indicator {
+    text-align: center;
+    padding: 0 var(--spacing-sm);
+  }
+
+  .floor-number {
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--accent);
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  }
+
+  .room-dots {
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+    margin-top: 4px;
+  }
+
+  .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    transition: all 0.2s ease;
+  }
+
+  .dot.active {
+    background: var(--accent);
+    transform: scale(1.3);
+    box-shadow: 0 0 6px var(--accent);
+  }
+
+  .dot.done {
+    background: var(--success);
+    opacity: 0.6;
+  }
+
+  /* ===== BATTLE ARENA (Big Monster) ===== */
+  .battle-arena {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     position: relative;
+    min-height: 180px;
   }
 
-  .sprite-emoji {
-    font-size: 3rem;
+  .monster-display {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .monster-emoji {
+    font-size: 7rem;
     display: block;
-    animation: spriteBounce 2s ease-in-out infinite;
+    filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.5));
+    animation: monsterIdle 2s ease-in-out infinite;
   }
 
-  @keyframes spriteBounce {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-4px); }
+  @keyframes monsterIdle {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-8px) scale(1.02); }
   }
 
-  .sprite-hit {
-    animation: spriteHit 0.3s ease-out !important;
+  .sprite-hit .monster-emoji {
+    animation: monsterHit 0.3s ease-out !important;
+    filter: brightness(2) saturate(0) drop-shadow(0 8px 16px rgba(0, 0, 0, 0.5));
   }
 
-  .sprite-hit .sprite-emoji {
-    animation: none;
-    filter: brightness(2) saturate(0);
-  }
-
-  @keyframes spriteHit {
+  @keyframes monsterHit {
     0%, 100% { transform: translateX(0); }
-    25%, 75% { transform: translateX(-6px); }
-    50% { transform: translateX(6px); }
+    25%, 75% { transform: translateX(-10px); }
+    50% { transform: translateX(10px); }
   }
 
-  .sprite-attack {
-    animation: spriteAttack 0.4s ease-out !important;
+  .sprite-attack .monster-emoji {
+    animation: monsterAttack 0.4s ease-out !important;
   }
 
-  @keyframes spriteAttack {
-    0% { transform: translate(0, 0); }
-    40% { transform: translate(-20px, 15px) scale(1.1); }
-    100% { transform: translate(0, 0); }
+  @keyframes monsterAttack {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.2) translateY(15px); }
+    100% { transform: scale(1); }
   }
 
-  .sprite-defeated {
-    animation: spriteDefeat 0.8s ease-out forwards !important;
+  .sprite-defeated .monster-emoji {
+    animation: monsterDefeat 0.8s ease-out forwards !important;
   }
 
-  .sprite-defeated .sprite-emoji {
-    animation: none;
-  }
-
-  @keyframes spriteDefeat {
+  @keyframes monsterDefeat {
     0% { transform: scale(1); opacity: 1; }
-    50% { transform: scale(1.2); filter: brightness(2); }
+    30% { transform: scale(1.3); filter: brightness(2); }
     100% { transform: scale(0) rotate(180deg); opacity: 0; }
   }
 
   /* Floating Damage */
   .floating-damage {
     position: absolute;
-    top: -10px;
+    top: 0;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 1.25rem;
+    font-size: 2rem;
     font-weight: 800;
     color: #fbbf24;
-    text-shadow: 2px 2px 0 #000;
+    text-shadow: 3px 3px 0 #000, -1px -1px 0 #000;
     animation: floatUp 0.6s ease-out forwards;
     z-index: 10;
   }
 
   @keyframes floatUp {
-    0% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1.3); }
-    100% { opacity: 0; transform: translateX(-50%) translateY(-30px) scale(1); }
-  }
-
-  /* Player Side (bottom) */
-  .player-side {
-    display: flex;
-    justify-content: flex-end;
-    align-items: flex-end;
-  }
-
-  .player-info-box {
-    background: var(--bg-primary);
-    border: 2px solid var(--border);
-    border-radius: var(--radius-md);
-    padding: var(--spacing-sm) var(--spacing-md);
-    min-width: 160px;
-  }
-
-  .hp-numbers-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-top: 2px;
-  }
-
-  .damage-taken {
-    font-size: 0.875rem;
-    font-weight: 700;
-    color: #ef4444;
-    animation: damageFlash 0.5s ease-out;
-  }
-
-  @keyframes damageFlash {
-    0% { transform: scale(1.3); opacity: 1; }
-    100% { transform: scale(1); opacity: 0; }
-  }
-
-  .player-name-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 4px;
-  }
-
-  .player-name {
-    font-weight: 700;
-    font-size: 0.875rem;
-  }
-
-  .floor-tag {
-    background: var(--accent);
-    color: white;
-    font-size: 0.5rem;
-    padding: 2px 6px;
-    border-radius: var(--radius-sm);
-    font-weight: 700;
+    0% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1.5); }
+    100% { opacity: 0; transform: translateX(-50%) translateY(-50px) scale(1); }
   }
 
   /* Battle Effects */
@@ -709,8 +691,8 @@
   }
 
   .battle-effect.slash {
-    width: 100px;
-    height: 100px;
+    width: 150px;
+    height: 150px;
     background: linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.9) 50%, transparent 70%);
     animation: slashEffect 0.25s ease-out forwards;
   }
@@ -718,18 +700,18 @@
   @keyframes slashEffect {
     0% { transform: translate(-50%, -50%) rotate(-45deg) scale(0); opacity: 0; }
     50% { opacity: 1; }
-    100% { transform: translate(-50%, -50%) rotate(-45deg) scale(2); opacity: 0; }
+    100% { transform: translate(-50%, -50%) rotate(-45deg) scale(2.5); opacity: 0; }
   }
 
   .battle-effect.shield {
-    font-size: 3rem;
+    font-size: 4rem;
     animation: shieldEffect 0.4s ease-out forwards;
   }
 
   @keyframes shieldEffect {
     0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
-    50% { transform: translate(-50%, -50%) scale(1.3); opacity: 1; }
-    100% { transform: translate(-50%, -50%) scale(1); opacity: 0.5; }
+    50% { transform: translate(-50%, -50%) scale(1.5); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.5; }
   }
 
   /* Message Box (Pokemon-style) */
