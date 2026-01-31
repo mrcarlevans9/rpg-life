@@ -33,8 +33,11 @@ export const currentRun = writable(null);
 // Game phase: 'idle' | 'exploring' | 'combat' | 'victory' | 'defeat' | 'retreat'
 export const gamePhase = writable('idle');
 
-// Combat log for displaying messages
+// Combat log for displaying messages (kept for history but not primary display)
 export const combatLog = writable([]);
+
+// Current combat message (Pokemon-style single message display)
+export const currentMessage = writable('');
 
 // Dice roll result for animation
 export const lastRoll = writable(null);
@@ -283,6 +286,7 @@ export async function retreat() {
 
 function addLog(type, message) {
   combatLog.update(logs => [...logs.slice(-20), { type, message }]);
+  currentMessage.set(message);
 }
 
 export async function playerAttack() {

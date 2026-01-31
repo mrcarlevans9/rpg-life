@@ -5,9 +5,8 @@
     dungeonData,
     currentRun,
     gamePhase,
-    combatLog,
+    currentMessage,
     lastRoll,
-    playerStats,
     currentMonster,
     combatState,
     startRun,
@@ -21,30 +20,6 @@
   import { DUNGEON_UPGRADES } from '../lib/db/index.js';
 
   let showShop = false;
-  let logContainer;
-
-  // Auto-scroll combat log
-  $: if (logContainer && $combatLog.length) {
-    setTimeout(() => {
-      logContainer.scrollTop = logContainer.scrollHeight;
-    }, 50);
-  }
-
-  function getLogClass(type) {
-    switch (type) {
-      case 'damage': return 'log-damage';
-      case 'enemy': return 'log-enemy';
-      case 'heal': return 'log-heal';
-      case 'crit': return 'log-crit';
-      case 'victory': return 'log-victory';
-      case 'death': return 'log-death';
-      case 'boss': return 'log-boss';
-      case 'treasure': return 'log-treasure';
-      case 'floor': return 'log-floor';
-      case 'block': return 'log-block';
-      default: return 'log-info';
-    }
-  }
 
   function canRetreat() {
     if (!$currentRun) return false;
@@ -141,174 +116,157 @@
     </div>
   {/if}
 
-  <!-- Combat State -->
+  <!-- Combat State - Pokemon-style compact layout -->
   {#if $gamePhase === 'exploring'}
-    <div class="combat-view">
-      <!-- Player HUD -->
-      <div class="hud" class:player-hit={$combatState.lastDamageToPlayer} class:player-defeated={$combatState.playerDefeated}>
-        <div class="hud-left">
-          <div class="hp-display">
-            <span class="hp-label">HP</span>
-            <div class="hp-bar-container" class:hp-flash={$combatState.lastDamageToPlayer}>
-              <div
-                class="hp-bar player-hp-bar"
-                style="width: {($currentRun?.playerHp / $currentRun?.maxHp) * 100}%;
-                       background: {getHpBarColor($currentRun?.playerHp, $currentRun?.maxHp)}"
-              ></div>
-              <div class="hp-bar-shine"></div>
+    <div class="battle-screen" class:screen-shake={$combatState.lastDamageToPlayer}>
+      <!-- Battle Arena -->
+      <div class="battle-arena">
+        <!-- Enemy Side (top right) -->
+        {#if $currentMonster}
+          <div class="enemy-side">
+            <div class="enemy-info-box">
+              <div class="enemy-name-row">
+                <span class="enemy-name">{$currentMonster.displayName}</span>
+                {#if $currentMonster.isBoss}
+                  <span class="boss-tag">BOSS</span>
+                {/if}
+              </div>
+              <div class="enemy-hp-row">
+                <span class="hp-label">HP</span>
+                <div class="hp-bar-wrapper" class:hp-flash={$combatState.lastDamageToEnemy}>
+                  <div
+                    class="hp-bar-fill enemy-hp"
+                    style="width: {($currentMonster.currentHp / $currentMonster.maxHp) * 100}%"
+                  ></div>
+                </div>
+              </div>
+              <span class="hp-numbers">{$currentMonster.currentHp}/{$currentMonster.maxHp}</span>
             </div>
-            <span class="hp-text">{$currentRun?.playerHp} / {$currentRun?.maxHp}</span>
-            <!-- Player damage number -->
-            {#if $combatState.lastDamageToPlayer}
-              <div class="damage-number player-damage">
-                -{$combatState.lastDamageToPlayer}
+
+            <!-- Enemy sprite -->
+            <div
+              class="enemy-sprite"
+              class:sprite-hit={$combatState.lastDamageToEnemy}
+              class:sprite-attack={$combatState.enemyAction === 'attack'}
+              class:sprite-defeated={$combatState.monsterDefeated}
+            >
+              <span class="sprite-emoji">{$currentMonster.emoji}</span>
+              {#key $combatState.lastDamageToEnemy}
+                {#if $combatState.lastDamageToEnemy}
+                  <div class="floating-damage">-{$combatState.lastDamageToEnemy}</div>
+                {/if}
+              {/key}
+            </div>
+          </div>
+        {/if}
+
+        <!-- Player Side (bottom left) -->
+        <div class="player-side">
+          <div class="player-sprite" class:sprite-hit={$combatState.lastDamageToPlayer}>
+            <span class="sprite-emoji">🧙</span>
+            {#key $combatState.lastDamageToPlayer}
+              {#if $combatState.lastDamageToPlayer}
+                <div class="floating-damage player-dmg">-{$combatState.lastDamageToPlayer}</div>
+              {/if}
+            {/key}
+          </div>
+
+          <div class="player-info-box">
+            <div class="player-name-row">
+              <span class="player-name">You</span>
+              <span class="floor-tag">F{$currentRun?.currentFloor}</span>
+            </div>
+            <div class="player-hp-row">
+              <span class="hp-label">HP</span>
+              <div class="hp-bar-wrapper" class:hp-flash={$combatState.lastDamageToPlayer}>
+                <div
+                  class="hp-bar-fill player-hp"
+                  style="width: {($currentRun?.playerHp / $currentRun?.maxHp) * 100}%;
+                         background: {getHpBarColor($currentRun?.playerHp, $currentRun?.maxHp)}"
+                ></div>
+              </div>
+            </div>
+            <span class="hp-numbers">{$currentRun?.playerHp}/{$currentRun?.maxHp}</span>
+          </div>
+        </div>
+
+        <!-- Visual Effects -->
+        {#if $combatState.playerAction === 'attack'}
+          <div class="battle-effect slash"></div>
+        {/if}
+        {#if $combatState.playerAction === 'defend'}
+          <div class="battle-effect shield">🛡️</div>
+        {/if}
+      </div>
+
+      <!-- Message Box (Pokemon-style) -->
+      <div class="message-box">
+        <p class="message-text">{$currentMessage || 'What will you do?'}</p>
+      </div>
+
+      <!-- Action Panel -->
+      <div class="action-panel">
+        <!-- Dice display (compact) -->
+        {#if $lastRoll && $combatState.isAnimating}
+          <div class="dice-row">
+            {#each $lastRoll.rolls as roll}
+              <span class="mini-die" class:crit={$lastRoll.critical}>{roll}</span>
+            {/each}
+            {#if $lastRoll.critical}
+              <span class="crit-badge">CRIT!</span>
+            {/if}
+          </div>
+        {:else}
+          <!-- Action Buttons -->
+          <div class="action-grid">
+            {#if $currentMonster}
+              <button
+                class="action-btn attack"
+                on:click={playerAttack}
+                disabled={$combatState.isAnimating}
+              >
+                ⚔️ FIGHT
+              </button>
+              <button
+                class="action-btn defend"
+                on:click={playerDefend}
+                disabled={$combatState.isAnimating}
+              >
+                🛡️ DEFEND
+              </button>
+            {/if}
+            <button
+              class="action-btn item"
+              on:click={usePotion}
+              disabled={!$dungeonData?.healthPotions || $currentRun?.playerHp >= $currentRun?.maxHp || $combatState.isAnimating}
+            >
+              🧪 POTION <span class="item-count">({$dungeonData?.healthPotions || 0})</span>
+            </button>
+            {#if canRetreat()}
+              <button
+                class="action-btn run"
+                on:click={retreat}
+                disabled={$combatState.isAnimating}
+              >
+                🏃 RUN
+              </button>
+            {:else}
+              <div class="action-btn placeholder">
+                <span class="gold-display">🪙 {$currentRun?.goldCollected || 0}</span>
               </div>
             {/if}
           </div>
-        </div>
-        <div class="hud-center">
-          <span class="floor-display">Floor {$currentRun?.currentFloor}</span>
-        </div>
-        <div class="hud-right">
-          <div class="gold-display">
-            <span class="gold-icon">🪙</span>
-            <span class="gold-amount">{$currentRun?.goldCollected || 0}</span>
-          </div>
-          <div class="potion-display">
-            <span class="potion-icon">🧪</span>
-            <span class="potion-count">{$dungeonData?.healthPotions || 0}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Monster Display -->
-      {#if $currentMonster}
-        <Card class="monster-card">
-          <div
-            class="monster-display"
-            class:monster-hit={$combatState.lastDamageToEnemy}
-            class:monster-defeated={$combatState.monsterDefeated}
-            class:monster-attacking={$combatState.enemyAction === 'attack'}
-          >
-            <!-- Damage number floating above monster -->
-            {#key $combatState.lastDamageToEnemy}
-              {#if $combatState.lastDamageToEnemy}
-                <div class="damage-number enemy-damage">
-                  -{$combatState.lastDamageToEnemy}
-                </div>
-              {/if}
-            {/key}
-
-            <span class="monster-emoji">{$currentMonster.emoji}</span>
-            <h3 class="monster-name">{$currentMonster.displayName}</h3>
-            {#if $currentMonster.isBoss}
-              <span class="boss-badge">BOSS</span>
-            {/if}
-
-            <!-- Enhanced HP Bar -->
-            <div class="monster-hp-bar-container" class:hp-flash={$combatState.lastDamageToEnemy}>
-              <div
-                class="monster-hp-bar"
-                style="width: {($currentMonster.currentHp / $currentMonster.maxHp) * 100}%"
-              ></div>
-              <div class="hp-bar-shine"></div>
-            </div>
-            <span class="monster-hp-text">{$currentMonster.currentHp} / {$currentMonster.maxHp}</span>
-
-            <!-- Turn indicator -->
-            <div class="turn-indicator" class:enemy-turn={$combatState.turn === 'enemy'}>
-              {#if $combatState.turn === 'enemy'}
-                <span class="turn-text">Enemy Turn</span>
-              {:else if $combatState.turn === 'player' && !$combatState.isAnimating}
-                <span class="turn-text your-turn">Your Turn</span>
-              {/if}
-            </div>
-          </div>
-        </Card>
-      {/if}
-
-      <!-- Player attack effect overlay -->
-      {#if $combatState.playerAction === 'attack'}
-        <div class="attack-effect">
-          <div class="slash-effect"></div>
-        </div>
-      {/if}
-
-      {#if $combatState.playerAction === 'defend'}
-        <div class="defend-effect">
-          <div class="shield-effect">🛡️</div>
-        </div>
-      {/if}
-
-      <!-- Dice Display -->
-      {#if $lastRoll}
-        <div class="dice-display">
-          {#each $lastRoll.rolls as roll}
-            <div class="die" class:critical={$lastRoll.critical}>{roll}</div>
-          {/each}
-          {#if $lastRoll.critical}
-            <span class="crit-text">CRITICAL!</span>
-          {/if}
-        </div>
-      {/if}
-
-      <!-- Combat Log -->
-      <div class="combat-log" bind:this={logContainer}>
-        {#each $combatLog as log}
-          <p class="log-entry {getLogClass(log.type)}">{log.message}</p>
-        {/each}
-      </div>
-
-      <!-- Action Buttons -->
-      <div class="action-buttons">
-        {#if $currentMonster}
-          <Button
-            variant="danger"
-            size="lg"
-            on:click={playerAttack}
-            disabled={$combatState.isAnimating}
-          >
-            <span class="btn-icon">⚔️</span> Attack
-          </Button>
-          <Button
-            variant="secondary"
-            size="lg"
-            on:click={playerDefend}
-            disabled={$combatState.isAnimating}
-          >
-            <span class="btn-icon">🛡️</span> Defend
-          </Button>
-        {/if}
-        <Button
-          variant="outline"
-          on:click={usePotion}
-          disabled={!$dungeonData?.healthPotions || $currentRun?.playerHp >= $currentRun?.maxHp || $combatState.isAnimating}
-        >
-          <span class="btn-icon">🧪</span> Potion ({$dungeonData?.healthPotions || 0})
-        </Button>
-        {#if canRetreat()}
-          <Button variant="warning" on:click={retreat} disabled={$combatState.isAnimating}>
-            <span class="btn-icon">🏃</span> Retreat
-          </Button>
         {/if}
       </div>
 
-      <!-- Room Progress -->
-      <div class="room-progress">
+      <!-- Room Progress (minimal) -->
+      <div class="room-dots">
         {#each $currentRun?.floor?.rooms || [] as room, i}
-          <div
-            class="room-dot"
-            class:current={i === $currentRun?.floor?.currentRoom}
-            class:completed={room.completed}
-            class:combat={room.type === 'combat' || room.type === 'boss'}
-            class:treasure={room.type === 'treasure'}
-            class:shrine={room.type === 'shrine'}
-          >
-            {#if room.type === 'boss'}👑
-            {:else if room.type === 'treasure'}💎
-            {:else if room.type === 'shrine'}✨
-            {:else}⚔️{/if}
-          </div>
+          <span
+            class="dot"
+            class:active={i === $currentRun?.floor?.currentRoom}
+            class:done={room.completed}
+          ></span>
         {/each}
       </div>
     </div>
@@ -495,465 +453,454 @@
     justify-content: center;
   }
 
-  /* Combat View Styles */
-  .combat-view {
+  /* ========== POKEMON-STYLE BATTLE SCREEN ========== */
+  .battle-screen {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-md);
+    height: calc(100vh - 180px);
+    max-height: 500px;
+    background: linear-gradient(180deg, var(--bg-tertiary) 0%, var(--bg-secondary) 100%);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    position: relative;
   }
 
-  .hud {
+  .battle-screen.screen-shake {
+    animation: screenShake 0.3s ease-out;
+  }
+
+  @keyframes screenShake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-4px); }
+    40%, 80% { transform: translateX(4px); }
+  }
+
+  /* Battle Arena */
+  .battle-arena {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: var(--spacing-md);
+    position: relative;
+    min-height: 200px;
+  }
+
+  /* Enemy Side (top) */
+  .enemy-side {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    padding: var(--spacing-sm);
-    background: var(--bg-secondary);
-    border-radius: var(--radius-md);
+    align-items: flex-start;
   }
 
-  .hp-display {
+  .enemy-info-box {
+    background: var(--bg-primary);
+    border: 2px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-sm) var(--spacing-md);
+    min-width: 140px;
+  }
+
+  .enemy-name-row {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm);
+    gap: var(--spacing-xs);
+    margin-bottom: 4px;
   }
 
-  .hp-label {
-    font-weight: 600;
+  .enemy-name {
+    font-weight: 700;
     font-size: 0.875rem;
   }
 
-  .hp-bar-container {
-    width: 100px;
-    height: 12px;
-    background: var(--bg-tertiary);
-    border-radius: var(--radius-full);
-    overflow: hidden;
-  }
-
-  .hp-bar {
-    height: 100%;
-    transition: width 0.3s ease, background 0.3s ease;
-  }
-
-  .hp-text {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-  }
-
-  .floor-display {
+  .boss-tag {
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    color: #1a1a1a;
+    font-size: 0.5rem;
+    padding: 2px 4px;
+    border-radius: var(--radius-sm);
     font-weight: 700;
-    font-size: 1rem;
-    color: var(--accent);
   }
 
-  .hud-right {
-    display: flex;
-    gap: var(--spacing-md);
-  }
-
-  .gold-display, .potion-display {
+  .enemy-hp-row, .player-hp-row {
     display: flex;
     align-items: center;
     gap: var(--spacing-xs);
   }
 
-  .gold-amount, .potion-count {
+  .hp-label {
+    font-size: 0.625rem;
     font-weight: 600;
+    color: var(--text-muted);
   }
 
-  /* Monster Display */
-  .monster-display {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: var(--spacing-lg);
-    gap: var(--spacing-sm);
-    position: relative;
-    transition: transform 0.1s ease;
-  }
-
-  .monster-display.monster-hit {
-    animation: monsterHit 0.4s ease-out;
-  }
-
-  .monster-display.monster-defeated {
-    animation: monsterDefeat 0.8s ease-out forwards;
-  }
-
-  .monster-display.monster-attacking {
-    animation: monsterAttackAnim 0.5s ease-out;
-  }
-
-  @keyframes monsterHit {
-    0%, 100% { transform: translateX(0); }
-    10%, 30%, 50%, 70%, 90% { transform: translateX(-8px); }
-    20%, 40%, 60%, 80% { transform: translateX(8px); }
-  }
-
-  @keyframes monsterDefeat {
-    0% { transform: scale(1); opacity: 1; filter: brightness(1); }
-    30% { transform: scale(1.1); filter: brightness(2); }
-    100% { transform: scale(0) rotate(180deg); opacity: 0; filter: brightness(0); }
-  }
-
-  @keyframes monsterAttackAnim {
-    0% { transform: translateY(0) scale(1); }
-    30% { transform: translateY(-20px) scale(1.1); }
-    60% { transform: translateY(10px) scale(0.95); }
-    100% { transform: translateY(0) scale(1); }
-  }
-
-  .monster-emoji {
-    font-size: 4rem;
-    animation: monsterBounce 1s ease-in-out infinite;
-    transition: filter 0.2s ease;
-  }
-
-  .monster-hit .monster-emoji {
-    filter: brightness(2) saturate(0);
-    animation: none;
-  }
-
-  @keyframes monsterBounce {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-5px); }
-  }
-
-  .monster-name {
-    font-size: 1.25rem;
-    font-weight: 700;
-  }
-
-  .boss-badge {
-    background: linear-gradient(135deg, #fbbf24, #f59e0b);
-    color: #1a1a1a;
-    padding: var(--spacing-xs) var(--spacing-sm);
-    border-radius: var(--radius-full);
-    font-size: 0.75rem;
-    font-weight: 700;
-    animation: bossPulse 2s ease-in-out infinite;
-  }
-
-  @keyframes bossPulse {
-    0%, 100% { box-shadow: 0 0 10px rgba(251, 191, 36, 0.5); }
-    50% { box-shadow: 0 0 20px rgba(251, 191, 36, 0.8); }
-  }
-
-  .monster-hp-bar-container {
-    width: 200px;
-    height: 16px;
+  .hp-bar-wrapper {
+    flex: 1;
+    height: 8px;
     background: var(--bg-tertiary);
     border-radius: var(--radius-full);
     overflow: hidden;
-    position: relative;
-    border: 2px solid var(--border);
+    border: 1px solid var(--border);
   }
 
-  .monster-hp-bar-container.hp-flash {
+  .hp-bar-wrapper.hp-flash {
     animation: hpFlash 0.3s ease-out;
   }
 
   @keyframes hpFlash {
     0%, 100% { border-color: var(--border); }
-    50% { border-color: var(--danger); box-shadow: 0 0 10px var(--danger); }
+    50% { border-color: #ef4444; box-shadow: 0 0 8px #ef4444; }
   }
 
-  .monster-hp-bar {
+  .hp-bar-fill {
     height: 100%;
-    background: linear-gradient(180deg, #ef4444 0%, #b91c1c 100%);
     transition: width 0.4s ease-out;
+  }
+
+  .hp-bar-fill.enemy-hp {
+    background: linear-gradient(90deg, #ef4444, #dc2626);
+  }
+
+  .hp-bar-fill.player-hp {
+    background: linear-gradient(90deg, #22c55e, #16a34a);
+  }
+
+  .hp-numbers {
+    font-size: 0.625rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  /* Sprites */
+  .enemy-sprite, .player-sprite {
     position: relative;
   }
 
-  .hp-bar-shine {
+  .sprite-emoji {
+    font-size: 3rem;
+    display: block;
+    animation: spriteBounce 2s ease-in-out infinite;
+  }
+
+  @keyframes spriteBounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+  }
+
+  .sprite-hit {
+    animation: spriteHit 0.3s ease-out !important;
+  }
+
+  .sprite-hit .sprite-emoji {
+    animation: none;
+    filter: brightness(2) saturate(0);
+  }
+
+  @keyframes spriteHit {
+    0%, 100% { transform: translateX(0); }
+    25%, 75% { transform: translateX(-6px); }
+    50% { transform: translateX(6px); }
+  }
+
+  .sprite-attack {
+    animation: spriteAttack 0.4s ease-out !important;
+  }
+
+  @keyframes spriteAttack {
+    0% { transform: translate(0, 0); }
+    40% { transform: translate(-20px, 15px) scale(1.1); }
+    100% { transform: translate(0, 0); }
+  }
+
+  .sprite-defeated {
+    animation: spriteDefeat 0.8s ease-out forwards !important;
+  }
+
+  .sprite-defeated .sprite-emoji {
+    animation: none;
+  }
+
+  @keyframes spriteDefeat {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.2); filter: brightness(2); }
+    100% { transform: scale(0) rotate(180deg); opacity: 0; }
+  }
+
+  /* Floating Damage */
+  .floating-damage {
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 40%;
-    background: linear-gradient(180deg, rgba(255,255,255,0.3) 0%, transparent 100%);
-    pointer-events: none;
-  }
-
-  .monster-hp-text {
-    font-size: 0.875rem;
-    color: var(--text-muted);
-    font-weight: 600;
-  }
-
-  /* Turn Indicator */
-  .turn-indicator {
-    margin-top: var(--spacing-sm);
-    padding: var(--spacing-xs) var(--spacing-md);
-    border-radius: var(--radius-full);
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  .turn-text {
-    color: var(--text-muted);
-  }
-
-  .turn-text.your-turn {
-    color: var(--success);
-    animation: turnPulse 1s ease-in-out infinite;
-  }
-
-  .turn-indicator.enemy-turn .turn-text {
-    color: var(--danger);
-    animation: turnPulse 0.5s ease-in-out infinite;
-  }
-
-  @keyframes turnPulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-  }
-
-  /* Damage Numbers */
-  .damage-number {
-    position: absolute;
-    font-size: 1.5rem;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 1.25rem;
     font-weight: 800;
-    text-shadow: 2px 2px 0 rgba(0,0,0,0.5);
-    pointer-events: none;
+    color: #fbbf24;
+    text-shadow: 2px 2px 0 #000;
+    animation: floatUp 0.6s ease-out forwards;
     z-index: 10;
   }
 
-  .enemy-damage {
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    color: #fbbf24;
-    animation: damageFloat 0.6s ease-out forwards;
+  .floating-damage.player-dmg {
+    color: #ef4444;
   }
 
-  .player-damage {
-    color: var(--danger);
-    animation: damageFloat 0.6s ease-out forwards;
-    margin-left: var(--spacing-sm);
+  @keyframes floatUp {
+    0% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1.3); }
+    100% { opacity: 0; transform: translateX(-50%) translateY(-30px) scale(1); }
   }
 
-  @keyframes damageFloat {
-    0% {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0) scale(1.5);
-    }
-    100% {
-      opacity: 0;
-      transform: translateX(-50%) translateY(-40px) scale(1);
-    }
-  }
-
-  /* Attack Effect Overlay */
-  .attack-effect {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 50;
+  /* Player Side (bottom) */
+  .player-side {
     display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .slash-effect {
-    width: 200px;
-    height: 200px;
-    background: linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.8) 50%, transparent 60%);
-    animation: slashAnim 0.3s ease-out forwards;
-  }
-
-  @keyframes slashAnim {
-    0% {
-      transform: rotate(-45deg) scale(0) translateX(-100px);
-      opacity: 0;
-    }
-    50% {
-      opacity: 1;
-    }
-    100% {
-      transform: rotate(-45deg) scale(2) translateX(100px);
-      opacity: 0;
-    }
-  }
-
-  /* Defend Effect */
-  .defend-effect {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 50;
-    display: flex;
+    justify-content: space-between;
     align-items: flex-end;
-    justify-content: center;
-    padding-bottom: 200px;
+    flex-direction: row-reverse;
   }
 
-  .shield-effect {
-    font-size: 4rem;
-    animation: shieldAnim 0.5s ease-out forwards;
-  }
-
-  @keyframes shieldAnim {
-    0% {
-      transform: scale(0) rotate(-20deg);
-      opacity: 0;
-    }
-    50% {
-      transform: scale(1.2) rotate(0deg);
-      opacity: 1;
-    }
-    100% {
-      transform: scale(1) rotate(0deg);
-      opacity: 0.7;
-    }
-  }
-
-  /* Player HUD animations */
-  .hud.player-hit {
-    animation: hudShake 0.4s ease-out;
-  }
-
-  .hud.player-defeated {
-    animation: hudDefeat 0.8s ease-out;
-  }
-
-  @keyframes hudShake {
-    0%, 100% { transform: translateX(0); }
-    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
-    20%, 40%, 60%, 80% { transform: translateX(5px); }
-  }
-
-  @keyframes hudDefeat {
-    0% { filter: brightness(1); }
-    50% { filter: brightness(0.5) saturate(0); }
-    100% { filter: brightness(0.3) saturate(0); }
-  }
-
-  .player-hp-bar {
-    transition: width 0.4s ease-out;
-  }
-
-  /* Button icons */
-  .btn-icon {
-    margin-right: var(--spacing-xs);
-  }
-
-  /* Dice Display */
-  .dice-display {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: var(--spacing-md);
-    padding: var(--spacing-md);
-  }
-
-  .die {
-    width: 48px;
-    height: 48px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--bg-secondary);
+  .player-info-box {
+    background: var(--bg-primary);
     border: 2px solid var(--border);
     border-radius: var(--radius-md);
-    font-size: 1.5rem;
+    padding: var(--spacing-sm) var(--spacing-md);
+    min-width: 140px;
+  }
+
+  .player-name-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+
+  .player-name {
+    font-weight: 700;
+    font-size: 0.875rem;
+  }
+
+  .floor-tag {
+    background: var(--accent);
+    color: white;
+    font-size: 0.5rem;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    font-weight: 700;
+  }
+
+  /* Battle Effects */
+  .battle-effect {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 20;
+  }
+
+  .battle-effect.slash {
+    width: 100px;
+    height: 100px;
+    background: linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.9) 50%, transparent 70%);
+    animation: slashEffect 0.25s ease-out forwards;
+  }
+
+  @keyframes slashEffect {
+    0% { transform: translate(-50%, -50%) rotate(-45deg) scale(0); opacity: 0; }
+    50% { opacity: 1; }
+    100% { transform: translate(-50%, -50%) rotate(-45deg) scale(2); opacity: 0; }
+  }
+
+  .battle-effect.shield {
+    font-size: 3rem;
+    animation: shieldEffect 0.4s ease-out forwards;
+  }
+
+  @keyframes shieldEffect {
+    0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+    50% { transform: translate(-50%, -50%) scale(1.3); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(1); opacity: 0.5; }
+  }
+
+  /* Message Box (Pokemon-style) */
+  .message-box {
+    background: var(--bg-primary);
+    border-top: 3px solid var(--border);
+    padding: var(--spacing-md) var(--spacing-lg);
+    min-height: 50px;
+    display: flex;
+    align-items: center;
+  }
+
+  .message-text {
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    line-height: 1.4;
+  }
+
+  /* Action Panel */
+  .action-panel {
+    background: var(--bg-secondary);
+    border-top: 2px solid var(--border);
+    padding: var(--spacing-sm);
+  }
+
+  .action-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-xs);
+  }
+
+  .action-btn {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 2px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-weight: 600;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-xs);
+  }
+
+  .action-btn:hover:not(:disabled) {
+    background: var(--bg-tertiary);
+    border-color: var(--accent);
+  }
+
+  .action-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .action-btn.attack {
+    border-color: #ef4444;
+    color: #ef4444;
+  }
+
+  .action-btn.attack:hover:not(:disabled) {
+    background: rgba(239, 68, 68, 0.1);
+  }
+
+  .action-btn.defend {
+    border-color: #3b82f6;
+    color: #3b82f6;
+  }
+
+  .action-btn.defend:hover:not(:disabled) {
+    background: rgba(59, 130, 246, 0.1);
+  }
+
+  .action-btn.item {
+    border-color: #22c55e;
+    color: #22c55e;
+  }
+
+  .action-btn.item:hover:not(:disabled) {
+    background: rgba(34, 197, 94, 0.1);
+  }
+
+  .action-btn.run {
+    border-color: #f59e0b;
+    color: #f59e0b;
+  }
+
+  .action-btn.run:hover:not(:disabled) {
+    background: rgba(245, 158, 11, 0.1);
+  }
+
+  .action-btn.placeholder {
+    border-color: transparent;
+    background: transparent;
+    cursor: default;
+  }
+
+  .item-count {
+    font-size: 0.7rem;
+    opacity: 0.8;
+  }
+
+  .gold-display {
+    font-size: 0.9rem;
+    color: #fbbf24;
+  }
+
+  /* Dice Row (compact) */
+  .dice-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-xs);
+  }
+
+  .mini-die {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-primary);
+    border: 2px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 1.25rem;
     font-weight: 700;
     animation: diceRoll 0.3s ease-out;
   }
 
-  .die.critical {
-    border-color: var(--warning);
-    background: var(--warning);
+  .mini-die.crit {
+    border-color: #fbbf24;
+    background: #fbbf24;
     color: #1a1a1a;
-    animation: diceCrit 0.5s ease-out;
   }
 
   @keyframes diceRoll {
-    0% { transform: rotate(-10deg) scale(1.2); }
+    0% { transform: rotate(-15deg) scale(1.2); }
     100% { transform: rotate(0) scale(1); }
   }
 
-  @keyframes diceCrit {
-    0% { transform: rotate(-20deg) scale(1.5); }
-    50% { transform: rotate(10deg) scale(1.3); }
-    100% { transform: rotate(0) scale(1); }
-  }
-
-  .crit-text {
-    color: var(--warning);
-    font-weight: 700;
-    animation: critPulse 0.5s ease-out;
-  }
-
-  @keyframes critPulse {
-    0% { transform: scale(1.5); opacity: 0; }
-    100% { transform: scale(1); opacity: 1; }
-  }
-
-  /* Combat Log */
-  .combat-log {
-    height: 150px;
-    overflow-y: auto;
-    padding: var(--spacing-md);
-    background: var(--bg-secondary);
-    border-radius: var(--radius-md);
-    font-size: 0.875rem;
-  }
-
-  .log-entry {
-    margin-bottom: var(--spacing-xs);
-    padding: var(--spacing-xs);
-    border-radius: var(--radius-sm);
-  }
-
-  .log-damage { color: var(--success); }
-  .log-enemy { color: var(--danger); }
-  .log-heal { color: #22c55e; }
-  .log-crit { color: var(--warning); font-weight: 700; }
-  .log-victory { color: var(--success); font-weight: 700; }
-  .log-death { color: var(--danger); font-weight: 700; }
-  .log-boss { color: #f59e0b; font-weight: 700; }
-  .log-treasure { color: #fbbf24; }
-  .log-floor { color: var(--accent); font-weight: 600; }
-  .log-block { color: #60a5fa; }
-  .log-info { color: var(--text-muted); }
-
-  /* Action Buttons */
-  .action-buttons {
-    display: flex;
-    justify-content: center;
-    gap: var(--spacing-md);
-    flex-wrap: wrap;
-  }
-
-  /* Room Progress */
-  .room-progress {
-    display: flex;
-    justify-content: center;
-    gap: var(--spacing-sm);
-    padding: var(--spacing-md);
-  }
-
-  .room-dot {
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  .crit-badge {
+    background: #fbbf24;
+    color: #1a1a1a;
+    padding: 2px 8px;
     border-radius: var(--radius-full);
+    font-size: 0.7rem;
+    font-weight: 700;
+    animation: critPop 0.3s ease-out;
+  }
+
+  @keyframes critPop {
+    0% { transform: scale(0); }
+    50% { transform: scale(1.3); }
+    100% { transform: scale(1); }
+  }
+
+  /* Room Progress Dots */
+  .room-dots {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    padding: var(--spacing-xs);
     background: var(--bg-tertiary);
-    font-size: 0.875rem;
-    transition: all 0.3s ease;
   }
 
-  .room-dot.current {
-    border: 2px solid var(--accent);
-    transform: scale(1.2);
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: all 0.2s ease;
   }
 
-  .room-dot.completed {
+  .dot.active {
+    background: var(--accent);
+    transform: scale(1.3);
+  }
+
+  .dot.done {
+    background: var(--success);
     opacity: 0.5;
   }
 
