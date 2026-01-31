@@ -283,17 +283,18 @@
         <!-- Combat Message Overlay (bottom of arena) -->
         {#if $combatState.isAnimating && $currentMessage}
           <div class="combat-message-overlay">
-            <div class="combat-message-box">
-              <p class="combat-message">{$currentMessage}</p>
-              {#if $lastRoll}
-                <div class="dice-row">
-                  {#each $lastRoll.rolls as roll}
-                    <span class="mini-die" class:crit={$lastRoll.critical}>{roll}</span>
+            <div class="combat-toast" class:crit={$lastRoll?.critical}>
+              {#if $lastRoll && $lastRoll.rolls.length > 0}
+                <span class="toast-dice">
+                  {#each $lastRoll.rolls as roll, i}
+                    <span class="toast-die">{roll}</span>{#if i < $lastRoll.rolls.length - 1}<span class="toast-plus">+</span>{/if}
                   {/each}
-                  {#if $lastRoll.critical}
-                    <span class="crit-badge">CRIT!</span>
-                  {/if}
-                </div>
+                </span>
+                <span class="toast-arrow">→</span>
+              {/if}
+              <span class="toast-message">{$currentMessage}</span>
+              {#if $lastRoll?.critical}
+                <span class="toast-crit">CRIT!</span>
               {/if}
             </div>
           </div>
@@ -1067,50 +1068,98 @@
     position: relative;
   }
 
-  /* Combat Message Overlay (inside battle arena) */
+  /* Combat Message Toast (inside battle arena) */
   .combat-message-overlay {
     position: absolute;
-    bottom: 8px;
-    left: 8px;
-    right: 8px;
+    bottom: 10px;
+    left: 10px;
+    right: 10px;
     z-index: 30;
     pointer-events: none;
   }
 
-  .combat-message-box {
-    background: linear-gradient(180deg, rgba(26, 26, 46, 0.95) 0%, rgba(15, 15, 26, 0.95) 100%);
-    border: 2px solid var(--accent);
-    border-radius: var(--radius-md);
-    padding: 10px 14px;
-    text-align: center;
-    box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
-    animation: messageSlideUp 0.25s ease-out;
+  .combat-toast {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.85);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    animation: toastSlide 0.2s ease-out;
   }
 
-  @keyframes messageSlideUp {
+  .combat-toast.crit {
+    border-left-color: #fbbf24;
+    background: rgba(251, 191, 36, 0.15);
+  }
+
+  @keyframes toastSlide {
     from {
       opacity: 0;
-      transform: translateY(20px);
+      transform: translateX(-10px);
     }
     to {
       opacity: 1;
-      transform: translateY(0);
+      transform: translateX(0);
     }
   }
 
-  .combat-message {
-    color: var(--text-primary);
-    font-size: 0.9rem;
-    font-weight: 500;
-    margin: 0;
-    line-height: 1.3;
+  .toast-dice {
+    display: flex;
+    align-items: center;
+    gap: 2px;
   }
 
-  .combat-message-box .dice-row {
-    justify-content: center;
-    padding: 6px 0 0 0;
-    background: none;
-    margin-top: 4px;
+  .toast-die {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 2px 6px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    min-width: 20px;
+    text-align: center;
+  }
+
+  .combat-toast.crit .toast-die {
+    background: #fbbf24;
+    border-color: #fbbf24;
+    color: #1a1a1a;
+  }
+
+  .toast-plus {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+  }
+
+  .toast-arrow {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+  }
+
+  .toast-message {
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    font-weight: 500;
+    flex: 1;
+  }
+
+  .toast-crit {
+    background: #fbbf24;
+    color: #1a1a1a;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    animation: critPulse 0.3s ease-out;
+  }
+
+  @keyframes critPulse {
+    0% { transform: scale(1.3); }
+    100% { transform: scale(1); }
   }
 
   .action-grid {
