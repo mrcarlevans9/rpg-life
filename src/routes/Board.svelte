@@ -54,7 +54,12 @@
   async function loadTasks() {
     try {
       loading = true;
+      // Ensure db is open
+      if (!db.isOpen()) {
+        await db.open();
+      }
       tasks = await db.tasks.orderBy('order').toArray();
+      console.log('Loaded tasks:', tasks.length);
     } catch (err) {
       console.error('Error loading tasks:', err);
       tasks = [];
@@ -87,6 +92,8 @@
     if (!taskForm.title.trim()) return;
 
     try {
+      console.log('Saving task:', taskForm);
+
       if (editingTask) {
         await updateTask(editingTask.id, {
           title: taskForm.title,
@@ -94,19 +101,23 @@
           priority: taskForm.priority,
           dueDate: taskForm.dueDate || null
         });
+        console.log('Task updated successfully');
       } else {
-        await createTask({
+        const newId = await createTask({
           status: 'todo',
           title: taskForm.title,
           description: taskForm.description,
           priority: taskForm.priority,
           dueDate: taskForm.dueDate || null
         });
+        console.log('Task created with id:', newId);
       }
       closeModal();
       await loadTasks();
+      console.log('Tasks reloaded, count:', tasks.length);
     } catch (err) {
       console.error('Error saving task:', err);
+      alert('Failed to save bounty: ' + err.message);
     }
   }
 
