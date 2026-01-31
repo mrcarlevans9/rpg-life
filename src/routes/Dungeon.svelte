@@ -451,9 +451,13 @@
               <span class="bar-value">{$currentRun?.playerMp}/{$currentRun?.maxMp}</span>
             </div>
           </div>
-          <!-- Gold -->
+          <!-- Gold Display -->
           <div class="gold-section">
-            <span class="gold-display">🪙 {$currentRun?.goldCollected || 0}</span>
+            <div class="gold-stash">
+              <span class="gold-bank" title="Safe in bank">🏦 {$currentRun?.bankGold || 0}</span>
+              <span class="gold-divider">|</span>
+              <span class="gold-run" title="This run (at risk)">💰 +{$currentRun?.goldCollected || 0}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -1539,9 +1543,32 @@
     100% { transform: scale(1); }
   }
 
-  .gold-display {
-    font-size: 0.75rem;
+  .gold-section {
+    display: flex;
+    justify-content: center;
+  }
+
+  .gold-stash {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.7rem;
     font-weight: 600;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 4px 10px;
+    border-radius: 12px;
+  }
+
+  .gold-bank {
+    color: #94a3b8;
+  }
+
+  .gold-divider {
+    color: var(--text-muted);
+    opacity: 0.5;
+  }
+
+  .gold-run {
     color: #fbbf24;
   }
 

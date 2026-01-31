@@ -407,6 +407,7 @@ export async function startRun() {
     playerMp: maxMp,
     maxMp,
     goldCollected: 0,
+    bankGold: dungeon?.gold || 0, // Store bank gold at start of run (safe, won't be lost)
     potionsUsed: 0,
     monstersKilled: 0,
     isDefending: false,
