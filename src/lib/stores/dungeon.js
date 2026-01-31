@@ -469,8 +469,17 @@ export async function playerAttack() {
   } else {
     // Monster counter-attacks
     combatState.update(s => ({ ...s, turn: 'enemy' }));
-    await delay(400);
+    currentMessage.set(`${monster.displayName} strikes back!`);
+    lastRoll.set({ rolls: [], total: 0, type: 'transition', critical: false });
+    await delay(600);
     await monsterAttack(run, monster);
+
+    // Check if player survived before showing "Your move"
+    if (run.playerHp > 0) {
+      currentMessage.set('Your move!');
+      lastRoll.set({ rolls: [], total: 0, type: 'transition', critical: false });
+      await delay(600);
+    }
     combatState.update(s => ({ ...s, isAnimating: false, turn: 'player' }));
   }
 
@@ -507,9 +516,17 @@ export async function playerDefend() {
 
   // Monster attacks
   combatState.update(s => ({ ...s, playerAction: null, turn: 'enemy' }));
-  await delay(300);
+  currentMessage.set(`${monster.displayName} strikes back!`);
+  lastRoll.set({ rolls: [], total: 0, type: 'transition', critical: false });
+  await delay(600);
   await monsterAttack(run, monster);
 
+  // Check if player survived before showing "Your move"
+  if (run.playerHp > 0) {
+    currentMessage.set('Your move!');
+    lastRoll.set({ rolls: [], total: 0, type: 'transition', critical: false });
+    await delay(600);
+  }
   combatState.update(s => ({ ...s, isAnimating: false, turn: 'player' }));
   currentRun.set(run);
 }
@@ -815,8 +832,17 @@ export async function castSpell(spellIndex = 0) {
   } else {
     // Monster counter-attacks
     combatState.update(s => ({ ...s, turn: 'enemy' }));
-    await delay(400);
+    currentMessage.set(`${monster.displayName} strikes back!`);
+    lastRoll.set({ rolls: [], total: 0, type: 'transition', critical: false });
+    await delay(600);
     await monsterAttack(run, monster);
+
+    // Check if player survived before showing "Your move"
+    if (run.playerHp > 0) {
+      currentMessage.set('Your move!');
+      lastRoll.set({ rolls: [], total: 0, type: 'transition', critical: false });
+      await delay(600);
+    }
     combatState.update(s => ({ ...s, isAnimating: false, turn: 'player' }));
   }
 
