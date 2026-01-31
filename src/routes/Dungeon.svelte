@@ -1,4 +1,5 @@
 <script>
+  import { onDestroy } from 'svelte';
   import Card from '../components/common/Card.svelte';
   import Button from '../components/common/Button.svelte';
   import {
@@ -43,6 +44,22 @@
     displayedRolls = [];
     diceRevealed = [];
   }
+
+  // Lock body scroll during combat
+  $: if (typeof document !== 'undefined') {
+    if ($gamePhase !== 'idle') {
+      document.body.classList.add('no-scroll');
+    } else {
+      document.body.classList.remove('no-scroll');
+    }
+  }
+
+  // Clean up on component destroy
+  onDestroy(() => {
+    if (typeof document !== 'undefined') {
+      document.body.classList.remove('no-scroll');
+    }
+  });
 
   function animateDiceRoll(finalRolls) {
     const currentAnimId = ++rollAnimationId;
