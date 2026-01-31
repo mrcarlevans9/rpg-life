@@ -287,13 +287,20 @@
         <!-- Floor indicator -->
         <div class="floor-indicator">
           <span class="floor-number">F{$currentRun?.currentFloor}</span>
-          <div class="room-dots">
+          <div class="room-enemies">
             {#each $currentRun?.floor?.rooms || [] as room, i}
-              <span
-                class="dot"
-                class:active={i === $currentRun?.floor?.currentRoom}
-                class:done={room.completed}
-              ></span>
+              {#if room.type === 'combat' || room.type === 'boss'}
+                <span
+                  class="enemy-marker"
+                  class:active={i === $currentRun?.floor?.currentRoom}
+                  class:defeated={room.completed}
+                >
+                  {#if room.completed}
+                    <span class="defeated-x">✕</span>
+                  {/if}
+                  <span class="enemy-icon" class:faded={room.completed}>{room.monster?.emoji || '👹'}</span>
+                </span>
+              {/if}
             {/each}
           </div>
         </div>
@@ -916,28 +923,48 @@
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
   }
 
-  .room-dots {
+  .room-enemies {
     display: flex;
-    gap: 4px;
+    gap: 6px;
+    align-items: center;
   }
 
-  .dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.2);
+  .enemy-marker {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     transition: all 0.2s ease;
   }
 
-  .dot.active {
-    background: var(--accent);
-    transform: scale(1.3);
-    box-shadow: 0 0 6px var(--accent);
+  .enemy-icon {
+    font-size: 1.1rem;
+    transition: all 0.2s ease;
   }
 
-  .dot.done {
-    background: var(--success);
-    opacity: 0.6;
+  .enemy-icon.faded {
+    opacity: 0.3;
+    filter: grayscale(100%);
+  }
+
+  .enemy-marker.active .enemy-icon {
+    font-size: 1.3rem;
+    filter: drop-shadow(0 0 4px var(--accent));
+    animation: enemyPulse 1.5s ease-in-out infinite;
+  }
+
+  .defeated-x {
+    position: absolute;
+    color: var(--danger);
+    font-size: 1.4rem;
+    font-weight: 900;
+    z-index: 1;
+    text-shadow: 0 0 2px rgba(0,0,0,0.8);
+  }
+
+  @keyframes enemyPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
   }
 
   /* ===== BATTLE ARENA (Compact Monster) ===== */
