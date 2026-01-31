@@ -203,15 +203,19 @@
           <div class="stat-block">
             <h3>🏆 Dungeon Stats</h3>
             <div class="dungeon-stats">
-              <div class="dstat">
-                <span class="dstat-icon">🏔️</span>
-                <span class="dstat-value">{$playerData?.highestFloor || 0}</span>
-                <span class="dstat-label">Best Floor</span>
+              <div class="dstat-card">
+                <div class="dstat-icon">🏔️</div>
+                <div class="dstat-info">
+                  <span class="dstat-value">{$playerData?.highestFloor || 0}</span>
+                  <span class="dstat-label">Best Floor</span>
+                </div>
               </div>
-              <div class="dstat">
-                <span class="dstat-icon">💀</span>
-                <span class="dstat-value">{$playerData?.totalKills || 0}</span>
-                <span class="dstat-label">Monsters Slain</span>
+              <div class="dstat-card">
+                <div class="dstat-icon">💀</div>
+                <div class="dstat-info">
+                  <span class="dstat-value">{$playerData?.totalKills || 0}</span>
+                  <span class="dstat-label">Monsters Slain</span>
+                </div>
               </div>
             </div>
           </div>
@@ -671,31 +675,57 @@
   }
 
   .dungeon-stats {
-    display: flex;
-    gap: var(--spacing-lg);
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-md);
   }
 
-  .dstat {
+  .dstat-card {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm);
-    padding: var(--spacing-sm) var(--spacing-md);
-    background: var(--bg-tertiary);
-    border-radius: var(--radius-md);
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    background: linear-gradient(135deg, var(--bg-tertiary), var(--bg-secondary));
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  }
+
+  .dstat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   }
 
   .dstat-icon {
-    font-size: 1.25rem;
+    font-size: 2rem;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-primary);
+    border-radius: var(--radius-md);
+    flex-shrink: 0;
+  }
+
+  .dstat-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
   }
 
   .dstat-value {
-    font-weight: 600;
-    font-size: 1.1rem;
+    font-weight: 700;
+    font-size: 1.5rem;
+    color: var(--text-primary);
+    line-height: 1;
   }
 
   .dstat-label {
     color: var(--text-muted);
-    font-size: 0.75rem;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
   }
 
   .sync-section {
