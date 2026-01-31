@@ -420,6 +420,9 @@ export async function playerAttack() {
 
   const monster = room.monster;
 
+  // Clear "Your move!" message when player acts
+  currentMessage.set('');
+
   // Start player attack animation
   combatState.update(s => ({ ...s, isAnimating: true, playerAction: 'attack', turn: 'animating' }));
 
@@ -497,6 +500,9 @@ export async function playerDefend() {
   if (room.type !== 'combat' && room.type !== 'boss') return;
 
   const monster = room.monster;
+
+  // Clear "Your move!" message when player acts
+  currentMessage.set('');
 
   // Start defend animation
   combatState.update(s => ({ ...s, isAnimating: true, playerAction: 'defend', turn: 'animating' }));
@@ -794,6 +800,9 @@ export async function castSpell(spellIndex = 0) {
   }
 
   const monster = room.monster;
+
+  // Clear "Your move!" message when player acts
+  currentMessage.set('');
 
   // Start spell animation
   combatState.update(s => ({ ...s, isAnimating: true, playerAction: 'spell', turn: 'animating' }));
