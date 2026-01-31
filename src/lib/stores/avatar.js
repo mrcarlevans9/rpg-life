@@ -2,6 +2,7 @@ import { writable, derived } from 'svelte/store';
 import { liveQuery } from 'dexie';
 import { db, UNLOCKABLES } from '../db/index.js';
 import { currentLevel } from './player.js';
+import { pushAvatarUpdate } from '../supabase/sync.js';
 
 // Create a store from a Dexie liveQuery
 function createLiveQueryStore(queryFn, defaultValue = null) {
@@ -58,11 +59,17 @@ export async function checkUnlocks(level) {
 // Update avatar cosmetic
 export async function updateAvatar(field, value) {
   await db.avatar.update(1, { [field]: value });
+
+  // Sync to cloud
+  pushAvatarUpdate({ [field]: value }).catch(err => console.error('Failed to sync avatar:', err));
 }
 
 // Update equipped title
 export async function updateTitle(titleKey) {
   await db.avatar.update(1, { equippedTitle: titleKey });
+
+  // Sync to cloud
+  pushAvatarUpdate({ equippedTitle: titleKey }).catch(err => console.error('Failed to sync title:', err));
 }
 
 // Get avatar display data with resolved colors

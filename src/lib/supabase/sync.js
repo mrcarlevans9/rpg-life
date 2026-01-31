@@ -363,6 +363,81 @@ export async function pushExpeditionCreate(expedition) {
   }
 }
 
+// ============ Avatar Sync ============
+export async function syncAvatar() {
+  const userId = getUserId();
+  if (!userId) return null;
+
+  try {
+    const { data: remoteAvatar, error } = await supabase
+      .from('avatars')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('Error fetching remote avatar:', error);
+      return null;
+    }
+
+    const localAvatar = await db.avatar.get(1);
+
+    if (remoteAvatar) {
+      // Remote exists, update local
+      const avatar = {
+        skinTone: remoteAvatar.skin_tone || 'medium',
+        hairStyle: remoteAvatar.hair_style || 'default',
+        hairColor: remoteAvatar.hair_color || 'brown',
+        outfit: remoteAvatar.outfit || 'casual',
+        accessory: remoteAvatar.accessory || 'none',
+        equippedTitle: remoteAvatar.equipped_title || 'rookie'
+      };
+      await db.avatar.update(1, avatar);
+      return avatar;
+    } else if (localAvatar) {
+      // Push local avatar to remote
+      await supabase.from('avatars').insert({
+        user_id: userId,
+        skin_tone: localAvatar.skinTone,
+        hair_style: localAvatar.hairStyle,
+        hair_color: localAvatar.hairColor,
+        outfit: localAvatar.outfit,
+        accessory: localAvatar.accessory,
+        equipped_title: localAvatar.equippedTitle
+      });
+    }
+
+    return localAvatar;
+  } catch (error) {
+    console.error('Sync avatar error:', error);
+    return null;
+  }
+}
+
+export async function pushAvatarUpdate(updates) {
+  const userId = getUserId();
+  if (!userId) return;
+
+  try {
+    const remoteUpdates = {};
+    if (updates.skinTone !== undefined) remoteUpdates.skin_tone = updates.skinTone;
+    if (updates.hairStyle !== undefined) remoteUpdates.hair_style = updates.hairStyle;
+    if (updates.hairColor !== undefined) remoteUpdates.hair_color = updates.hairColor;
+    if (updates.outfit !== undefined) remoteUpdates.outfit = updates.outfit;
+    if (updates.accessory !== undefined) remoteUpdates.accessory = updates.accessory;
+    if (updates.equippedTitle !== undefined) remoteUpdates.equipped_title = updates.equippedTitle;
+
+    if (Object.keys(remoteUpdates).length > 0) {
+      await supabase
+        .from('avatars')
+        .update(remoteUpdates)
+        .eq('user_id', userId);
+    }
+  } catch (error) {
+    console.error('Push avatar update error:', error);
+  }
+}
+
 // ============ Settings Sync ============
 export async function syncSettings() {
   const userId = getUserId();
@@ -434,6 +509,7 @@ export async function fullSync() {
 
   try {
     await syncPlayer();
+    await syncAvatar();
     await syncSettings();
     await syncBoard();
     await syncTasks();
