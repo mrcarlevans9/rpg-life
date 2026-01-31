@@ -698,15 +698,23 @@
 
   /* Only lock height/scroll during active combat */
   .dungeon-page.in-combat {
-    height: calc(100vh - var(--header-height) - var(--mobile-nav-height) - 8px);
-    max-height: calc(100vh - var(--header-height) - var(--mobile-nav-height) - 8px);
+    height: calc(100dvh - var(--header-height) - var(--mobile-nav-height));
+    max-height: calc(100dvh - var(--header-height) - var(--mobile-nav-height));
     overflow: hidden;
+  }
+
+  /* Fallback for browsers without dvh support */
+  @supports not (height: 100dvh) {
+    .dungeon-page.in-combat {
+      height: calc(100vh - var(--header-height) - var(--mobile-nav-height));
+      max-height: calc(100vh - var(--header-height) - var(--mobile-nav-height));
+    }
   }
 
   @media (min-width: 1024px) {
     .dungeon-page.in-combat {
-      height: calc(100vh - var(--header-height));
-      max-height: calc(100vh - var(--header-height));
+      height: calc(100dvh - var(--header-height));
+      max-height: calc(100dvh - var(--header-height));
     }
   }
 
