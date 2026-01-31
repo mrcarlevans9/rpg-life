@@ -316,6 +316,11 @@ export async function startRun() {
     customSpells: dungeon?.customSpells || []
   };
 
+  // Lock scroll immediately when entering dungeon
+  if (typeof document !== 'undefined') {
+    document.body.classList.add('no-scroll');
+  }
+
   currentRun.set(run);
   gamePhase.set('exploring');
   combatLog.set([{ type: 'info', message: 'You enter the dungeon...' }]);
@@ -357,7 +362,10 @@ export async function collectRewards() {
       : dungeon?.bossesDefeated || 0
   });
 
-  // Reset run
+  // Reset run and unlock scroll
+  if (typeof document !== 'undefined') {
+    document.body.classList.remove('no-scroll');
+  }
   currentRun.set(null);
   gamePhase.set('idle');
   combatLog.set([]);
