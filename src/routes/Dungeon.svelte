@@ -780,8 +780,7 @@
     align-items: center;
     justify-content: center;
     position: relative;
-    min-height: 120px;
-    max-height: 180px;
+    min-height: 140px;
   }
 
   .monster-display {
@@ -891,7 +890,7 @@
   .player-bar {
     background: rgba(0, 0, 0, 0.5);
     border-top: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 6px var(--spacing-sm);
+    padding: 4px var(--spacing-sm);
   }
 
   .player-bar.bar-flash {
@@ -936,7 +935,7 @@
 
   .bar-track {
     flex: 1;
-    height: 10px;
+    height: 8px;
     background: rgba(0, 0, 0, 0.6);
     border-radius: var(--radius-full);
     overflow: hidden;
@@ -984,14 +983,14 @@
   /* Action Panel */
   .action-panel {
     background: var(--bg-secondary);
-    border-top: 2px solid var(--border);
-    padding: var(--spacing-sm);
+    border-top: 1px solid var(--border);
+    padding: 6px;
   }
 
   .action-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: var(--spacing-xs);
+    gap: 4px;
   }
 
   .action-grid.has-spell {
@@ -1004,19 +1003,19 @@
   }
 
   .action-btn {
-    padding: var(--spacing-sm) var(--spacing-md);
-    border: 2px solid var(--border);
-    border-radius: var(--radius-md);
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
     background: var(--bg-primary);
     color: var(--text-primary);
     font-weight: 600;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     cursor: pointer;
     transition: all 0.15s ease;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: var(--spacing-xs);
+    gap: 4px;
   }
 
   .action-btn:hover:not(:disabled) {
@@ -1059,8 +1058,8 @@
   .action-btn.run {
     flex-direction: column;
     gap: 0;
-    padding: var(--spacing-xs);
-    font-size: 0.75rem;
+    padding: 4px;
+    font-size: 0.7rem;
   }
 
   .action-btn.run.safe {
@@ -1086,8 +1085,8 @@
     color: #8b5cf6;
     flex-direction: column;
     gap: 0;
-    padding: var(--spacing-xs);
-    font-size: 0.7rem;
+    padding: 4px;
+    font-size: 0.65rem;
   }
 
   .action-btn.spell:hover:not(:disabled) {
@@ -1095,7 +1094,7 @@
   }
 
   .item-count {
-    font-size: 0.7rem;
+    font-size: 0.6rem;
     opacity: 0.8;
   }
 
