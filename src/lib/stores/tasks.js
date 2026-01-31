@@ -70,14 +70,18 @@ export const overdueTasks = createLiveQueryStore(() => {
 
 // Create a new task/bounty
 export async function createTask(taskData) {
-  // Ensure db is open
+  console.log('=== createTask called ===');
+  console.log('DB isOpen:', db.isOpen());
+
   if (!db.isOpen()) {
+    console.log('Opening DB for createTask...');
     await db.open();
   }
 
   const count = await db.tasks.count();
+  console.log('Current task count:', count);
 
-  const id = await db.tasks.add({
+  const taskToAdd = {
     status: taskData.status || 'todo',
     title: taskData.title,
     description: taskData.description || '',
@@ -93,7 +97,15 @@ export async function createTask(taskData) {
     order: count,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
-  });
+  };
+
+  console.log('Adding task:', taskToAdd);
+  const id = await db.tasks.add(taskToAdd);
+  console.log('Task added with ID:', id);
+
+  // Verify it was saved
+  const allTasks = await db.tasks.toArray();
+  console.log('All tasks after add:', allTasks);
 
   return id;
 }

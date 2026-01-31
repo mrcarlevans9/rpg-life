@@ -2,14 +2,19 @@ import { db, ACHIEVEMENTS, UNLOCKABLES, TITLES } from './schema.js';
 
 // Initialize database with default data
 export async function initializeDB() {
+  console.log('=== initializeDB called ===');
+  console.log('DB isOpen:', db.isOpen());
+
   // Ensure database is open
   if (!db.isOpen()) {
     await db.open();
     console.log('Database opened');
   }
 
+  // Check existing data
   const playerCount = await db.player.count();
-  console.log('Player count:', playerCount);
+  const taskCount = await db.tasks.count();
+  console.log('Player count:', playerCount, 'Task count:', taskCount);
 
   if (playerCount === 0) {
     // Create default player

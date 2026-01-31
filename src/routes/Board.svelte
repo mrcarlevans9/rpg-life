@@ -54,17 +54,27 @@
   async function loadTasks() {
     try {
       loading = true;
-      // Ensure db is open
+      console.log('=== Loading tasks ===');
+      console.log('DB isOpen:', db.isOpen());
+
       if (!db.isOpen()) {
-        console.log('DB was closed, opening...');
+        console.log('Opening DB...');
         await db.open();
+        console.log('DB opened, isOpen now:', db.isOpen());
       }
+
+      // Check what tables exist
+      console.log('DB tables:', db.tables.map(t => t.name));
+
       const allTasks = await db.tasks.toArray();
-      console.log('Loaded from DB:', allTasks.length, 'tasks');
+      console.log('Raw tasks from DB:', allTasks);
+
       // Force reactivity by creating a new array reference
       tasks = [...allTasks].sort((a, b) => (a.order || 0) - (b.order || 0));
+      console.log('Sorted tasks:', tasks.length);
     } catch (err) {
       console.error('Error loading tasks:', err);
+      console.error('Error stack:', err.stack);
       tasks = [];
     } finally {
       loading = false;
