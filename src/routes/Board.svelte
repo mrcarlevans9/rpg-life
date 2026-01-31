@@ -172,21 +172,6 @@
     }
   }
 
-  function getFilteredTasks() {
-    if (!tasks) return [];
-
-    switch (filter) {
-      case 'todo':
-        return tasks.filter(t => t.status === 'todo' && !t.completed);
-      case 'active':
-        return tasks.filter(t => t.status === 'active');
-      case 'done':
-        return tasks.filter(t => t.completed);
-      default:
-        return tasks.filter(t => !t.completed);
-    }
-  }
-
   function getPriorityLabel(priority) {
     switch (priority) {
       case 'high': return 'Hard';
@@ -215,7 +200,13 @@
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   }
 
-  $: filteredTasks = getFilteredTasks();
+  // Reactive filtered tasks - explicitly reference tasks and filter for reactivity
+  $: filteredTasks = !tasks ? [] : (
+    filter === 'todo' ? tasks.filter(t => t.status === 'todo' && !t.completed) :
+    filter === 'active' ? tasks.filter(t => t.status === 'active') :
+    filter === 'done' ? tasks.filter(t => t.completed) :
+    tasks.filter(t => !t.completed)
+  );
   $: activeTask = tasks.find(t => t.status === 'active');
   $: todoCount = tasks.filter(t => t.status === 'todo' && !t.completed).length;
   $: activeCount = tasks.filter(t => t.status === 'active').length;
