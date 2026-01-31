@@ -336,7 +336,7 @@
                     <span class="defeated-x">🚫</span>
                   {/if}
                   <span class="enemy-icon" class:faded={room.completed}>
-                    {#if room.type === 'boss'}👑{:else if room.type === 'merchant'}💰{:else if room.type === 'loot_chest'}🎁{:else}☠️{/if}
+                    {#if room.type === 'boss' && room.monster?.isMajorBoss}👑{:else if room.type === 'boss'}☠️{:else if room.type === 'merchant'}💰{:else if room.type === 'loot_chest'}🎁{:else}💀{/if}
                   </span>
                 </span>
               {/if}
