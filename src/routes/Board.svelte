@@ -209,7 +209,11 @@
     <h1>Bounty Board</h1>
   </header>
 
-  <button class="new-bounty-btn" on:click={() => openTaskModal()}>
+  <button
+    class="new-bounty-btn"
+    on:click={() => openTaskModal()}
+    style="display: block; width: 100%; padding: 16px; margin: 16px 0; background: #6366f1; color: white; font-size: 18px; font-weight: bold; border: none; border-radius: 12px; cursor: pointer;"
+  >
     + New Bounty
   </button>
 
