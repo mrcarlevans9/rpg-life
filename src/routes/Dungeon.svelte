@@ -756,7 +756,12 @@
         <span class="merchant-emoji">{merchant?.emoji || '🧌'}</span>
         <h2>Goblin Merchant</h2>
         <p class="merchant-greeting">"{merchant?.greeting}"</p>
-        <span class="floor-complete-badge">Floor {$currentRun?.currentFloor} Complete!</span>
+        {#if merchant?.afterBoss}
+          <span class="floor-complete-badge boss-cleared">🏆 Floor {$currentRun?.currentFloor} Complete!</span>
+          <span class="gold-collected-notice">+{merchant.bossGoldEarned} gold added to your run!</span>
+        {:else}
+          <span class="floor-complete-badge">Floor {$currentRun?.currentFloor} Complete!</span>
+        {/if}
       </div>
 
       <div class="merchant-gold">
@@ -789,10 +794,10 @@
 
       <div class="merchant-actions">
         <Button variant="primary" on:click={leaveFloorMerchant}>
-          Descend to Floor {($currentRun?.currentFloor || 0) + 1}
+          ⬇️ Descend to Floor {($currentRun?.currentFloor || 0) + 1}
         </Button>
-        <Button variant="secondary" on:click={retreat}>
-          End Run & Collect Rewards
+        <Button variant="ghost" on:click={retreat}>
+          🚪 Exit Dungeon (Keep {$currentRun?.goldCollected || 0} gold)
         </Button>
       </div>
 
@@ -2796,6 +2801,30 @@
   @keyframes badgePulse {
     0%, 100% { transform: scale(1); box-shadow: 0 0 0 rgba(34, 197, 94, 0); }
     50% { transform: scale(1.05); box-shadow: 0 0 20px rgba(34, 197, 94, 0.5); }
+  }
+
+  .floor-complete-badge.boss-cleared {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    animation: bossVictoryPulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes bossVictoryPulse {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 0 rgba(245, 158, 11, 0); }
+    50% { transform: scale(1.08); box-shadow: 0 0 25px rgba(245, 158, 11, 0.6); }
+  }
+
+  .gold-collected-notice {
+    display: block;
+    margin-top: var(--spacing-xs);
+    color: #fcd34d;
+    font-weight: 600;
+    font-size: 0.9rem;
+    animation: goldShine 2s ease-in-out infinite;
+  }
+
+  @keyframes goldShine {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; text-shadow: 0 0 10px rgba(252, 211, 77, 0.8); }
   }
 
   /* ========== LOOT CHEST ENCOUNTER ========== */
