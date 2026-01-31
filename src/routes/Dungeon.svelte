@@ -676,13 +676,16 @@
     padding: 0 var(--spacing-xs);
     /* Fill available height during combat to prevent scroll */
     height: calc(100vh - var(--header-height) - var(--mobile-nav-height) - var(--spacing-lg) * 2);
+    max-height: calc(100vh - var(--header-height) - var(--mobile-nav-height) - var(--spacing-lg) * 2);
     display: flex;
     flex-direction: column;
+    overflow: hidden;
   }
 
   @media (min-width: 1024px) {
     .dungeon-page {
       height: calc(100vh - var(--header-height) - var(--spacing-lg) * 2);
+      max-height: calc(100vh - var(--header-height) - var(--spacing-lg) * 2);
     }
   }
 
