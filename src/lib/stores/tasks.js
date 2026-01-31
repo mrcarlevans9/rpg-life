@@ -33,10 +33,10 @@ export const tasksData = createLiveQueryStore(() => db.tasks.toArray(), []);
 // Tags from DB
 export const tagsData = createLiveQueryStore(() => db.tags.toArray(), []);
 
-// Get tasks for a specific project
-export function getProjectTasks(projectId) {
+// Get all tasks for the global board
+export function getAllTasks() {
   return createLiveQueryStore(
-    () => db.tasks.where('projectId').equals(projectId).sortBy('order'),
+    () => db.tasks.orderBy('order').toArray(),
     []
   );
 }
@@ -63,10 +63,9 @@ export const overdueTasks = createLiveQueryStore(() => {
 
 // Create a new task
 export async function createTask(taskData) {
-  const count = await db.tasks.where('projectId').equals(taskData.projectId).count();
+  const count = await db.tasks.count();
 
   const id = await db.tasks.add({
-    projectId: taskData.projectId,
     columnId: taskData.columnId || 'todo',
     title: taskData.title,
     description: taskData.description || '',
@@ -249,17 +248,18 @@ async function createRecurringTask(originalTask) {
   }
 
   await createTask({
-    ...originalTask,
-    id: undefined,
+    columnId: 'todo',
+    title: originalTask.title,
+    description: originalTask.description,
+    priority: originalTask.priority,
     dueDate: nextDate.toISOString().split('T')[0],
-    completed: false,
-    completedAt: null,
+    recurring: originalTask.recurring,
     subtasks: originalTask.subtasks.map(st => ({ ...st, completed: false }))
   });
 }
 
 // Reorder tasks within a column
-export async function reorderTasks(projectId, columnId, taskIds) {
+export async function reorderTasks(columnId, taskIds) {
   for (let i = 0; i < taskIds.length; i++) {
     await db.tasks.update(taskIds[i], { order: i });
   }

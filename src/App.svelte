@@ -19,11 +19,8 @@
     '/quests': wrap({
       asyncComponent: () => import('./routes/DailyQuests.svelte')
     }),
-    '/projects': wrap({
-      asyncComponent: () => import('./routes/Projects.svelte')
-    }),
-    '/projects/:id': wrap({
-      asyncComponent: () => import('./routes/ProjectBoard.svelte')
+    '/board': wrap({
+      asyncComponent: () => import('./routes/Board.svelte')
     }),
     '/expedition': wrap({
       asyncComponent: () => import('./routes/ExpeditionTimer.svelte')

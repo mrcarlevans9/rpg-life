@@ -34,25 +34,20 @@ CREATE TABLE IF NOT EXISTS avatars (
   UNIQUE(user_id)
 );
 
--- Projects/Boards
-CREATE TABLE IF NOT EXISTS projects (
+-- Global Kanban Board (one per user)
+CREATE TABLE IF NOT EXISTS board (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  name TEXT NOT NULL,
-  description TEXT,
-  color TEXT DEFAULT '#6366f1',
-  sort_order INTEGER DEFAULT 0,
-  archived BOOLEAN DEFAULT FALSE,
   columns JSONB DEFAULT '[{"id": "todo", "name": "To Do", "order": 0}, {"id": "in-progress", "name": "In Progress", "order": 1}, {"id": "done", "name": "Done", "order": 2}]'::jsonb,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id)
 );
 
--- Tasks
+-- Tasks (global, not tied to projects)
 CREATE TABLE IF NOT EXISTS tasks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  project_id UUID REFERENCES projects(id) ON DELETE CASCADE NOT NULL,
   column_id TEXT DEFAULT 'todo',
   title TEXT NOT NULL,
   description TEXT,
@@ -149,7 +144,7 @@ CREATE TABLE IF NOT EXISTS daily_stats (
 -- Enable Row Level Security
 ALTER TABLE players ENABLE ROW LEVEL SECURITY;
 ALTER TABLE avatars ENABLE ROW LEVEL SECURITY;
-ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE board ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tags ENABLE ROW LEVEL SECURITY;
 ALTER TABLE expeditions ENABLE ROW LEVEL SECURITY;
@@ -170,11 +165,10 @@ CREATE POLICY "Users can view own avatar" ON avatars FOR SELECT USING (auth.uid(
 CREATE POLICY "Users can insert own avatar" ON avatars FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can update own avatar" ON avatars FOR UPDATE USING (auth.uid() = user_id);
 
--- Projects
-CREATE POLICY "Users can view own projects" ON projects FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can insert own projects" ON projects FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own projects" ON projects FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users can delete own projects" ON projects FOR DELETE USING (auth.uid() = user_id);
+-- Board
+CREATE POLICY "Users can view own board" ON board FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own board" ON board FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own board" ON board FOR UPDATE USING (auth.uid() = user_id);
 
 -- Tasks
 CREATE POLICY "Users can view own tasks" ON tasks FOR SELECT USING (auth.uid() = user_id);
@@ -230,7 +224,7 @@ $$ LANGUAGE plpgsql;
 -- Create triggers for updated_at
 CREATE TRIGGER update_players_updated_at BEFORE UPDATE ON players FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER update_avatars_updated_at BEFORE UPDATE ON avatars FOR EACH ROW EXECUTE FUNCTION update_updated_at();
-CREATE TRIGGER update_projects_updated_at BEFORE UPDATE ON projects FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TRIGGER update_board_updated_at BEFORE UPDATE ON board FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER update_tasks_updated_at BEFORE UPDATE ON tasks FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER update_settings_updated_at BEFORE UPDATE ON settings FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER update_daily_stats_updated_at BEFORE UPDATE ON daily_stats FOR EACH ROW EXECUTE FUNCTION update_updated_at();
@@ -248,9 +242,8 @@ BEGIN
   -- Create settings
   INSERT INTO settings (user_id) VALUES (NEW.id);
 
-  -- Create default project
-  INSERT INTO projects (user_id, name, description, color, sort_order)
-  VALUES (NEW.id, 'My First Project', 'Welcome to RPG Life!', '#6366f1', 0);
+  -- Create global kanban board
+  INSERT INTO board (user_id) VALUES (NEW.id);
 
   RETURN NEW;
 END;

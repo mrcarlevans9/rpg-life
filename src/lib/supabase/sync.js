@@ -92,131 +92,64 @@ export async function pushPlayerUpdate(updates) {
   }
 }
 
-// ============ Projects Sync ============
-export async function syncProjects() {
-  const userId = getUserId();
-  if (!userId) return [];
-
-  try {
-    // Get remote projects
-    const { data: remoteProjects, error } = await supabase
-      .from('projects')
-      .select('*')
-      .eq('user_id', userId)
-      .order('sort_order');
-
-    if (error) {
-      console.error('Error fetching remote projects:', error);
-      return [];
-    }
-
-    // Get local projects
-    const localProjects = await db.projects.toArray();
-
-    // Simple sync: if remote has projects, use them; otherwise push local
-    if (remoteProjects && remoteProjects.length > 0) {
-      // Clear local and replace with remote
-      await db.projects.clear();
-      for (const rp of remoteProjects) {
-        await db.projects.add({
-          id: rp.id,
-          name: rp.name,
-          description: rp.description,
-          color: rp.color,
-          order: rp.sort_order,
-          archived: rp.archived,
-          columns: rp.columns,
-          createdAt: rp.created_at,
-          updatedAt: rp.updated_at
-        });
-      }
-      return remoteProjects;
-    } else if (localProjects.length > 0) {
-      // Push local projects to remote
-      for (const lp of localProjects) {
-        await supabase.from('projects').insert({
-          user_id: userId,
-          name: lp.name,
-          description: lp.description,
-          color: lp.color,
-          sort_order: lp.order,
-          archived: lp.archived,
-          columns: lp.columns
-        });
-      }
-    }
-
-    return localProjects;
-  } catch (error) {
-    console.error('Sync projects error:', error);
-    return [];
-  }
-}
-
-export async function pushProjectCreate(project) {
+// ============ Board Sync ============
+export async function syncBoard() {
   const userId = getUserId();
   if (!userId) return null;
 
   try {
-    const { data, error } = await supabase
-      .from('projects')
-      .insert({
-        user_id: userId,
-        name: project.name,
-        description: project.description,
-        color: project.color,
-        sort_order: project.order,
-        archived: project.archived || false,
-        columns: project.columns
-      })
-      .select()
+    // Get remote board
+    const { data: remoteBoard, error } = await supabase
+      .from('board')
+      .select('*')
+      .eq('user_id', userId)
       .single();
 
-    if (error) throw error;
-    return data;
+    if (error && error.code !== 'PGRST116') {
+      console.error('Error fetching remote board:', error);
+      return null;
+    }
+
+    // Get local board
+    const localBoard = await db.board.get(1);
+
+    if (remoteBoard) {
+      // Remote exists, update local
+      await db.board.update(1, {
+        columns: remoteBoard.columns,
+        updatedAt: remoteBoard.updated_at
+      });
+      return remoteBoard;
+    } else if (localBoard) {
+      // Push local board to remote
+      await supabase.from('board').insert({
+        user_id: userId,
+        columns: localBoard.columns
+      });
+    }
+
+    return localBoard;
   } catch (error) {
-    console.error('Push project create error:', error);
+    console.error('Sync board error:', error);
     return null;
   }
 }
 
-export async function pushProjectUpdate(projectId, updates) {
+export async function pushBoardUpdate(columns) {
   const userId = getUserId();
   if (!userId) return;
 
   try {
-    const remoteUpdates = {};
-    if (updates.name !== undefined) remoteUpdates.name = updates.name;
-    if (updates.description !== undefined) remoteUpdates.description = updates.description;
-    if (updates.color !== undefined) remoteUpdates.color = updates.color;
-    if (updates.order !== undefined) remoteUpdates.sort_order = updates.order;
-    if (updates.archived !== undefined) remoteUpdates.archived = updates.archived;
-    if (updates.columns !== undefined) remoteUpdates.columns = updates.columns;
-
-    if (Object.keys(remoteUpdates).length > 0) {
-      await supabase
-        .from('projects')
-        .update(remoteUpdates)
-        .eq('id', projectId)
-        .eq('user_id', userId);
-    }
-  } catch (error) {
-    console.error('Push project update error:', error);
-  }
-}
-
-export async function pushProjectDelete(projectId) {
-  const userId = getUserId();
-  if (!userId) return;
-
-  try {
+    // Upsert the board (insert if not exists, update if exists)
     await supabase
-      .from('projects')
-      .delete()
-      .eq('id', projectId)
-      .eq('user_id', userId);
+      .from('board')
+      .upsert({
+        user_id: userId,
+        columns: columns,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id' });
   } catch (error) {
-    console.error('Push project delete error:', error);
+    console.error('Push board update error:', error);
   }
 }
 
@@ -244,7 +177,6 @@ export async function syncTasks() {
       for (const rt of remoteTasks) {
         await db.tasks.add({
           id: rt.id,
-          projectId: rt.project_id,
           columnId: rt.column_id,
           title: rt.title,
           description: rt.description,
@@ -263,7 +195,6 @@ export async function syncTasks() {
       for (const lt of localTasks) {
         await supabase.from('tasks').insert({
           user_id: userId,
-          project_id: lt.projectId,
           column_id: lt.columnId,
           title: lt.title,
           description: lt.description,
@@ -293,7 +224,6 @@ export async function pushTaskCreate(task) {
       .from('tasks')
       .insert({
         user_id: userId,
-        project_id: task.projectId,
         column_id: task.columnId,
         title: task.title,
         description: task.description,
@@ -453,7 +383,7 @@ export async function fullSync() {
   try {
     await syncPlayer();
     await syncSettings();
-    await syncProjects();
+    await syncBoard();
     await syncTasks();
     console.log('Full sync complete');
   } catch (error) {

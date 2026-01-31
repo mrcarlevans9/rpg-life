@@ -2,18 +2,18 @@ import Dexie from 'dexie';
 
 export const db = new Dexie('RPGLifeDB');
 
-db.version(2).stores({
+db.version(3).stores({
   // Player profile - single row (id: 1)
   player: '++id',
 
   // Avatar customization
   avatar: '++id',
 
-  // Projects/Boards
-  projects: '++id, name, order, archived',
+  // Global kanban board - single row (id: 1)
+  board: '++id',
 
-  // Tasks
-  tasks: '++id, projectId, columnId, status, priority, dueDate, completed, order',
+  // Tasks (no longer tied to projects)
+  tasks: '++id, columnId, priority, dueDate, completed, order',
 
   // Tags
   tags: '++id, name',

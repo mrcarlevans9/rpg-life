@@ -65,23 +65,31 @@ export async function initializeDB() {
       }
     }
 
-    // Create a default project
-    await db.projects.add({
-      name: 'My First Project',
-      description: 'Welcome to RPG Life!',
-      color: '#6366f1',
-      order: 0,
-      archived: false,
+    // Create the global kanban board
+    await db.board.add({
       columns: [
         { id: 'todo', name: 'To Do', order: 0 },
         { id: 'in-progress', name: 'In Progress', order: 1 },
         { id: 'done', name: 'Done', order: 2 }
       ],
-      createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     });
 
     console.log('Database initialized with default data');
+  }
+
+  // Ensure board exists (for existing users upgrading)
+  const boardCount = await db.board.count();
+  if (boardCount === 0) {
+    await db.board.add({
+      columns: [
+        { id: 'todo', name: 'To Do', order: 0 },
+        { id: 'in-progress', name: 'In Progress', order: 1 },
+        { id: 'done', name: 'Done', order: 2 }
+      ],
+      updatedAt: new Date().toISOString()
+    });
+    console.log('Board initialized');
   }
 }
 

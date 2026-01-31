@@ -1,17 +1,15 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { dndzone } from 'svelte-dnd-action';
   import Card from '../components/common/Card.svelte';
   import Button from '../components/common/Button.svelte';
   import Modal from '../components/common/Modal.svelte';
   import { db } from '../lib/db/index.js';
-  import { getProject, updateProject } from '../lib/stores/projects.js';
+  import { boardData, getBoard, addColumn, updateColumn, deleteColumn } from '../lib/stores/board.js';
   import { createTask, updateTask, completeTask, deleteTask, moveTaskToColumn } from '../lib/stores/tasks.js';
   import { showXPGain } from '../lib/stores/notifications.js';
 
-  export let params = {};
-
-  let project = null;
+  let board = null;
   let tasks = [];
   let loading = true;
 
@@ -26,19 +24,40 @@
     columnId: 'todo'
   };
 
+  // Column management
+  let showColumnModal = false;
+  let newColumnName = '';
+  let editingColumn = null;
+
+  // Drag scrolling
+  let boardContainer;
+  let isDragging = false;
+  let scrollInterval = null;
+
   const flipDurationMs = 200;
 
   onMount(async () => {
-    await loadProject();
+    await loadBoard();
   });
 
-  async function loadProject() {
+  onDestroy(() => {
+    if (scrollInterval) {
+      clearInterval(scrollInterval);
+    }
+  });
+
+  async function loadBoard() {
     loading = true;
-    project = await getProject(parseInt(params.id));
-    if (project) {
-      tasks = await db.tasks.where('projectId').equals(project.id).toArray();
+    board = await getBoard();
+    if (board) {
+      tasks = await db.tasks.toArray();
     }
     loading = false;
+  }
+
+  // Subscribe to board changes
+  $: if ($boardData) {
+    board = $boardData;
   }
 
   function getColumnTasks(columnId) {
@@ -53,8 +72,8 @@
   }
 
   function handleDndConsider(columnId, e) {
-    const columnTasks = getColumnTasks(columnId);
     const newItems = e.detail.items;
+    isDragging = true;
 
     // Update local state temporarily
     tasks = tasks.map(t => {
@@ -68,6 +87,8 @@
 
   async function handleDndFinalize(columnId, e) {
     const newItems = e.detail.items;
+    isDragging = false;
+    stopAutoScroll();
 
     // Update database
     for (let i = 0; i < newItems.length; i++) {
@@ -75,7 +96,40 @@
       await moveTaskToColumn(item.id, columnId, i);
     }
 
-    await loadProject();
+    await loadBoard();
+  }
+
+  // Auto-scroll during drag
+  function handleDragOver(e) {
+    if (!isDragging || !boardContainer) return;
+
+    const rect = boardContainer.getBoundingClientRect();
+    const threshold = 100;
+    const scrollSpeed = 8;
+
+    if (e.clientX - rect.left < threshold) {
+      startAutoScroll(-scrollSpeed);
+    } else if (rect.right - e.clientX < threshold) {
+      startAutoScroll(scrollSpeed);
+    } else {
+      stopAutoScroll();
+    }
+  }
+
+  function startAutoScroll(speed) {
+    if (scrollInterval) return;
+    scrollInterval = setInterval(() => {
+      if (boardContainer) {
+        boardContainer.scrollLeft += speed;
+      }
+    }, 16);
+  }
+
+  function stopAutoScroll() {
+    if (scrollInterval) {
+      clearInterval(scrollInterval);
+      scrollInterval = null;
+    }
   }
 
   function openTaskModal(columnId = 'todo', task = null) {
@@ -112,7 +166,6 @@
       });
     } else {
       await createTask({
-        projectId: project.id,
         columnId: taskForm.columnId,
         title: taskForm.title,
         description: taskForm.description,
@@ -123,7 +176,7 @@
 
     showTaskModal = false;
     editingTask = null;
-    await loadProject();
+    await loadBoard();
   }
 
   async function handleCompleteTask(task) {
@@ -131,13 +184,52 @@
     if (result) {
       showXPGain(result.amount, 'task');
     }
-    await loadProject();
+    await loadBoard();
   }
 
   async function handleDeleteTask(task) {
     if (confirm('Delete this task?')) {
       await deleteTask(task.id);
-      await loadProject();
+      await loadBoard();
+    }
+  }
+
+  // Column management
+  function openColumnModal(column = null) {
+    editingColumn = column;
+    newColumnName = column ? column.name : '';
+    showColumnModal = true;
+  }
+
+  async function handleSaveColumn() {
+    if (!newColumnName.trim()) return;
+
+    if (editingColumn) {
+      await updateColumn(editingColumn.id, newColumnName);
+    } else {
+      await addColumn(newColumnName);
+    }
+
+    showColumnModal = false;
+    editingColumn = null;
+    newColumnName = '';
+    await loadBoard();
+  }
+
+  async function handleDeleteColumn(column) {
+    if (board.columns.length <= 1) {
+      alert('Cannot delete the last column');
+      return;
+    }
+
+    const taskCount = getColumnTasks(column.id).length;
+    const message = taskCount > 0
+      ? `Delete "${column.name}"? ${taskCount} task(s) will be moved to the first column.`
+      : `Delete "${column.name}"?`;
+
+    if (confirm(message)) {
+      await deleteColumn(column.id);
+      await loadBoard();
     }
   }
 
@@ -158,30 +250,43 @@
   }
 </script>
 
+<svelte:window on:mousemove={handleDragOver} on:mouseup={stopAutoScroll} />
+
 <div class="board-page">
   {#if loading}
-    <div class="loading">Loading project...</div>
-  {:else if !project}
+    <div class="loading">Loading board...</div>
+  {:else if !board}
     <div class="not-found">
-      <h2>Project not found</h2>
-      <a href="#/projects">← Back to Projects</a>
+      <h2>Board not found</h2>
+      <p>Please refresh the page.</p>
     </div>
   {:else}
     <header class="board-header">
-      <div class="header-left">
-        <a href="#/projects" class="back-link">← Projects</a>
-        <h1 style="border-left: 4px solid {project.color}; padding-left: var(--spacing-md);">
-          {project.name}
-        </h1>
-      </div>
+      <h1>Task Board</h1>
+      <Button variant="secondary" on:click={() => openColumnModal()}>
+        + Add Column
+      </Button>
     </header>
 
-    <div class="kanban-board">
-      {#each project.columns as column}
+    <div class="kanban-board" bind:this={boardContainer}>
+      {#each board.columns as column}
         <div class="kanban-column">
           <div class="column-header">
-            <h3>{column.name}</h3>
-            <span class="task-count">{getColumnTasks(column.id).length}</span>
+            <button class="column-title" on:click={() => openColumnModal(column)}>
+              <h3>{column.name}</h3>
+            </button>
+            <div class="column-actions">
+              <span class="task-count">{getColumnTasks(column.id).length}</span>
+              {#if board.columns.length > 1}
+                <button
+                  class="column-delete"
+                  on:click={() => handleDeleteColumn(column)}
+                  title="Delete column"
+                >
+                  &times;
+                </button>
+              {/if}
+            </div>
           </div>
 
           <div
@@ -209,7 +314,7 @@
 
                 {#if task.dueDate}
                   <div class="task-due-date" class:overdue={isOverdue(task.dueDate)}>
-                    📅 {task.dueDate}
+                    {task.dueDate}
                   </div>
                 {/if}
 
@@ -228,7 +333,7 @@
                     on:click={() => handleDeleteTask(task)}
                     title="Delete task"
                   >
-                    ✕
+                    &times;
                   </button>
                 </div>
               </div>
@@ -261,6 +366,7 @@
   {/if}
 </div>
 
+<!-- Task Modal -->
 <Modal
   open={showTaskModal}
   title={editingTask ? 'Edit Task' : 'New Task'}
@@ -319,6 +425,35 @@
   </svelte:fragment>
 </Modal>
 
+<!-- Column Modal -->
+<Modal
+  open={showColumnModal}
+  title={editingColumn ? 'Edit Column' : 'New Column'}
+  on:close={() => { showColumnModal = false; editingColumn = null; newColumnName = ''; }}
+>
+  <form on:submit|preventDefault={handleSaveColumn}>
+    <div class="form-group">
+      <label for="column-name">Column Name</label>
+      <input
+        id="column-name"
+        type="text"
+        bind:value={newColumnName}
+        placeholder="e.g., Review, Blocked, Testing..."
+        required
+      />
+    </div>
+  </form>
+
+  <svelte:fragment slot="footer">
+    <Button variant="secondary" on:click={() => { showColumnModal = false; editingColumn = null; newColumnName = ''; }}>
+      Cancel
+    </Button>
+    <Button on:click={handleSaveColumn} disabled={!newColumnName.trim()}>
+      {editingColumn ? 'Save' : 'Add Column'}
+    </Button>
+  </svelte:fragment>
+</Modal>
+
 <style>
   .board-page {
     min-height: calc(100vh - var(--header-height) - var(--spacing-lg) * 2);
@@ -331,26 +466,12 @@
     margin-bottom: var(--spacing-lg);
   }
 
-  .header-left {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-lg);
-  }
-
-  .back-link {
-    color: var(--text-muted);
-    font-size: 0.875rem;
-  }
-
-  .back-link:hover {
-    color: var(--text-primary);
-  }
-
   .kanban-board {
     display: flex;
     gap: var(--spacing-md);
     overflow-x: auto;
     padding-bottom: var(--spacing-md);
+    scroll-behavior: auto;
   }
 
   .kanban-column {
@@ -370,11 +491,30 @@
     margin-bottom: var(--spacing-md);
   }
 
-  .column-header h3 {
+  .column-title {
+    flex: 1;
+    text-align: left;
+    padding: var(--spacing-xs);
+    border-radius: var(--radius-sm);
+    transition: background-color var(--transition-fast);
+  }
+
+  .column-title:hover {
+    background-color: var(--bg-tertiary);
+  }
+
+  .column-title h3 {
     font-size: 0.875rem;
     font-weight: 600;
     text-transform: uppercase;
     color: var(--text-muted);
+    margin: 0;
+  }
+
+  .column-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
   }
 
   .task-count {
@@ -383,6 +523,23 @@
     background-color: var(--bg-tertiary);
     padding: 2px 8px;
     border-radius: var(--radius-full);
+  }
+
+  .column-delete {
+    width: 24px;
+    height: 24px;
+    font-size: 1rem;
+    color: var(--text-muted);
+    opacity: 0.5;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .column-delete:hover {
+    opacity: 1;
+    color: var(--error);
   }
 
   .column-tasks {
