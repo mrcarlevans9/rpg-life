@@ -24,8 +24,10 @@
     title: '',
     description: '',
     priority: 'medium',
-    dueDate: ''
+    dueDate: '',
+    checklist: []
   };
+  let newChecklistItem = '';
 
   let timerInterval = null;
   let currentTime = 0;
@@ -89,11 +91,13 @@
         title: task.title,
         description: task.description || '',
         priority: task.priority,
-        dueDate: task.dueDate || ''
+        dueDate: task.dueDate || '',
+        checklist: task.checklist ? [...task.checklist] : []
       };
     } else {
-      taskForm = { title: '', description: '', priority: 'medium', dueDate: '' };
+      taskForm = { title: '', description: '', priority: 'medium', dueDate: '', checklist: [] };
     }
+    newChecklistItem = '';
     showModal = true;
   }
 
@@ -111,7 +115,8 @@
           title: taskForm.title,
           description: taskForm.description,
           priority: taskForm.priority,
-          dueDate: taskForm.dueDate || null
+          dueDate: taskForm.dueDate || null,
+          checklist: taskForm.checklist || []
         });
       } else {
         const newId = await createTask({
@@ -119,7 +124,8 @@
           title: taskForm.title,
           description: taskForm.description,
           priority: taskForm.priority,
-          dueDate: taskForm.dueDate || null
+          dueDate: taskForm.dueDate || null,
+          checklist: taskForm.checklist || []
         });
         console.log('Created bounty with id:', newId);
       }
@@ -216,6 +222,44 @@
   function toggleExpand(taskId) {
     expandedTaskId = expandedTaskId === taskId ? null : taskId;
   }
+
+  // Checklist functions for modal
+  function addChecklistItem() {
+    if (newChecklistItem.trim()) {
+      taskForm.checklist = [...taskForm.checklist, { text: newChecklistItem.trim(), done: false }];
+      newChecklistItem = '';
+    }
+  }
+
+  function removeChecklistItem(index) {
+    taskForm.checklist = taskForm.checklist.filter((_, i) => i !== index);
+  }
+
+  function toggleChecklistItemInForm(index) {
+    taskForm.checklist = taskForm.checklist.map((item, i) =>
+      i === index ? { ...item, done: !item.done } : item
+    );
+  }
+
+  // Toggle checklist item directly on a task card
+  async function toggleChecklistItem(task, index) {
+    const updatedChecklist = task.checklist.map((item, i) =>
+      i === index ? { ...item, done: !item.done } : item
+    );
+    try {
+      await updateTask(task.id, { checklist: updatedChecklist });
+      await loadTasks();
+    } catch (err) {
+      console.error('Error updating checklist:', err);
+    }
+  }
+
+  // Get checklist progress
+  function getChecklistProgress(checklist) {
+    if (!checklist || checklist.length === 0) return null;
+    const done = checklist.filter(item => item.done).length;
+    return { done, total: checklist.length };
+  }
 </script>
 
 <div class="bounty-board">
@@ -277,6 +321,7 @@
     <div class="task-list">
       {#each filteredTasks as task (task.id)}
         {@const isExpanded = expandedTaskId === task.id}
+        {@const checklistProgress = getChecklistProgress(task.checklist)}
         <div class="task-card" class:active={task.status === 'active'} class:completed={task.completed} class:expanded={isExpanded}>
           <!-- Compact View (always visible) -->
           <div class="task-compact" on:click={() => toggleExpand(task.id)} role="button" tabindex="0" on:keypress={(e) => e.key === 'Enter' && toggleExpand(task.id)}>
@@ -284,6 +329,11 @@
               {getPriorityLabel(task.priority)}
             </span>
             <h3 class="task-title">{task.title}</h3>
+            {#if checklistProgress}
+              <span class="checklist-progress" class:all-done={checklistProgress.done === checklistProgress.total}>
+                {checklistProgress.done}/{checklistProgress.total}
+              </span>
+            {/if}
             <span class="xp-reward">{getXPReward(task.priority)}</span>
             <span class="expand-icon">{isExpanded ? '▲' : '▼'}</span>
           </div>
@@ -329,6 +379,23 @@
                   </span>
                 </div>
               {/if}
+              {#if task.checklist && task.checklist.length > 0}
+                <div class="detail-row">
+                  <span class="detail-label">Checklist</span>
+                  <div class="checklist-items">
+                    {#each task.checklist as item, i}
+                      <label class="checklist-item" on:click|stopPropagation>
+                        <input
+                          type="checkbox"
+                          checked={item.done}
+                          on:change={() => toggleChecklistItem(task, i)}
+                        />
+                        <span class="checklist-text" class:done={item.done}>{item.text}</span>
+                      </label>
+                    {/each}
+                  </div>
+                </div>
+              {/if}
               <div class="expanded-actions">
                 <button class="edit-btn" on:click|stopPropagation={() => openModal(task)}>Edit</button>
                 <button class="delete-btn" on:click|stopPropagation={() => handleDeleteTask(task)}>Delete</button>
@@ -370,6 +437,37 @@
         <div class="form-group">
           <label for="dueDate">Due Date</label>
           <input id="dueDate" type="date" bind:value={taskForm.dueDate} />
+        </div>
+      </div>
+
+      <!-- Checklist -->
+      <div class="form-group">
+        <label>Checklist</label>
+        <div class="checklist-editor">
+          {#if taskForm.checklist.length > 0}
+            <div class="checklist-edit-items">
+              {#each taskForm.checklist as item, i}
+                <div class="checklist-edit-item">
+                  <input
+                    type="checkbox"
+                    checked={item.done}
+                    on:change={() => toggleChecklistItemInForm(i)}
+                  />
+                  <span class="checklist-edit-text" class:done={item.done}>{item.text}</span>
+                  <button type="button" class="checklist-remove" on:click={() => removeChecklistItem(i)}>×</button>
+                </div>
+              {/each}
+            </div>
+          {/if}
+          <div class="checklist-add">
+            <input
+              type="text"
+              bind:value={newChecklistItem}
+              placeholder="Add item..."
+              on:keypress={(e) => e.key === 'Enter' && (e.preventDefault(), addChecklistItem())}
+            />
+            <button type="button" class="checklist-add-btn" on:click={addChecklistItem}>+</button>
+          </div>
         </div>
       </div>
 
@@ -733,6 +831,145 @@
 
   .delete-btn:hover {
     background: rgba(239, 68, 68, 0.1);
+  }
+
+  /* Checklist Progress in Compact View */
+  .checklist-progress {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(99, 102, 241, 0.2);
+    color: #6366f1;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .checklist-progress.all-done {
+    background: rgba(34, 197, 94, 0.2);
+    color: #22c55e;
+  }
+
+  /* Checklist in Expanded View */
+  .checklist-items {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .checklist-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    padding: 8px;
+    background: var(--bg-secondary);
+    border-radius: 6px;
+    transition: background 0.15s ease;
+  }
+
+  .checklist-item:hover {
+    background: var(--bg-tertiary);
+  }
+
+  .checklist-item input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: #6366f1;
+    cursor: pointer;
+  }
+
+  .checklist-text {
+    flex: 1;
+    font-size: 14px;
+    color: var(--text-primary);
+  }
+
+  .checklist-text.done {
+    text-decoration: line-through;
+    color: var(--text-muted);
+  }
+
+  /* Checklist Editor in Modal */
+  .checklist-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .checklist-edit-items {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .checklist-edit-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    background: var(--bg-secondary);
+    border-radius: 6px;
+  }
+
+  .checklist-edit-item input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: #6366f1;
+  }
+
+  .checklist-edit-text {
+    flex: 1;
+    font-size: 14px;
+    color: var(--text-primary);
+  }
+
+  .checklist-edit-text.done {
+    text-decoration: line-through;
+    color: var(--text-muted);
+  }
+
+  .checklist-remove {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+  }
+
+  .checklist-remove:hover {
+    color: #ef4444;
+  }
+
+  .checklist-add {
+    display: flex;
+    gap: 8px;
+  }
+
+  .checklist-add input {
+    flex: 1;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 14px;
+  }
+
+  .checklist-add-btn {
+    padding: 8px 16px;
+    background: #6366f1;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+  }
+
+  .checklist-add-btn:hover {
+    background: #4f46e5;
   }
 
   /* Empty & Loading */
