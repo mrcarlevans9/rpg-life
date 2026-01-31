@@ -189,6 +189,7 @@ export async function syncTasks() {
       await db.tasks.clear();
       for (const rt of remoteTasks) {
         await db.tasks.add({
+          remoteId: rt.id, // Store Supabase UUID for sync
           status: rt.status || 'todo',
           title: rt.title,
           description: rt.description || '',
@@ -244,7 +245,7 @@ export async function syncTasks() {
   }
 }
 
-export async function pushTaskCreate(task) {
+export async function pushTaskCreate(localTaskId, task) {
   const userId = getUserId();
   if (!userId) return null;
 
@@ -271,6 +272,13 @@ export async function pushTaskCreate(task) {
       console.error('Push task create error:', error);
       return null;
     }
+
+    // Store the remote UUID in local task for future syncs
+    if (data?.id) {
+      await db.tasks.update(localTaskId, { remoteId: data.id });
+      console.log('Stored remoteId', data.id, 'for local task', localTaskId);
+    }
+
     return data;
   } catch (error) {
     console.error('Push task create error:', error);
@@ -278,11 +286,18 @@ export async function pushTaskCreate(task) {
   }
 }
 
-export async function pushTaskUpdate(taskId, updates) {
+export async function pushTaskUpdate(localTaskId, updates) {
   const userId = getUserId();
   if (!userId) return;
 
   try {
+    // Get the remote UUID from local task
+    const localTask = await db.tasks.get(localTaskId);
+    if (!localTask?.remoteId) {
+      console.log('No remoteId for task', localTaskId, '- skipping remote update');
+      return;
+    }
+
     const remoteUpdates = {};
     if (updates.status !== undefined) remoteUpdates.status = updates.status;
     if (updates.title !== undefined) remoteUpdates.title = updates.title;
@@ -299,7 +314,7 @@ export async function pushTaskUpdate(taskId, updates) {
       await supabase
         .from('tasks')
         .update(remoteUpdates)
-        .eq('id', taskId)
+        .eq('id', localTask.remoteId)
         .eq('user_id', userId);
     }
   } catch (error) {
@@ -307,15 +322,15 @@ export async function pushTaskUpdate(taskId, updates) {
   }
 }
 
-export async function pushTaskDelete(taskId) {
+export async function pushTaskDelete(remoteId) {
   const userId = getUserId();
-  if (!userId) return;
+  if (!userId || !remoteId) return;
 
   try {
     await supabase
       .from('tasks')
       .delete()
-      .eq('id', taskId)
+      .eq('id', remoteId)
       .eq('user_id', userId);
   } catch (error) {
     console.error('Push task delete error:', error);

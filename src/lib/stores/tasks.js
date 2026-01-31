@@ -4,6 +4,7 @@ import { db } from '../db/index.js';
 import { addXP, calculateTaskXP, calculateSubtaskXP } from '../services/xpService.js';
 import { xpGainNotification, updateStreak, playerData } from './player.js';
 import { get } from 'svelte/store';
+import { pushTaskCreate, pushTaskUpdate, pushTaskDelete } from '../supabase/sync.js';
 
 // Create a store from a Dexie liveQuery
 function createLiveQueryStore(queryFn, defaultValue = null) {
@@ -103,6 +104,9 @@ export async function createTask(taskData) {
   const id = await db.tasks.add(taskToAdd);
   console.log('Task added with ID:', id);
 
+  // Push to Supabase (will store remoteId on success)
+  pushTaskCreate(id, taskToAdd).catch(err => console.error('Failed to sync task to cloud:', err));
+
   // Verify it was saved
   const allTasks = await db.tasks.toArray();
   console.log('All tasks after add:', allTasks);
@@ -116,6 +120,9 @@ export async function updateTask(id, updates) {
     ...updates,
     updatedAt: new Date().toISOString()
   });
+
+  // Sync to cloud
+  pushTaskUpdate(id, updates).catch(err => console.error('Failed to sync task update:', err));
 }
 
 // Change task status
@@ -152,6 +159,9 @@ export async function setTaskStatus(taskId, newStatus) {
   }
 
   await db.tasks.update(taskId, updates);
+
+  // Sync to cloud
+  pushTaskUpdate(taskId, updates).catch(err => console.error('Failed to sync status update:', err));
 }
 
 // Start working on a task (set to active)
@@ -190,14 +200,18 @@ export async function completeTask(taskId) {
   const xpEarned = calculateTaskXP(task, player?.currentStreak || 0);
 
   // Mark task as completed
-  await db.tasks.update(taskId, {
+  const completionUpdates = {
     completed: true,
     completedAt: new Date().toISOString(),
     status: 'done',
     timeSpent: finalTimeSpent,
     activeStartTime: null,
     updatedAt: new Date().toISOString()
-  });
+  };
+  await db.tasks.update(taskId, completionUpdates);
+
+  // Sync to cloud
+  pushTaskUpdate(taskId, completionUpdates).catch(err => console.error('Failed to sync task completion:', err));
 
   // Clear the client-side timer if this was the active task
   const timer = get(activeTaskTimer);
@@ -257,10 +271,14 @@ export async function completeSubtask(taskId, subtaskId) {
     st.id === subtaskId ? { ...st, completed: true } : st
   );
 
-  await db.tasks.update(taskId, {
+  const subtaskUpdates = {
     subtasks,
     updatedAt: new Date().toISOString()
-  });
+  };
+  await db.tasks.update(taskId, subtaskUpdates);
+
+  // Sync to cloud
+  pushTaskUpdate(taskId, subtaskUpdates).catch(err => console.error('Failed to sync subtask:', err));
 
   // Award subtask XP
   const player = await db.player.get(1);
@@ -286,7 +304,11 @@ export async function uncompleteSubtask(taskId, subtaskId) {
     st.id === subtaskId ? { ...st, completed: false } : st
   );
 
-  await db.tasks.update(taskId, { subtasks, updatedAt: new Date().toISOString() });
+  const updates = { subtasks, updatedAt: new Date().toISOString() };
+  await db.tasks.update(taskId, updates);
+
+  // Sync to cloud
+  pushTaskUpdate(taskId, updates).catch(err => console.error('Failed to sync subtask:', err));
 }
 
 // Undo task completion (move back to todo)
@@ -294,12 +316,16 @@ export async function undoCompleteTask(taskId) {
   const task = await db.tasks.get(taskId);
   if (!task || !task.completed) return;
 
-  await db.tasks.update(taskId, {
+  const undoUpdates = {
     completed: false,
     completedAt: null,
     status: 'todo',
     updatedAt: new Date().toISOString()
-  });
+  };
+  await db.tasks.update(taskId, undoUpdates);
+
+  // Sync to cloud
+  pushTaskUpdate(taskId, undoUpdates).catch(err => console.error('Failed to sync undo:', err));
 }
 
 // Delete a task
@@ -310,7 +336,16 @@ export async function deleteTask(taskId) {
     activeTaskTimer.set({ taskId: null, startTime: null, elapsed: 0 });
   }
 
+  // Get remoteId before deleting locally
+  const task = await db.tasks.get(taskId);
+  const remoteId = task?.remoteId;
+
   await db.tasks.delete(taskId);
+
+  // Delete from cloud
+  if (remoteId) {
+    pushTaskDelete(remoteId).catch(err => console.error('Failed to sync task deletion:', err));
+  }
 }
 
 // Create recurring task instance

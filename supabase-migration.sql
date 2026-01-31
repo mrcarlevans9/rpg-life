@@ -15,12 +15,16 @@ CREATE TABLE IF NOT EXISTS board (
 -- 2. Enable RLS on board
 ALTER TABLE board ENABLE ROW LEVEL SECURITY;
 
--- 3. Create RLS policies for board
+-- 3. Create RLS policies for board (drop first to make idempotent)
+DROP POLICY IF EXISTS "Users can view own board" ON board;
+DROP POLICY IF EXISTS "Users can insert own board" ON board;
+DROP POLICY IF EXISTS "Users can update own board" ON board;
 CREATE POLICY "Users can view own board" ON board FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can insert own board" ON board FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can update own board" ON board FOR UPDATE USING (auth.uid() = user_id);
 
--- 4. Create trigger for board updated_at
+-- 4. Create trigger for board updated_at (drop first to make idempotent)
+DROP TRIGGER IF EXISTS update_board_updated_at ON board;
 CREATE TRIGGER update_board_updated_at BEFORE UPDATE ON board FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 -- 5. Remove project_id constraint from tasks (if exists)

@@ -4,7 +4,7 @@ import Dexie from 'dexie';
 export const db = new Dexie('RPGLifeDB');
 
 // Define the database schema
-db.version(4).stores({
+db.version(5).stores({
   // Player profile - single row (id: 1)
   player: '++id',
 
@@ -14,8 +14,8 @@ db.version(4).stores({
   // Bounty board settings - single row (id: 1)
   board: '++id',
 
-  // Tasks/Bounties
-  tasks: '++id, status, priority, dueDate, completed, order',
+  // Tasks/Bounties - remoteId tracks Supabase UUID for sync
+  tasks: '++id, remoteId, status, priority, dueDate, completed, order',
 
   // Tags
   tags: '++id, name',
