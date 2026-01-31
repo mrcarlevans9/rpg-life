@@ -27,6 +27,7 @@
 
   let showShop = false;
   let showSpellEditor = false;
+  let showSpellMenu = false;
 
   // Spell editor state
   let editingSlotIndex = 0;
@@ -39,6 +40,9 @@
   // Get spell slots info
   $: spellSlots = getSpellSlots();
   $: customSpells = $dungeonData?.customSpells || [];
+
+  // Close spell menu when combat state changes
+  $: if ($combatState.isAnimating || !$currentMonster) showSpellMenu = false;
 
   // Open spell editor for a specific slot
   function openSpellEditor(slotIndex = 0) {
@@ -345,19 +349,16 @@
               >
                 🛡️ DEFEND
               </button>
-              {#each ($currentRun?.customSpells || []) as spell, i}
-                {#if spell}
-                  <button
-                    class="action-btn spell"
-                    on:click={() => castSpell(i)}
-                    disabled={$combatState.isAnimating || $currentRun.playerMp < spell.manaCost}
-                    title="{spell.description || ''}"
-                  >
-                    ✨ {spell.name}
-                    <span class="item-count">({spell.manaCost} MP)</span>
-                  </button>
-                {/if}
-              {/each}
+              {#if ($currentRun?.customSpells || []).filter(s => s).length > 0}
+                <button
+                  class="action-btn spell"
+                  on:click={() => showSpellMenu = !showSpellMenu}
+                  disabled={$combatState.isAnimating}
+                >
+                  ✨ CAST
+                  <span class="item-count">({$currentRun?.playerMp || 0} MP)</span>
+                </button>
+              {/if}
             {/if}
             <button
               class="action-btn item"
@@ -388,6 +389,36 @@
               </button>
             {/if}
           </div>
+
+          <!-- Spell Selection Menu -->
+          {#if showSpellMenu && $currentMonster}
+            <div class="spell-menu">
+              <div class="spell-menu-header">
+                <span>Select Spell</span>
+                <button class="spell-menu-close" on:click={() => showSpellMenu = false}>×</button>
+              </div>
+              <div class="spell-menu-list">
+                {#each ($currentRun?.customSpells || []) as spell, i}
+                  {#if spell}
+                    <button
+                      class="spell-menu-item"
+                      on:click={() => { castSpell(i); showSpellMenu = false; }}
+                      disabled={$currentRun.playerMp < spell.manaCost}
+                    >
+                      <span class="spell-menu-icon">✨</span>
+                      <div class="spell-menu-info">
+                        <span class="spell-menu-name">{spell.name}</span>
+                        <span class="spell-menu-stats">{spell.damage} DMG</span>
+                      </div>
+                      <span class="spell-menu-cost" class:insufficient={$currentRun.playerMp < spell.manaCost}>
+                        {spell.manaCost} MP
+                      </span>
+                    </button>
+                  {/if}
+                {/each}
+              </div>
+            </div>
+          {/if}
         {/if}
       </div>
     </div>
@@ -1025,6 +1056,7 @@
     background: var(--bg-secondary);
     border-top: 1px solid var(--border);
     padding: 8px;
+    position: relative;
   }
 
   .action-grid {
@@ -1126,6 +1158,116 @@
 
   .action-btn.spell:hover:not(:disabled) {
     background: rgba(139, 92, 246, 0.1);
+  }
+
+  /* ===== SPELL SELECTION MENU ===== */
+  .spell-menu {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    right: 0;
+    background: var(--bg-primary);
+    border: 2px solid #8b5cf6;
+    border-radius: var(--radius-md);
+    margin-bottom: 8px;
+    box-shadow: 0 -4px 20px rgba(139, 92, 246, 0.3);
+    z-index: 100;
+    overflow: hidden;
+  }
+
+  .spell-menu-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(59, 130, 246, 0.2));
+    border-bottom: 1px solid rgba(139, 92, 246, 0.3);
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #8b5cf6;
+  }
+
+  .spell-menu-close {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.25rem;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+  }
+
+  .spell-menu-close:hover {
+    color: var(--text-primary);
+  }
+
+  .spell-menu-list {
+    display: flex;
+    flex-direction: column;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  .spell-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-align: left;
+  }
+
+  .spell-menu-item:last-child {
+    border-bottom: none;
+  }
+
+  .spell-menu-item:hover:not(:disabled) {
+    background: rgba(139, 92, 246, 0.1);
+  }
+
+  .spell-menu-item:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .spell-menu-icon {
+    font-size: 1.25rem;
+  }
+
+  .spell-menu-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .spell-menu-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+  }
+
+  .spell-menu-stats {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+
+  .spell-menu-cost {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #8b5cf6;
+    padding: 4px 8px;
+    background: rgba(139, 92, 246, 0.1);
+    border-radius: var(--radius-sm);
+  }
+
+  .spell-menu-cost.insufficient {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
   }
 
   .item-count {
