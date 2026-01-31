@@ -518,26 +518,39 @@ async function monsterAttack(run, monster) {
   // Start enemy attack animation
   combatState.update(s => ({ ...s, enemyAction: 'attack' }));
 
-  // Monster rolls 1D6 + base damage
-  const roll = rollD6(1)[0];
-  let damage = Math.floor(monster.damage * (roll / 3.5)); // Scale with roll
+  // Monster rolls 2D6 (same as player)
+  const rolls = rollD6(2);
+  const total = rolls.reduce((a, b) => a + b, 0);
+  const isDoubles = rolls[0] === rolls[1];
+
+  // Calculate damage scaled by roll
+  let damage = Math.floor(monster.damage * (total / 7)); // 7 is average of 2D6
+  if (isDoubles) {
+    damage = Math.floor(damage * 1.5); // Critical hit!
+  }
   damage = Math.max(1, damage); // Minimum 1 damage
 
   // Set lastRoll for enemy attack display
-  lastRoll.set({ rolls: [roll], total: damage, type: 'enemy', critical: false });
+  lastRoll.set({ rolls, total, type: 'enemy', critical: isDoubles });
 
   // Apply defense if player is defending
   if (run.isDefending && run.defenseAmount) {
     damage = Math.max(0, damage - run.defenseAmount);
     if (damage === 0) {
       addLog('block', `${monster.displayName}'s attack is completely blocked!`);
+    } else if (isDoubles) {
+      addLog('block', `CRITICAL! You block some damage. ${monster.displayName} deals ${damage} damage!`);
     } else {
       addLog('block', `You block some damage! ${monster.displayName} deals ${damage} damage.`);
     }
     run.isDefending = false;
     run.defenseAmount = 0;
   } else {
-    addLog('enemy', `${monster.displayName} attacks for ${damage} damage!`);
+    if (isDoubles) {
+      addLog('crit', `CRITICAL HIT! ${monster.displayName} attacks for ${damage} damage!`);
+    } else {
+      addLog('enemy', `${monster.displayName} attacks for ${damage} damage!`);
+    }
   }
 
   await delay(400);
