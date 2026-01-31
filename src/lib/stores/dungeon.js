@@ -252,16 +252,24 @@ function generateFloor(floorNumber) {
     };
   }
 
-  // Regular floors have 2-4 rooms
-  const roomCount = 2 + Math.floor(Math.random() * 3);
+  // Regular floors have 4-10 rooms
+  const roomCount = 4 + Math.floor(Math.random() * 7); // 4 to 10
   const rooms = [];
 
   // Check if merchant appears on this floor (12% chance, max 1 per floor)
+  // Merchant can only appear in rooms 3 through (roomCount - 1) - not first 2, not last
   const merchantSpawns = Math.random() < MERCHANT.spawnChance;
-  // If merchant spawns, pick which room index it will replace (not first room)
-  const merchantRoomIndex = merchantSpawns && roomCount > 1
-    ? 1 + Math.floor(Math.random() * (roomCount - 1))
-    : -1;
+  let merchantRoomIndex = -1;
+
+  if (merchantSpawns && roomCount >= 4) {
+    // Valid merchant positions: index 2 to (roomCount - 2)
+    // That's rooms 3 through second-to-last
+    const minIndex = 2;
+    const maxIndex = roomCount - 2;
+    if (maxIndex >= minIndex) {
+      merchantRoomIndex = minIndex + Math.floor(Math.random() * (maxIndex - minIndex + 1));
+    }
+  }
 
   for (let i = 0; i < roomCount; i++) {
     // Merchant room
@@ -277,7 +285,7 @@ function generateFloor(floorNumber) {
       continue;
     }
 
-    // 15% chance for treasure room, 10% chance for rest shrine
+    // 15% chance for treasure room, 10% chance for rest shrine (not first room)
     const roll = Math.random();
     if (roll < 0.15 && i > 0) {
       // Treasure room (bonus gold)
@@ -307,7 +315,8 @@ function generateFloor(floorNumber) {
     floorNumber,
     rooms,
     currentRoom: 0,
-    isBossFloor: false
+    isBossFloor: false,
+    hasMidFloorMerchant: merchantRoomIndex !== -1 // Track if merchant appeared mid-floor
   };
 }
 
@@ -711,16 +720,35 @@ function advanceRoom(run) {
       resetCombatState(); // Reset combat state for new monster
     }
   } else {
-    // Floor complete - show merchant before advancing to next floor
+    // Floor complete - advance to next floor
     if (run.currentFloor < 10) {
-      // Show end-of-floor merchant
-      run.floorMerchant = {
-        ...MERCHANT,
-        items: generateMerchantItems(),
-        greeting: "Floor cleared! Care to browse before you descend?"
-      };
-      addLog('info', `"Floor cleared! Care to browse before you descend?"`);
-      gamePhase.set('floor_merchant');
+      // Only show end-of-floor merchant if no mid-floor merchant appeared
+      if (!run.floor.hasMidFloorMerchant) {
+        // Show end-of-floor merchant
+        run.floorMerchant = {
+          ...MERCHANT,
+          items: generateMerchantItems(),
+          greeting: "Floor cleared! Care to browse before you descend?"
+        };
+        addLog('info', `"Floor cleared! Care to browse before you descend?"`);
+        gamePhase.set('floor_merchant');
+      } else {
+        // Skip merchant, go straight to next floor
+        run.currentFloor++;
+        run.floor = generateFloor(run.currentFloor);
+
+        if (run.currentFloor === 10) {
+          addLog('boss', `FLOOR 10 - BOSS CHAMBER`);
+          addLog('boss', `${run.floor.rooms[0].monster.displayName} awaits!`);
+        } else {
+          addLog('floor', `Descending to Floor ${run.currentFloor}...`);
+          const firstRoom = run.floor.rooms[0];
+          if (firstRoom.type === 'combat') {
+            addLog('info', `A ${firstRoom.monster.displayName} blocks your path!`);
+          }
+        }
+        resetCombatState();
+      }
     }
   }
 
