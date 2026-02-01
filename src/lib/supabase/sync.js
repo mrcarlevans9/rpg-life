@@ -731,7 +731,7 @@ export async function fullSync() {
 }
 
 // ============ Reset Remote Data ============
-// Deletes all user data from Supabase and recreates with defaults
+// Force overwrites all user data in Supabase with defaults
 // Used to fix corrupted accounts that have wrong data
 export async function resetRemoteData() {
   const userId = getUserId();
@@ -742,22 +742,89 @@ export async function resetRemoteData() {
   console.log('Resetting remote data for user:', userId);
 
   try {
-    // Delete from all tables in order (tasks first due to potential dependencies)
-    const tables = ['tasks', 'board', 'settings', 'avatars', 'dungeon', 'players', 'player_snapshots'];
+    // Delete tasks first (they have unique IDs, can't upsert)
+    const { error: tasksError } = await supabase
+      .from('tasks')
+      .delete()
+      .eq('user_id', userId);
+    if (tasksError) console.error('Error deleting tasks:', tasksError);
 
-    for (const table of tables) {
-      const { error } = await supabase
-        .from(table)
-        .delete()
-        .eq('user_id', userId);
+    // Delete player_snapshots
+    const { error: snapshotError } = await supabase
+      .from('player_snapshots')
+      .delete()
+      .eq('user_id', userId);
+    if (snapshotError) console.error('Error deleting snapshots:', snapshotError);
 
-      if (error) {
-        console.error(`Error deleting from ${table}:`, error);
-        // Continue with other tables even if one fails
-      } else {
-        console.log(`Deleted user data from ${table}`);
-      }
-    }
+    // Force upsert default values for all other tables (overwrites corrupted data)
+    const { error: playerError } = await supabase
+      .from('players')
+      .upsert({
+        user_id: userId,
+        username: 'Adventurer',
+        total_xp: 0,
+        current_streak: 0,
+        longest_streak: 0,
+        total_tasks_completed: 0,
+        total_expedition_minutes: 0,
+        last_active_date: null,
+        gold: 0,
+        health_potions: 0,
+        custom_spells: [],
+        purchased_spell_slot: false,
+        highest_floor: 0,
+        total_kills: 0
+      }, { onConflict: 'user_id' });
+    if (playerError) console.error('Error resetting players:', playerError);
+    else console.log('Players table reset to defaults');
+
+    const { error: dungeonError } = await supabase
+      .from('dungeon')
+      .upsert({
+        user_id: userId,
+        health_potions: 3,
+        gold: 0,
+        total_gold_earned: 0,
+        highest_floor: 0,
+        total_runs: 0,
+        total_kills: 0,
+        bosses_defeated: 0,
+        upgrades: [],
+        max_hp_bonus: 0,
+        bonus_damage: 0,
+        potion_bonus: 0,
+        crit_bonus: 0,
+        defense_bonus: 0,
+        max_mp_bonus: 0,
+        custom_spells: [],
+        purchased_spell_slot: false
+      }, { onConflict: 'user_id' });
+    if (dungeonError) console.error('Error resetting dungeon:', dungeonError);
+    else console.log('Dungeon table reset to defaults');
+
+    const { error: avatarError } = await supabase
+      .from('avatars')
+      .upsert({
+        user_id: userId,
+        gender: 'neutral',
+        skin_tone: 'medium',
+        hair_style: 'default',
+        hair_color: 'brown',
+        outfit: 'casual',
+        accessory: 'none',
+        equipped_title: 'rookie'
+      }, { onConflict: 'user_id' });
+    if (avatarError) console.error('Error resetting avatars:', avatarError);
+    else console.log('Avatars table reset to defaults');
+
+    const { error: boardError } = await supabase
+      .from('board')
+      .upsert({
+        user_id: userId,
+        columns: ['To Do', 'In Progress', 'Done']
+      }, { onConflict: 'user_id' });
+    if (boardError) console.error('Error resetting board:', boardError);
+    else console.log('Board table reset to defaults');
 
     // Clear local data as well
     await db.player.update(1, {
@@ -811,12 +878,7 @@ export async function resetRemoteData() {
       updatedAt: new Date().toISOString()
     });
 
-    console.log('Local data cleared');
-
-    // Now trigger a full sync which will create fresh remote records with defaults
-    await fullSync();
-
-    console.log('Remote data reset complete');
+    console.log('Reset complete - all data set to defaults');
     return true;
   } catch (error) {
     console.error('Reset remote data error:', error);
