@@ -40,6 +40,9 @@
     '/dungeon': wrap({
       asyncComponent: () => import('./routes/Dungeon.svelte')
     }),
+    '/multiplayer': wrap({
+      asyncComponent: () => import('./routes/Multiplayer.svelte')
+    }),
     '*': wrap({
       asyncComponent: () => import('./routes/NotFound.svelte')
     })

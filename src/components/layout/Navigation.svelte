@@ -7,6 +7,7 @@
     { path: '/board', label: 'Bounty Board', icon: '📋' },
     { path: '/expedition', label: 'Expedition', icon: '🗺️' },
     { path: '/dungeon', label: 'Dungeon', icon: '🏰' },
+    { path: '/multiplayer', label: 'Multiplayer', icon: '🌐' },
     { path: '/analytics', label: 'Analytics', icon: '📊' },
     { path: '/achievements', label: 'Achievements', icon: '🏆' },
     { path: '/avatar', label: 'Avatar', icon: '👤' },

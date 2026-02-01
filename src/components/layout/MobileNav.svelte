@@ -6,7 +6,8 @@
     { path: '/quests', label: 'Quests', icon: '⚔️' },
     { path: '/board', label: 'Bounties', icon: '📋' },
     { path: '/expedition', label: 'Expedition', icon: '🗺️' },
-    { path: '/dungeon', label: 'Dungeon', icon: '🏰' }
+    { path: '/dungeon', label: 'Dungeon', icon: '🏰' },
+    { path: '/multiplayer', label: 'PvP', icon: '🌐' }
   ];
 
   function isActive(path, currentPath) {
