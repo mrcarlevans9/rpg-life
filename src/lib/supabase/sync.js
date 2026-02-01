@@ -9,6 +9,37 @@ function getUserId() {
   return user?.id || null;
 }
 
+// Track last signed-in user to detect user changes
+const LAST_USER_KEY = 'rpg_life_last_user_id';
+
+function getLastUserId() {
+  return localStorage.getItem(LAST_USER_KEY);
+}
+
+function setLastUserId(userId) {
+  if (userId) {
+    localStorage.setItem(LAST_USER_KEY, userId);
+  } else {
+    localStorage.removeItem(LAST_USER_KEY);
+  }
+}
+
+// Clear all local data (for user switch or sign out)
+export async function clearLocalData() {
+  console.log('Clearing local data for user switch...');
+  await db.player.clear();
+  await db.avatar.clear();
+  await db.settings.clear();
+  await db.tasks.clear();
+  await db.board.clear();
+  await db.dungeon.clear();
+  await db.achievements.clear();
+  await db.unlockables.clear();
+  await db.expeditions.clear();
+  await db.dailyQuests.clear();
+  console.log('Local data cleared');
+}
+
 // ============ Player Sync ============
 export async function syncPlayer() {
   const userId = getUserId();
@@ -48,8 +79,14 @@ export async function syncPlayer() {
       const remoteHasCharData = (remotePlayer.gold || 0) > 0 ||
         (remotePlayer.custom_spells && remotePlayer.custom_spells.length > 0 && remotePlayer.custom_spells[0]);
 
+      // For username: prefer remote if local is default, otherwise use local if set
+      const localUsernameIsDefault = !localPlayer?.username || localPlayer.username === 'Adventurer';
+      const remoteHasUsername = remotePlayer.username && remotePlayer.username !== 'Adventurer';
+
       const merged = {
-        username: localPlayer?.username || remotePlayer.username || 'Adventurer',
+        username: (localUsernameIsDefault && remoteHasUsername)
+          ? remotePlayer.username
+          : (localPlayer?.username || remotePlayer.username || 'Adventurer'),
         totalXP: Math.max(localPlayer?.totalXP || 0, remotePlayer.total_xp || 0),
         currentStreak: Math.max(localPlayer?.currentStreak || 0, remotePlayer.current_streak || 0),
         longestStreak: Math.max(localPlayer?.longestStreak || 0, remotePlayer.longest_streak || 0),
@@ -792,7 +829,21 @@ export async function fullSync() {
     return;
   }
 
-  console.log('Starting full sync...');
+  console.log('Starting full sync for user:', userId);
+
+  // Check if this is a different user than last time
+  const lastUserId = getLastUserId();
+  if (lastUserId && lastUserId !== userId) {
+    console.log('Different user detected! Previous:', lastUserId, 'Current:', userId);
+    // Clear local data and reinitialize
+    await clearLocalData();
+    // Reinitialize DB with defaults
+    const { initializeDB } = await import('../db/index.js');
+    await initializeDB();
+  }
+
+  // Update the stored user ID
+  setLastUserId(userId);
 
   try {
     await syncPlayer();

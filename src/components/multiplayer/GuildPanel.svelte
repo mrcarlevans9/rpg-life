@@ -527,7 +527,7 @@
             <div class="member-card">
               <div class="member-info">
                 <span class="member-name">
-                  {member.snapshot?.username || 'Unknown'}
+                  {member.username}
                 </span>
                 <span class="role-badge {getRoleBadgeClass(member.role)}">
                   {member.role}
