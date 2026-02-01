@@ -210,7 +210,7 @@
             <div class="friend-card">
               <div class="friend-info">
                 <span class="friend-name">
-                  {friend.snapshot?.username || 'Unknown'}
+                  {friend.username}
                 </span>
                 {#if friend.snapshot}
                   <span class="friend-level">Lv. {friend.snapshot.level}</span>
@@ -255,7 +255,7 @@
               <div class="request-card">
                 <div class="request-info">
                   <span class="request-name">
-                    {request.snapshot?.username || 'Unknown'}
+                    {request.username}
                   </span>
                   {#if request.snapshot}
                     <span class="request-level">Lv. {request.snapshot.level}</span>
@@ -291,7 +291,7 @@
               <div class="request-card pending">
                 <div class="request-info">
                   <span class="request-name">
-                    {request.snapshot?.username || 'Unknown'}
+                    {request.username}
                   </span>
                   <span class="pending-label">Pending...</span>
                 </div>

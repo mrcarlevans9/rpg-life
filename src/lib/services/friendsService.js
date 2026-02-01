@@ -185,23 +185,32 @@ export async function getFriends() {
     f.requester_id === user.id ? f.addressee_id : f.requester_id
   );
 
-  // Get snapshots for all friends
+  // Get player data for usernames (canonical source)
+  const { data: players } = await supabase
+    .from('players')
+    .select('user_id, username')
+    .in('user_id', friendIds);
+
+  // Get snapshots for additional combat stats
   const { data: snapshots } = await supabase
     .from('player_snapshots')
     .select('*')
     .in('user_id', friendIds);
 
-  // Combine friendship data with snapshots
+  // Combine friendship data with player info and snapshots
   return friendships.map(friendship => {
     const friendId = friendship.requester_id === user.id
       ? friendship.addressee_id
       : friendship.requester_id;
+    const player = players?.find(p => p.user_id === friendId);
     const snapshot = snapshots?.find(s => s.user_id === friendId);
 
     return {
       friendshipId: friendship.id,
       friendId,
       friendedAt: friendship.created_at,
+      // Use player username as primary, fall back to snapshot username
+      username: player?.username || snapshot?.username || 'Adventurer',
       snapshot: snapshot || null
     };
   });
@@ -227,19 +236,34 @@ export async function getPendingRequests() {
 
   if (!requests?.length) return [];
 
-  // Get snapshots for requesters
+  // Get requester IDs
   const requesterIds = requests.map(r => r.requester_id);
+
+  // Get player data for usernames (canonical source)
+  const { data: players } = await supabase
+    .from('players')
+    .select('user_id, username')
+    .in('user_id', requesterIds);
+
+  // Get snapshots for additional info
   const { data: snapshots } = await supabase
     .from('player_snapshots')
     .select('*')
     .in('user_id', requesterIds);
 
-  return requests.map(request => ({
-    friendshipId: request.id,
-    requesterId: request.requester_id,
-    requestedAt: request.created_at,
-    snapshot: snapshots?.find(s => s.user_id === request.requester_id) || null
-  }));
+  return requests.map(request => {
+    const player = players?.find(p => p.user_id === request.requester_id);
+    const snapshot = snapshots?.find(s => s.user_id === request.requester_id);
+
+    return {
+      friendshipId: request.id,
+      requesterId: request.requester_id,
+      requestedAt: request.created_at,
+      // Use player username as primary, fall back to snapshot username
+      username: player?.username || snapshot?.username || 'Adventurer',
+      snapshot: snapshot || null
+    };
+  });
 }
 
 /**
@@ -262,19 +286,34 @@ export async function getSentRequests() {
 
   if (!requests?.length) return [];
 
-  // Get snapshots for addressees
+  // Get addressee IDs
   const addresseeIds = requests.map(r => r.addressee_id);
+
+  // Get player data for usernames (canonical source)
+  const { data: players } = await supabase
+    .from('players')
+    .select('user_id, username')
+    .in('user_id', addresseeIds);
+
+  // Get snapshots for additional info
   const { data: snapshots } = await supabase
     .from('player_snapshots')
     .select('*')
     .in('user_id', addresseeIds);
 
-  return requests.map(request => ({
-    friendshipId: request.id,
-    addresseeId: request.addressee_id,
-    sentAt: request.created_at,
-    snapshot: snapshots?.find(s => s.user_id === request.addressee_id) || null
-  }));
+  return requests.map(request => {
+    const player = players?.find(p => p.user_id === request.addressee_id);
+    const snapshot = snapshots?.find(s => s.user_id === request.addressee_id);
+
+    return {
+      friendshipId: request.id,
+      addresseeId: request.addressee_id,
+      sentAt: request.created_at,
+      // Use player username as primary, fall back to snapshot username
+      username: player?.username || snapshot?.username || 'Adventurer',
+      snapshot: snapshot || null
+    };
+  });
 }
 
 // ============ SEARCH ============
