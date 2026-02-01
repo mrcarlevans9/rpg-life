@@ -411,17 +411,30 @@ export async function getMyGuild() {
     .eq('guild_id', guild.id)
     .order('contribution_xp', { ascending: false });
 
-  // Get snapshots for all members
+  // Get member IDs
   const memberIds = members?.map(m => m.user_id) || [];
+
+  // Get player data for usernames (canonical source)
+  const { data: players } = await supabase
+    .from('players')
+    .select('user_id, username')
+    .in('user_id', memberIds);
+
+  // Get snapshots for combat stats
   const { data: snapshots } = await supabase
     .from('player_snapshots')
     .select('*')
     .in('user_id', memberIds);
 
-  const membersWithSnapshots = members?.map(member => ({
-    ...member,
-    snapshot: snapshots?.find(s => s.user_id === member.user_id) || null
-  })) || [];
+  const membersWithSnapshots = members?.map(member => {
+    const player = players?.find(p => p.user_id === member.user_id);
+    const snapshot = snapshots?.find(s => s.user_id === member.user_id);
+    return {
+      ...member,
+      username: player?.username || snapshot?.username || 'Adventurer',
+      snapshot: snapshot || null
+    };
+  }) || [];
 
   return {
     guild,

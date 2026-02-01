@@ -1,5 +1,6 @@
 import { writable, derived } from 'svelte/store';
 import { supabase, signIn as supabaseSignIn, signUp as supabaseSignUp, signOut as supabaseSignOut, getSession, onAuthStateChange } from '../supabase/client.js';
+import { clearLocalData } from '../supabase/sync.js';
 
 // Auth state
 export const authUser = writable(null);
@@ -97,6 +98,10 @@ export async function signOut() {
       authError.set(error.message);
       return { success: false, error: error.message };
     }
+
+    // Clear local data and stored user ID
+    await clearLocalData();
+    localStorage.removeItem('rpg_life_last_user_id');
 
     authSession.set(null);
     authUser.set(null);
