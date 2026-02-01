@@ -49,6 +49,7 @@ export async function syncPlayer() {
         (remotePlayer.custom_spells && remotePlayer.custom_spells.length > 0 && remotePlayer.custom_spells[0]);
 
       const merged = {
+        username: localPlayer?.username || remotePlayer.username || 'Adventurer',
         totalXP: Math.max(localPlayer?.totalXP || 0, remotePlayer.total_xp || 0),
         currentStreak: Math.max(localPlayer?.currentStreak || 0, remotePlayer.current_streak || 0),
         longestStreak: Math.max(localPlayer?.longestStreak || 0, remotePlayer.longest_streak || 0),
@@ -79,6 +80,7 @@ export async function syncPlayer() {
         .from('players')
         .upsert({
           user_id: userId,
+          username: merged.username,
           total_xp: merged.totalXP,
           current_streak: merged.currentStreak,
           longest_streak: merged.longestStreak,
@@ -104,6 +106,7 @@ export async function syncPlayer() {
       console.log('No remote player found, creating one with gold:', localPlayer.gold);
       const { error: insertError } = await supabase.from('players').insert({
         user_id: userId,
+        username: localPlayer.username || 'Adventurer',
         total_xp: localPlayer.totalXP || 0,
         current_streak: localPlayer.currentStreak || 0,
         longest_streak: localPlayer.longestStreak || 0,
@@ -139,6 +142,7 @@ export async function pushPlayerUpdate(updates) {
 
   try {
     const remoteUpdates = {};
+    if (updates.username !== undefined) remoteUpdates.username = updates.username;
     if (updates.totalXP !== undefined) remoteUpdates.total_xp = updates.totalXP;
     if (updates.currentStreak !== undefined) remoteUpdates.current_streak = updates.currentStreak;
     if (updates.longestStreak !== undefined) remoteUpdates.longest_streak = updates.longestStreak;
