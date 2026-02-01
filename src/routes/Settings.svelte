@@ -1,11 +1,45 @@
 <script>
+  import { onMount } from 'svelte';
   import Card from '../components/common/Card.svelte';
   import Button from '../components/common/Button.svelte';
   import { settingsData, updateSetting, toggleTheme } from '../lib/stores/settings.js';
   import { db } from '../lib/db/index.js';
   import { showSuccess, showError } from '../lib/stores/notifications.js';
+  import { pushPlayerUpdate } from '../lib/supabase/sync.js';
 
   let importInput;
+  let username = 'Adventurer';
+  let usernameInput = '';
+
+  onMount(async () => {
+    const player = await db.player.get(1);
+    if (player?.username) {
+      username = player.username;
+      usernameInput = player.username;
+    }
+  });
+
+  async function saveUsername() {
+    const newUsername = usernameInput.trim();
+    if (!newUsername) {
+      showError('Username cannot be empty');
+      return;
+    }
+    if (newUsername.length > 20) {
+      showError('Username must be 20 characters or less');
+      return;
+    }
+
+    try {
+      await db.player.update(1, { username: newUsername });
+      pushPlayerUpdate({ username: newUsername });
+      username = newUsername;
+      showSuccess('Username updated!');
+    } catch (err) {
+      console.error('Failed to update username:', err);
+      showError('Failed to update username');
+    }
+  }
 
   const accentColors = [
     '#6366f1', // Indigo
@@ -143,6 +177,30 @@
   <header class="page-header">
     <h1>Settings</h1>
   </header>
+
+  <section class="settings-section">
+    <h2>Profile</h2>
+
+    <Card>
+      <div class="setting-item">
+        <div class="setting-info">
+          <h3>Username</h3>
+          <p>Your display name for multiplayer</p>
+        </div>
+        <div class="username-input">
+          <input
+            type="text"
+            bind:value={usernameInput}
+            placeholder="Enter username"
+            maxlength="20"
+          />
+          <Button variant="primary" size="sm" on:click={saveUsername}>
+            Save
+          </Button>
+        </div>
+      </div>
+    </Card>
+  </section>
 
   <section class="settings-section">
     <h2>Appearance</h2>
@@ -348,6 +406,27 @@
   .goal-input span {
     color: var(--text-muted);
     font-size: 0.875rem;
+  }
+
+  .username-input {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+
+  .username-input input {
+    width: 150px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+  }
+
+  .username-input input:focus {
+    outline: none;
+    border-color: var(--accent);
   }
 
   .setting-item.danger {
