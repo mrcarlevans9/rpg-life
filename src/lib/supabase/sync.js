@@ -55,35 +55,55 @@ export async function syncPlayer() {
       await db.player.update(1, playerData);
       console.log('Player synced from remote:', playerData.username, playerData.gold, 'gold');
       return playerData;
-    } else if (localPlayer) {
-      // No remote player exists - create one from local data
-      console.log('No remote player found, creating one');
+    } else {
+      // No remote player exists - this is a NEW user
+      // Create with DEFAULTS, not local data (local data may belong to different user)
+      console.log('No remote player found, creating new player with defaults');
+
+      const defaultPlayer = {
+        username: 'Adventurer',
+        totalXP: 0,
+        currentStreak: 0,
+        longestStreak: 0,
+        totalTasksCompleted: 0,
+        totalExpeditionMinutes: 0,
+        lastActiveDate: null,
+        gold: 0,
+        healthPotions: 0,
+        customSpells: [],
+        purchasedSpellSlot: false,
+        highestFloor: 0,
+        totalKills: 0
+      };
+
+      // Update local with defaults (clears any previous user's data)
+      await db.player.update(1, defaultPlayer);
+
+      // Create remote player with defaults
       const { error: insertError } = await supabase.from('players').insert({
         user_id: userId,
-        username: localPlayer.username || 'Adventurer',
-        total_xp: localPlayer.totalXP || 0,
-        current_streak: localPlayer.currentStreak || 0,
-        longest_streak: localPlayer.longestStreak || 0,
-        total_tasks_completed: localPlayer.totalTasksCompleted || 0,
-        total_expedition_minutes: localPlayer.totalExpeditionMinutes || 0,
-        last_active_date: localPlayer.lastActiveDate,
-        gold: localPlayer.gold || 0,
-        health_potions: localPlayer.healthPotions || 0,
-        custom_spells: localPlayer.customSpells || [],
-        purchased_spell_slot: localPlayer.purchasedSpellSlot || false,
-        highest_floor: localPlayer.highestFloor || 0,
-        total_kills: localPlayer.totalKills || 0
+        username: 'Adventurer',
+        total_xp: 0,
+        current_streak: 0,
+        longest_streak: 0,
+        total_tasks_completed: 0,
+        total_expedition_minutes: 0,
+        last_active_date: null,
+        gold: 0,
+        health_potions: 0,
+        custom_spells: [],
+        purchased_spell_slot: false,
+        highest_floor: 0,
+        total_kills: 0
       });
 
       if (insertError) {
         console.error('Failed to create remote player:', insertError);
       } else {
-        console.log('Remote player created successfully');
+        console.log('New player created successfully');
       }
-      return localPlayer;
+      return defaultPlayer;
     }
-
-    return null;
   } catch (error) {
     console.error('Sync player error:', error);
     return null;
@@ -159,15 +179,22 @@ export async function syncBoard() {
         updatedAt: remoteBoard.updated_at
       });
       return remoteBoard;
-    } else if (localBoard) {
-      // Push local board to remote
+    } else {
+      // No remote board - create with defaults for new user
+      const defaultBoard = {
+        columns: ['To Do', 'In Progress', 'Done'],
+        updatedAt: new Date().toISOString()
+      };
+
+      await db.board.update(1, defaultBoard);
+
       await supabase.from('board').insert({
         user_id: userId,
-        columns: localBoard.columns
+        columns: defaultBoard.columns
       });
-    }
 
-    return localBoard;
+      return defaultBoard;
+    }
   } catch (error) {
     console.error('Sync board error:', error);
     return null;
@@ -249,38 +276,13 @@ export async function syncTasks() {
       return remoteTasks;
     }
 
-    // Case 2: Remote is empty but local has tasks - push to remote
-    if (localTasks.length > 0) {
-      console.log('Pushing local tasks to remote...');
-      for (const lt of localTasks) {
-        const { error: insertError } = await supabase.from('tasks').insert({
-          user_id: userId,
-          status: lt.status || 'todo',
-          title: lt.title,
-          description: lt.description || '',
-          priority: lt.priority || 'medium',
-          due_date: lt.dueDate,
-          completed: lt.completed || false,
-          completed_at: lt.completedAt,
-          time_spent: lt.timeSpent || 0,
-          active_start_time: lt.activeStartTime,
-          sort_order: lt.order || 0,
-          subtasks: lt.subtasks || [],
-          tags: lt.tags || []
-        });
-        if (insertError) {
-          console.error('Error pushing task to remote:', insertError);
-        }
-      }
-      console.log('Pushed', localTasks.length, 'tasks to remote');
-    }
-
-    return localTasks;
+    // Case 2: Remote is empty - this is a new user, clear local tasks (they belong to previous user)
+    console.log('No remote tasks found - clearing local tasks for new user');
+    await db.tasks.clear();
+    return [];
   } catch (error) {
     console.error('Sync tasks error:', error);
-    // Return local tasks on any error - don't lose data
-    const localTasks = await db.tasks.toArray();
-    return localTasks;
+    return [];
   }
 }
 
@@ -434,21 +436,33 @@ export async function syncAvatar() {
       };
       await db.avatar.update(1, avatar);
       return avatar;
-    } else if (localAvatar) {
-      // Push local avatar to remote
+    } else {
+      // No remote avatar - create with defaults for new user
+      const defaultAvatar = {
+        gender: 'neutral',
+        skinTone: 'medium',
+        hairStyle: 'default',
+        hairColor: 'brown',
+        outfit: 'casual',
+        accessory: 'none',
+        equippedTitle: 'rookie'
+      };
+
+      await db.avatar.update(1, defaultAvatar);
+
       await supabase.from('avatars').insert({
         user_id: userId,
-        gender: localAvatar.gender || 'neutral',
-        skin_tone: localAvatar.skinTone,
-        hair_style: localAvatar.hairStyle,
-        hair_color: localAvatar.hairColor,
-        outfit: localAvatar.outfit,
-        accessory: localAvatar.accessory,
-        equipped_title: localAvatar.equippedTitle
+        gender: 'neutral',
+        skin_tone: 'medium',
+        hair_style: 'default',
+        hair_color: 'brown',
+        outfit: 'casual',
+        accessory: 'none',
+        equipped_title: 'rookie'
       });
-    }
 
-    return localAvatar;
+      return defaultAvatar;
+    }
   } catch (error) {
     console.error('Sync avatar error:', error);
     return null;
@@ -586,37 +600,61 @@ export async function syncDungeon() {
       await db.dungeon.update(1, dungeonData);
       console.log('Dungeon synced from remote:', dungeonData.gold, 'gold');
       return dungeonData;
-    } else if (localDungeon) {
-      // No remote data, push local to remote
+    } else {
+      // No remote data - this is a NEW user
+      // Create with DEFAULTS, not local data (local data may belong to different user)
+      console.log('No remote dungeon found, creating new dungeon with defaults');
+
+      const defaultDungeon = {
+        healthPotions: 3,
+        gold: 0,
+        totalGoldEarned: 0,
+        highestFloor: 0,
+        totalRuns: 0,
+        totalKills: 0,
+        bossesDefeated: 0,
+        upgrades: [],
+        maxHpBonus: 0,
+        bonusDamage: 0,
+        potionBonus: 0,
+        critBonus: 0,
+        defenseBonus: 0,
+        maxMpBonus: 0,
+        customSpells: [],
+        purchasedSpellSlot: false
+      };
+
+      // Update local with defaults (clears any previous user's data)
+      await db.dungeon.update(1, defaultDungeon);
+
+      // Create remote dungeon with defaults
       const { error: insertError } = await supabase.from('dungeon').upsert({
         user_id: userId,
-        health_potions: localDungeon.healthPotions || 0,
-        gold: localDungeon.gold || 0,
-        total_gold_earned: localDungeon.totalGoldEarned || 0,
-        highest_floor: localDungeon.highestFloor || 0,
-        total_runs: localDungeon.totalRuns || 0,
-        total_kills: localDungeon.totalKills || 0,
-        bosses_defeated: localDungeon.bossesDefeated || 0,
-        upgrades: localDungeon.upgrades || [],
-        max_hp_bonus: localDungeon.maxHpBonus || 0,
-        bonus_damage: localDungeon.bonusDamage || 0,
-        potion_bonus: localDungeon.potionBonus || 0,
-        crit_bonus: localDungeon.critBonus || 0,
-        defense_bonus: localDungeon.defenseBonus || 0,
-        max_mp_bonus: localDungeon.maxMpBonus || 0,
-        custom_spells: localDungeon.customSpells || [],
-        purchased_spell_slot: localDungeon.purchasedSpellSlot || false
+        health_potions: 3,
+        gold: 0,
+        total_gold_earned: 0,
+        highest_floor: 0,
+        total_runs: 0,
+        total_kills: 0,
+        bosses_defeated: 0,
+        upgrades: [],
+        max_hp_bonus: 0,
+        bonus_damage: 0,
+        potion_bonus: 0,
+        crit_bonus: 0,
+        defense_bonus: 0,
+        max_mp_bonus: 0,
+        custom_spells: [],
+        purchased_spell_slot: false
       }, { onConflict: 'user_id' });
 
       if (insertError) {
-        console.error('Dungeon push FAILED:', insertError);
+        console.error('Dungeon create FAILED:', insertError);
       } else {
-        console.log('Dungeon data pushed to remote');
+        console.log('New dungeon created successfully');
       }
-      return localDungeon;
+      return defaultDungeon;
     }
-
-    return null;
   } catch (error) {
     console.error('Sync dungeon error:', error);
     return null;
