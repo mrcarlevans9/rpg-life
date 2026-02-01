@@ -756,6 +756,27 @@ export async function resetRemoteData() {
       .eq('user_id', userId);
     if (snapshotError) console.error('Error deleting snapshots:', snapshotError);
 
+    // Delete all friendships (where user is requester OR addressee)
+    const { error: friendsError1 } = await supabase
+      .from('friendships')
+      .delete()
+      .eq('requester_id', userId);
+    if (friendsError1) console.error('Error deleting friendships (requester):', friendsError1);
+
+    const { error: friendsError2 } = await supabase
+      .from('friendships')
+      .delete()
+      .eq('addressee_id', userId);
+    if (friendsError2) console.error('Error deleting friendships (addressee):', friendsError2);
+    else console.log('Friendships deleted');
+
+    // Delete avatar first then insert fresh (upsert may not update all fields)
+    const { error: avatarDeleteError } = await supabase
+      .from('avatars')
+      .delete()
+      .eq('user_id', userId);
+    if (avatarDeleteError) console.error('Error deleting avatar:', avatarDeleteError);
+
     // Force upsert default values for all other tables (overwrites corrupted data)
     const { error: playerError } = await supabase
       .from('players')
@@ -802,9 +823,10 @@ export async function resetRemoteData() {
     if (dungeonError) console.error('Error resetting dungeon:', dungeonError);
     else console.log('Dungeon table reset to defaults');
 
+    // Insert fresh avatar (we deleted it above)
     const { error: avatarError } = await supabase
       .from('avatars')
-      .upsert({
+      .insert({
         user_id: userId,
         gender: 'neutral',
         skin_tone: 'medium',
@@ -813,7 +835,7 @@ export async function resetRemoteData() {
         outfit: 'casual',
         accessory: 'none',
         equipped_title: 'rookie'
-      }, { onConflict: 'user_id' });
+      });
     if (avatarError) console.error('Error resetting avatars:', avatarError);
     else console.log('Avatars table reset to defaults');
 
