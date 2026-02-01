@@ -2,7 +2,8 @@
   import { createEventDispatcher, onMount } from 'svelte';
   import { BattleEngine } from '../../lib/game/battleEngine.js';
   import { recordBattle } from '../../lib/services/pvpService.js';
-  import { addXP, addGold } from '../../lib/stores/player.js';
+  import { addXP } from '../../lib/services/xpService.js';
+  import { db } from '../../lib/db/index.js';
   import ProgressBar from '../common/ProgressBar.svelte';
 
   export let mySnapshot;
@@ -64,11 +65,17 @@
     await recordBattle(opponent.user_id, result);
 
     if (result.won) {
-      await addXP(result.xpReward);
-      await addGold(result.goldReward);
+      await addXP(result.xpReward, 'pvp');
+      // Add gold reward
+      if (result.goldReward > 0) {
+        const player = await db.player.get(1);
+        if (player) {
+          await db.player.update(1, { gold: (player.gold || 0) + result.goldReward });
+        }
+      }
     } else if (!result.isDraw) {
       // Still give consolation XP for losing
-      await addXP(result.xpReward);
+      await addXP(result.xpReward, 'pvp');
     }
   }
 
