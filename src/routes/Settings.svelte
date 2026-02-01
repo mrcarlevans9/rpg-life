@@ -154,25 +154,6 @@
     e.target.value = '';
   }
 
-  async function resetAllData() {
-    if (!confirm('Are you sure you want to reset all data? This cannot be undone!')) {
-      return;
-    }
-
-    if (!confirm('REALLY sure? All progress will be lost!')) {
-      return;
-    }
-
-    try {
-      await db.delete();
-      showSuccess('Data reset! Refreshing...');
-      setTimeout(() => window.location.reload(), 1500);
-    } catch (error) {
-      console.error('Reset error:', error);
-      showError('Failed to reset data');
-    }
-  }
-
   async function resetAccount() {
     if (!$authUser) {
       showError('You must be signed in to reset your account');
@@ -315,18 +296,6 @@
         />
         <Button variant="secondary" on:click={() => importInput.click()}>
           Import JSON
-        </Button>
-      </div>
-    </Card>
-
-    <Card>
-      <div class="setting-item danger">
-        <div class="setting-info">
-          <h3>Reset All Data</h3>
-          <p>Delete all data and start fresh. This cannot be undone!</p>
-        </div>
-        <Button variant="danger" on:click={resetAllData}>
-          Reset Data
         </Button>
       </div>
     </Card>
