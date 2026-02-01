@@ -9,31 +9,9 @@ function getUserId() {
   return user?.id || null;
 }
 
-// Track last signed-in user to detect user changes
-const LAST_USER_KEY = 'rpg_life_last_user_id';
-
-function getLastUserId() {
-  return localStorage.getItem(LAST_USER_KEY);
-}
-
-function setLastUserId(userId) {
-  if (userId) {
-    localStorage.setItem(LAST_USER_KEY, userId);
-  } else {
-    localStorage.removeItem(LAST_USER_KEY);
-  }
-}
-
-// Check if this is a different user than last session
-function isDifferentUser(currentUserId) {
-  const lastUserId = getLastUserId();
-  return lastUserId && lastUserId !== currentUserId;
-}
-
-// Flag to track if we should skip merge and use remote only (different user)
-let skipMergeUseRemote = false;
-
 // ============ Player Sync ============
+// On sync: Remote is source of truth. Pull from remote, update local.
+// Changes are pushed via pushPlayerUpdate when they happen.
 export async function syncPlayer() {
   const userId = getUserId();
   console.log('syncPlayer called, userId:', userId);
@@ -42,7 +20,6 @@ export async function syncPlayer() {
   try {
     // Get local player data
     const localPlayer = await db.player.get(1);
-    console.log('LOCAL player:', JSON.stringify({ gold: localPlayer?.gold, healthPotions: localPlayer?.healthPotions, customSpells: localPlayer?.customSpells }));
 
     // Try to get remote player
     const { data: remotePlayer, error } = await supabase
@@ -51,92 +28,36 @@ export async function syncPlayer() {
       .eq('user_id', userId)
       .single();
 
-    console.log('REMOTE player:', JSON.stringify({ gold: remotePlayer?.gold, health_potions: remotePlayer?.health_potions, custom_spells: remotePlayer?.custom_spells }));
-    console.log('REMOTE error:', error);
-
     if (error && error.code !== 'PGRST116') {
       console.error('Error fetching remote player:', error);
-      return null;
+      return localPlayer; // Return local on error
     }
 
-    // If remote exists, merge (take higher values) OR use remote only if different user
+    // If remote exists, use it as source of truth
     if (remotePlayer) {
-      // If different user signed in, use remote data only (don't merge with stale local)
-      const useRemoteOnly = skipMergeUseRemote;
-
-      // Check if local looks like fresh defaults (just reset)
-      const localIsDefault = useRemoteOnly || !localPlayer || (
-        (localPlayer.gold || 0) === 0 &&
-        (localPlayer.totalXP || 0) === 0 &&
-        (!localPlayer.customSpells || localPlayer.customSpells.length === 0 || !localPlayer.customSpells[0])
-      );
-
-      // Check if remote has real character data
-      const remoteHasCharData = (remotePlayer.gold || 0) > 0 ||
-        (remotePlayer.custom_spells && remotePlayer.custom_spells.length > 0 && remotePlayer.custom_spells[0]);
-
-      // For username: prefer remote if local is default, otherwise use local if set
-      const localUsernameIsDefault = useRemoteOnly || !localPlayer?.username || localPlayer.username === 'Adventurer';
-      const remoteHasUsername = remotePlayer.username && remotePlayer.username !== 'Adventurer';
-
-      const merged = {
-        username: (localUsernameIsDefault && remoteHasUsername)
-          ? remotePlayer.username
-          : (useRemoteOnly ? (remotePlayer.username || 'Adventurer') : (localPlayer?.username || remotePlayer.username || 'Adventurer')),
-        totalXP: useRemoteOnly ? (remotePlayer.total_xp || 0) : Math.max(localPlayer?.totalXP || 0, remotePlayer.total_xp || 0),
-        currentStreak: useRemoteOnly ? (remotePlayer.current_streak || 0) : Math.max(localPlayer?.currentStreak || 0, remotePlayer.current_streak || 0),
-        longestStreak: useRemoteOnly ? (remotePlayer.longest_streak || 0) : Math.max(localPlayer?.longestStreak || 0, remotePlayer.longest_streak || 0),
-        totalTasksCompleted: useRemoteOnly ? (remotePlayer.total_tasks_completed || 0) : Math.max(localPlayer?.totalTasksCompleted || 0, remotePlayer.total_tasks_completed || 0),
-        totalExpeditionMinutes: useRemoteOnly ? (remotePlayer.total_expedition_minutes || 0) : Math.max(localPlayer?.totalExpeditionMinutes || 0, remotePlayer.total_expedition_minutes || 0),
-        lastActiveDate: useRemoteOnly ? remotePlayer.last_active_date : (localPlayer?.lastActiveDate || remotePlayer.last_active_date),
-        // Character inventory - use remote if different user or local is default
-        gold: (localIsDefault && remoteHasCharData)
-          ? (remotePlayer.gold || 0)
-          : (useRemoteOnly ? (remotePlayer.gold || 0) : Math.max(localPlayer?.gold || 0, remotePlayer.gold || 0)),
-        healthPotions: (localIsDefault && remoteHasCharData)
-          ? (remotePlayer.health_potions || 3)
-          : (useRemoteOnly ? (remotePlayer.health_potions || 0) : Math.max(localPlayer?.healthPotions || 0, remotePlayer.health_potions || 0)),
-        customSpells: (localIsDefault && remoteHasCharData)
-          ? (remotePlayer.custom_spells || [])
-          : (useRemoteOnly ? (remotePlayer.custom_spells || []) : ((remotePlayer.custom_spells?.[0]) ? remotePlayer.custom_spells : (localPlayer?.customSpells || []))),
-        purchasedSpellSlot: useRemoteOnly ? (remotePlayer.purchased_spell_slot || false) : (remotePlayer.purchased_spell_slot || localPlayer?.purchasedSpellSlot || false),
-        // Dungeon stats
-        highestFloor: useRemoteOnly ? (remotePlayer.highest_floor || 0) : Math.max(localPlayer?.highestFloor || 0, remotePlayer.highest_floor || 0),
-        totalKills: useRemoteOnly ? (remotePlayer.total_kills || 0) : Math.max(localPlayer?.totalKills || 0, remotePlayer.total_kills || 0)
+      const playerData = {
+        username: remotePlayer.username || 'Adventurer',
+        totalXP: remotePlayer.total_xp || 0,
+        currentStreak: remotePlayer.current_streak || 0,
+        longestStreak: remotePlayer.longest_streak || 0,
+        totalTasksCompleted: remotePlayer.total_tasks_completed || 0,
+        totalExpeditionMinutes: remotePlayer.total_expedition_minutes || 0,
+        lastActiveDate: remotePlayer.last_active_date,
+        gold: remotePlayer.gold || 0,
+        healthPotions: remotePlayer.health_potions || 0,
+        customSpells: remotePlayer.custom_spells || [],
+        purchasedSpellSlot: remotePlayer.purchased_spell_slot || false,
+        highestFloor: remotePlayer.highest_floor || 0,
+        totalKills: remotePlayer.total_kills || 0
       };
 
-      // Update local
-      await db.player.update(1, merged);
-
-      // Update remote (use upsert to create if not exists)
-      const { error: updateError } = await supabase
-        .from('players')
-        .upsert({
-          user_id: userId,
-          username: merged.username,
-          total_xp: merged.totalXP,
-          current_streak: merged.currentStreak,
-          longest_streak: merged.longestStreak,
-          total_tasks_completed: merged.totalTasksCompleted,
-          total_expedition_minutes: merged.totalExpeditionMinutes,
-          last_active_date: merged.lastActiveDate,
-          gold: merged.gold,
-          health_potions: merged.healthPotions,
-          custom_spells: merged.customSpells,
-          purchased_spell_slot: merged.purchasedSpellSlot,
-          highest_floor: merged.highestFloor,
-          total_kills: merged.totalKills
-        }, { onConflict: 'user_id' });
-
-      if (updateError) {
-        console.error('UPSERT ERROR:', updateError.message, updateError.details, updateError.hint);
-      }
-      console.log('MERGED result:', JSON.stringify({ gold: merged.gold, healthPotions: merged.healthPotions, customSpells: merged.customSpells }));
-      console.log('Player synced:', merged.gold, 'gold,', merged.highestFloor, 'best floor');
-      return merged;
+      // Update local with remote data
+      await db.player.update(1, playerData);
+      console.log('Player synced from remote:', playerData.username, playerData.gold, 'gold');
+      return playerData;
     } else if (localPlayer) {
-      // No remote player exists - create one!
-      console.log('No remote player found, creating one with gold:', localPlayer.gold);
+      // No remote player exists - create one from local data
+      console.log('No remote player found, creating one');
       const { error: insertError } = await supabase.from('players').insert({
         user_id: userId,
         username: localPlayer.username || 'Adventurer',
@@ -159,9 +80,10 @@ export async function syncPlayer() {
       } else {
         console.log('Remote player created successfully');
       }
+      return localPlayer;
     }
 
-    return localPlayer;
+    return null;
   } catch (error) {
     console.error('Sync player error:', error);
     return null;
@@ -618,6 +540,7 @@ export async function pushSettingsUpdate(updates) {
 }
 
 // ============ Dungeon Sync ============
+// On sync: Remote is source of truth. Pull from remote, update local.
 export async function syncDungeon() {
   const userId = getUserId();
   if (!userId) return null;
@@ -633,39 +556,15 @@ export async function syncDungeon() {
       .eq('user_id', userId)
       .single();
 
-    console.log('syncDungeon - local:', localDungeon);
-    console.log('syncDungeon - remote:', remoteDungeon);
-    console.log('syncDungeon - error:', error);
-
     if (error && error.code !== 'PGRST116') {
       console.error('Error fetching remote dungeon:', error);
       return localDungeon;
     }
 
-    // If different user signed in, use remote data only
-    const useRemoteOnly = skipMergeUseRemote;
-
-    // Check if local looks like fresh defaults (just reset)
-    const localIsDefault = useRemoteOnly || !localDungeon || (
-      (localDungeon.gold || 0) === 0 &&
-      (localDungeon.totalGoldEarned || 0) === 0 &&
-      (localDungeon.totalRuns || 0) <= 1 &&
-      (!localDungeon.customSpells || localDungeon.customSpells.length === 0 || !localDungeon.customSpells[0])
-    );
-
-    // Check if remote has real data
-    const remoteHasData = remoteDungeon && (
-      (remoteDungeon.gold || 0) > 0 ||
-      (remoteDungeon.total_gold_earned || 0) > 0 ||
-      (remoteDungeon.total_runs || 0) > 0 ||
-      (remoteDungeon.custom_spells && remoteDungeon.custom_spells.length > 0 && remoteDungeon.custom_spells[0])
-    );
-
-    // If local is default/fresh, different user, or remote has data, restore from remote
-    if (remoteDungeon && (useRemoteOnly || (localIsDefault && remoteHasData))) {
-      console.log('Local is fresh, restoring from cloud backup...');
-      const restored = {
-        healthPotions: remoteDungeon.health_potions || 3,
+    // If remote exists, use it as source of truth
+    if (remoteDungeon) {
+      const dungeonData = {
+        healthPotions: remoteDungeon.health_potions || 0,
         gold: remoteDungeon.gold || 0,
         totalGoldEarned: remoteDungeon.total_gold_earned || 0,
         highestFloor: remoteDungeon.highest_floor || 0,
@@ -682,67 +581,14 @@ export async function syncDungeon() {
         customSpells: remoteDungeon.custom_spells || [],
         purchasedSpellSlot: remoteDungeon.purchased_spell_slot || false
       };
-      await db.dungeon.update(1, restored);
-      console.log('Dungeon data restored from cloud!', restored);
-      return restored;
-    }
 
-    // If remote exists, merge (take higher/better values) OR use remote only if different user
-    if (remoteDungeon) {
-      const merged = {
-        healthPotions: useRemoteOnly ? (remoteDungeon.health_potions || 0) : Math.max(localDungeon?.healthPotions || 0, remoteDungeon.health_potions || 0),
-        gold: useRemoteOnly ? (remoteDungeon.gold || 0) : Math.max(localDungeon?.gold || 0, remoteDungeon.gold || 0),
-        totalGoldEarned: useRemoteOnly ? (remoteDungeon.total_gold_earned || 0) : Math.max(localDungeon?.totalGoldEarned || 0, remoteDungeon.total_gold_earned || 0),
-        highestFloor: useRemoteOnly ? (remoteDungeon.highest_floor || 0) : Math.max(localDungeon?.highestFloor || 0, remoteDungeon.highest_floor || 0),
-        totalRuns: useRemoteOnly ? (remoteDungeon.total_runs || 0) : Math.max(localDungeon?.totalRuns || 0, remoteDungeon.total_runs || 0),
-        totalKills: useRemoteOnly ? (remoteDungeon.total_kills || 0) : Math.max(localDungeon?.totalKills || 0, remoteDungeon.total_kills || 0),
-        bossesDefeated: useRemoteOnly ? (remoteDungeon.bosses_defeated || 0) : Math.max(localDungeon?.bossesDefeated || 0, remoteDungeon.bosses_defeated || 0),
-        upgrades: useRemoteOnly ? (remoteDungeon.upgrades || []) : ((remoteDungeon.upgrades?.length > (localDungeon?.upgrades?.length || 0))
-          ? remoteDungeon.upgrades
-          : (localDungeon?.upgrades || [])),
-        maxHpBonus: useRemoteOnly ? (remoteDungeon.max_hp_bonus || 0) : Math.max(localDungeon?.maxHpBonus || 0, remoteDungeon.max_hp_bonus || 0),
-        bonusDamage: useRemoteOnly ? (remoteDungeon.bonus_damage || 0) : Math.max(localDungeon?.bonusDamage || 0, remoteDungeon.bonus_damage || 0),
-        potionBonus: useRemoteOnly ? (remoteDungeon.potion_bonus || 0) : Math.max(localDungeon?.potionBonus || 0, remoteDungeon.potion_bonus || 0),
-        critBonus: useRemoteOnly ? (remoteDungeon.crit_bonus || 0) : Math.max(localDungeon?.critBonus || 0, remoteDungeon.crit_bonus || 0),
-        defenseBonus: useRemoteOnly ? (remoteDungeon.defense_bonus || 0) : Math.max(localDungeon?.defenseBonus || 0, remoteDungeon.defense_bonus || 0),
-        maxMpBonus: useRemoteOnly ? (remoteDungeon.max_mp_bonus || 0) : Math.max(localDungeon?.maxMpBonus || 0, remoteDungeon.max_mp_bonus || 0),
-        customSpells: useRemoteOnly ? (remoteDungeon.custom_spells || []) : ((remoteDungeon.custom_spells?.[0])
-          ? remoteDungeon.custom_spells
-          : (localDungeon?.customSpells || [])),
-        purchasedSpellSlot: useRemoteOnly ? (remoteDungeon.purchased_spell_slot || false) : (remoteDungeon.purchased_spell_slot || localDungeon?.purchasedSpellSlot || false)
-      };
-
-      // Update local
-      await db.dungeon.update(1, merged);
-
-      // Update remote with merged data
-      await supabase
-        .from('dungeon')
-        .update({
-          health_potions: merged.healthPotions,
-          gold: merged.gold,
-          total_gold_earned: merged.totalGoldEarned,
-          highest_floor: merged.highestFloor,
-          total_runs: merged.totalRuns,
-          total_kills: merged.totalKills,
-          bosses_defeated: merged.bossesDefeated,
-          upgrades: merged.upgrades,
-          max_hp_bonus: merged.maxHpBonus,
-          bonus_damage: merged.bonusDamage,
-          potion_bonus: merged.potionBonus,
-          crit_bonus: merged.critBonus,
-          defense_bonus: merged.defenseBonus,
-          max_mp_bonus: merged.maxMpBonus,
-          custom_spells: merged.customSpells,
-          purchased_spell_slot: merged.purchasedSpellSlot
-        })
-        .eq('user_id', userId);
-
-      console.log('Dungeon data synced and merged');
-      return merged;
+      // Update local with remote data
+      await db.dungeon.update(1, dungeonData);
+      console.log('Dungeon synced from remote:', dungeonData.gold, 'gold');
+      return dungeonData;
     } else if (localDungeon) {
       // No remote data, push local to remote
-      const { data, error: insertError } = await supabase.from('dungeon').upsert({
+      const { error: insertError } = await supabase.from('dungeon').upsert({
         user_id: userId,
         health_potions: localDungeon.healthPotions || 0,
         gold: localDungeon.gold || 0,
@@ -760,16 +606,17 @@ export async function syncDungeon() {
         max_mp_bonus: localDungeon.maxMpBonus || 0,
         custom_spells: localDungeon.customSpells || [],
         purchased_spell_slot: localDungeon.purchasedSpellSlot || false
-      }, { onConflict: 'user_id' }).select();
+      }, { onConflict: 'user_id' });
 
       if (insertError) {
         console.error('Dungeon push FAILED:', insertError);
       } else {
-        console.log('Dungeon data pushed to remote:', data);
+        console.log('Dungeon data pushed to remote');
       }
+      return localDungeon;
     }
 
-    return localDungeon;
+    return null;
   } catch (error) {
     console.error('Sync dungeon error:', error);
     return null;
@@ -821,6 +668,8 @@ export async function pushDungeonUpdate(updates) {
 }
 
 // ============ Full Sync ============
+// Simple approach: remote is always source of truth
+// On sync, pull from remote. Changes push via individual update functions.
 export async function fullSync() {
   const userId = getUserId();
   if (!userId) {
@@ -829,16 +678,6 @@ export async function fullSync() {
   }
 
   console.log('Starting full sync for user:', userId);
-
-  // Check if this is a different user than last time
-  // If so, we'll use remote data only (no merge with stale local data)
-  skipMergeUseRemote = isDifferentUser(userId);
-  if (skipMergeUseRemote) {
-    console.log('Different user detected - will use remote data only (no merge)');
-  }
-
-  // Update the stored user ID
-  setLastUserId(userId);
 
   try {
     await syncPlayer();
@@ -850,8 +689,5 @@ export async function fullSync() {
     console.log('Full sync complete');
   } catch (error) {
     console.error('Full sync error:', error);
-  } finally {
-    // Reset the flag
-    skipMergeUseRemote = false;
   }
 }
