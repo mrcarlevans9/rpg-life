@@ -19,6 +19,7 @@ export async function initializeDB() {
   if (playerCount === 0) {
     // Create default player
     await db.player.add({
+      username: 'Adventurer',
       totalXP: 0,
       currentStreak: 0,
       longestStreak: 0,

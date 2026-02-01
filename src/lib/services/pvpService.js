@@ -40,12 +40,16 @@ async function getPlayerCombatStats() {
 /**
  * Update or create the player's snapshot
  */
-export async function updateSnapshot(username = 'Adventurer') {
+export async function updateSnapshot() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { success: false, error: 'Not authenticated' };
 
   const stats = await getPlayerCombatStats();
   if (!stats) return { success: false, error: 'Could not get player stats' };
+
+  // Get username from local player data
+  const player = await db.player.get(1);
+  const username = player?.username || 'Adventurer';
 
   const snapshotData = {
     user_id: user.id,
