@@ -286,9 +286,10 @@ export async function searchUsers(query, limit = 10) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return [];
 
+  // Search in players table where usernames are stored
   const { data, error } = await supabase
-    .from('player_snapshots')
-    .select('user_id, username, level, equipped_title')
+    .from('players')
+    .select('user_id, username')
     .ilike('username', `%${query}%`)
     .neq('user_id', user.id)
     .limit(limit);
@@ -298,7 +299,25 @@ export async function searchUsers(query, limit = 10) {
     return [];
   }
 
-  return data || [];
+  if (!data?.length) return [];
+
+  // Get snapshots for additional info (level, title)
+  const userIds = data.map(p => p.user_id);
+  const { data: snapshots } = await supabase
+    .from('player_snapshots')
+    .select('user_id, level, equipped_title')
+    .in('user_id', userIds);
+
+  // Combine player data with snapshot info
+  return data.map(player => {
+    const snapshot = snapshots?.find(s => s.user_id === player.user_id);
+    return {
+      user_id: player.user_id,
+      username: player.username,
+      level: snapshot?.level || 1,
+      equipped_title: snapshot?.equipped_title || 'rookie'
+    };
+  });
 }
 
 /**
