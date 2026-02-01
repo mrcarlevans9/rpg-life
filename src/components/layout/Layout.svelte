@@ -3,11 +3,13 @@
   import Navigation from './Navigation.svelte';
   import MobileNav from './MobileNav.svelte';
   import Toast from '../common/Toast.svelte';
+  import FriendRequestNotification from '../multiplayer/FriendRequestNotification.svelte';
 </script>
 
 <div class="app-layout">
   <Header />
   <Navigation />
+  <FriendRequestNotification />
 
   <main class="main-content">
     <slot />
