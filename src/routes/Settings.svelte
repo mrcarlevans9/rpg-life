@@ -372,7 +372,9 @@
 
   .color-picker {
     display: flex;
+    flex-wrap: wrap;
     gap: var(--spacing-xs);
+    max-width: 160px;
   }
 
   .color-option {

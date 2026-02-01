@@ -68,16 +68,6 @@
       {#if menuOpen}
         <div class="menu-overlay" on:click={closeMenu}></div>
         <div class="dropdown-menu">
-          <div class="menu-stats mobile-only">
-            <div class="menu-gold">
-              <span class="gold-icon">🪙</span>
-              <span>{$playerData?.gold || 0} Gold</span>
-            </div>
-            <div class="menu-streak">
-              <StreakCounter size="sm" showMultiplier={false} />
-            </div>
-          </div>
-          <div class="menu-divider mobile-only"></div>
           <button class="menu-item mobile-only" on:click={() => { toggleTheme(); closeMenu(); }}>
             <span class="menu-icon">{$settingsData?.theme === 'dark' ? '☀️' : '🌙'}</span>
             {$settingsData?.theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
@@ -188,14 +178,6 @@
     font-size: 1rem;
   }
 
-  .menu-gold {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    color: #fbbf24;
-    font-weight: 600;
-  }
-
   .avatar-menu {
     position: relative;
   }
@@ -280,18 +262,6 @@
 
   .mobile-only {
     display: flex;
-  }
-
-  .menu-stats {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-xs);
-    padding: var(--spacing-sm) var(--spacing-md);
-  }
-
-  .menu-streak {
-    display: flex;
-    align-items: center;
   }
 
   @media (min-width: 768px) {
