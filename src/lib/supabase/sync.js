@@ -729,3 +729,97 @@ export async function fullSync() {
     console.error('Full sync error:', error);
   }
 }
+
+// ============ Reset Remote Data ============
+// Deletes all user data from Supabase and recreates with defaults
+// Used to fix corrupted accounts that have wrong data
+export async function resetRemoteData() {
+  const userId = getUserId();
+  if (!userId) {
+    throw new Error('No user logged in');
+  }
+
+  console.log('Resetting remote data for user:', userId);
+
+  try {
+    // Delete from all tables in order (tasks first due to potential dependencies)
+    const tables = ['tasks', 'board', 'settings', 'avatars', 'dungeon', 'players', 'player_snapshots'];
+
+    for (const table of tables) {
+      const { error } = await supabase
+        .from(table)
+        .delete()
+        .eq('user_id', userId);
+
+      if (error) {
+        console.error(`Error deleting from ${table}:`, error);
+        // Continue with other tables even if one fails
+      } else {
+        console.log(`Deleted user data from ${table}`);
+      }
+    }
+
+    // Clear local data as well
+    await db.player.update(1, {
+      username: 'Adventurer',
+      totalXP: 0,
+      currentStreak: 0,
+      longestStreak: 0,
+      totalTasksCompleted: 0,
+      totalExpeditionMinutes: 0,
+      lastActiveDate: null,
+      gold: 0,
+      healthPotions: 0,
+      customSpells: [],
+      purchasedSpellSlot: false,
+      highestFloor: 0,
+      totalKills: 0
+    });
+
+    await db.dungeon.update(1, {
+      healthPotions: 3,
+      gold: 0,
+      totalGoldEarned: 0,
+      highestFloor: 0,
+      totalRuns: 0,
+      totalKills: 0,
+      bossesDefeated: 0,
+      upgrades: [],
+      maxHpBonus: 0,
+      bonusDamage: 0,
+      potionBonus: 0,
+      critBonus: 0,
+      defenseBonus: 0,
+      maxMpBonus: 0,
+      customSpells: [],
+      purchasedSpellSlot: false
+    });
+
+    await db.avatar.update(1, {
+      gender: 'neutral',
+      skinTone: 'medium',
+      hairStyle: 'default',
+      hairColor: 'brown',
+      outfit: 'casual',
+      accessory: 'none',
+      equippedTitle: 'rookie'
+    });
+
+    await db.tasks.clear();
+    await db.board.update(1, {
+      columns: ['To Do', 'In Progress', 'Done'],
+      updatedAt: new Date().toISOString()
+    });
+
+    console.log('Local data cleared');
+
+    // Now trigger a full sync which will create fresh remote records with defaults
+    await fullSync();
+
+    console.log('Remote data reset complete');
+    return true;
+  } catch (error) {
+    console.error('Reset remote data error:', error);
+    throw error;
+  }
+}

@@ -5,7 +5,8 @@
   import { settingsData, updateSetting, toggleTheme } from '../lib/stores/settings.js';
   import { db } from '../lib/db/index.js';
   import { showSuccess, showError } from '../lib/stores/notifications.js';
-  import { pushPlayerUpdate } from '../lib/supabase/sync.js';
+  import { pushPlayerUpdate, resetRemoteData } from '../lib/supabase/sync.js';
+  import { authUser } from '../lib/stores/auth.js';
 
   let importInput;
   let username = 'Adventurer';
@@ -171,6 +172,30 @@
       showError('Failed to reset data');
     }
   }
+
+  async function resetAccount() {
+    if (!$authUser) {
+      showError('You must be signed in to reset your account');
+      return;
+    }
+
+    if (!confirm('This will reset your cloud account data (gold, level, spells, stats, etc.) back to defaults. Your local device data will also be cleared. Continue?')) {
+      return;
+    }
+
+    if (!confirm('REALLY sure? All your multiplayer progress will be reset!')) {
+      return;
+    }
+
+    try {
+      await resetRemoteData();
+      showSuccess('Account reset! Refreshing...');
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (error) {
+      console.error('Account reset error:', error);
+      showError('Failed to reset account: ' + error.message);
+    }
+  }
 </script>
 
 <div class="settings-page">
@@ -305,6 +330,20 @@
         </Button>
       </div>
     </Card>
+
+    {#if $authUser}
+    <Card>
+      <div class="setting-item danger">
+        <div class="setting-info">
+          <h3>Reset Cloud Account</h3>
+          <p>Reset your synced account data (gold, level, stats, etc.) to defaults. Use this if your account has incorrect data.</p>
+        </div>
+        <Button variant="danger" on:click={resetAccount}>
+          Reset Account
+        </Button>
+      </div>
+    </Card>
+    {/if}
   </section>
 
   <section class="settings-section">
