@@ -719,8 +719,8 @@
   }
 
   .monster-display.is-boss .monster-emoji {
-    font-size: 10rem;
-    filter: drop-shadow(0 0 40px rgba(251, 191, 36, 0.5));
+    font-size: 14rem;
+    filter: drop-shadow(0 0 50px rgba(251, 191, 36, 0.6));
     animation: bossPulse 2s ease-in-out infinite;
   }
 
