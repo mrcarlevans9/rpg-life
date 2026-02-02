@@ -1819,6 +1819,9 @@ export async function purchaseUpgrade(upgradeKey) {
 
   await db.dungeon.update(1, dungeonUpdates);
 
+  // Sync dungeon upgrades to cloud
+  pushDungeonUpdate(dungeonUpdates);
+
   return { success: true, upgrade };
 }
 
