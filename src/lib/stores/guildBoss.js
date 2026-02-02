@@ -464,9 +464,25 @@ async function dealDamageToGuildBoss(bossFightId, damage) {
     return;
   }
 
-  // Get player username
-  const player = await db.player.get(1);
-  const username = player?.username || 'Unknown';
+  // Get player username - try Supabase profile first, then local db
+  let username = 'Unknown';
+
+  // Try to get username from Supabase profiles
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('username')
+    .eq('id', user.id)
+    .single();
+
+  if (profile?.username) {
+    username = profile.username;
+  } else {
+    // Fall back to local db
+    const player = await db.player.get(1);
+    if (player?.username) {
+      username = player.username;
+    }
+  }
 
   // Calculate new HP
   const newHp = Math.max(0, boss.boss_current_hp - damage);
@@ -475,6 +491,9 @@ async function dealDamageToGuildBoss(bossFightId, damage) {
   const participants = boss.participants || {};
   if (!participants[user.id]) {
     participants[user.id] = { damage: 0, hits: 0, username };
+  } else {
+    // Always update username in case it was previously "Unknown"
+    participants[user.id].username = username;
   }
   participants[user.id].damage += damage;
   participants[user.id].hits += 1;
