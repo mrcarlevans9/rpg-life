@@ -1,8 +1,6 @@
 <script>
   import { onDestroy } from 'svelte';
   import { createEventDispatcher } from 'svelte';
-  import Card from '../common/Card.svelte';
-  import ProgressBar from '../common/ProgressBar.svelte';
   import {
     activeBossFight,
     battlePhase,
@@ -44,6 +42,9 @@
   // Watch for dice rolls
   $: if ($lastRoll && $lastRoll.rolls.length > 0) {
     animateDiceRoll($lastRoll.rolls);
+  } else if ($lastRoll && $lastRoll.rolls.length === 0) {
+    displayedRolls = [];
+    diceRevealed = [];
   }
 
   function animateDiceRoll(finalRolls) {
@@ -116,6 +117,12 @@
 
   $: canAct = !$combatState.isAnimating && $battlePhase === 'combat';
 
+  function getHpBarColor(hp, maxHp) {
+    const pct = hp / maxHp;
+    if (pct > 0.6) return 'var(--success)';
+    if (pct > 0.3) return 'var(--warning)';
+    return 'var(--danger)';
+  }
 </script>
 
 <div class="guild-boss-battle">
@@ -175,14 +182,21 @@
     </div>
 
   {:else if $battlePhase === 'combat' || $battlePhase === 'victory' || $battlePhase === 'defeat'}
-    <!-- COMBAT PHASE - Dungeon Style -->
+    <!-- COMBAT PHASE - Exact Dungeon Style -->
     <div class="battle-screen" class:screen-shake={$combatState.lastDamageToPlayer}>
-      <!-- Top HUD: Boss HP -->
+      <!-- Top HUD: Boss indicator left, Enemy HP right -->
       <div class="battle-hud">
+        <!-- Boss indicator -->
+        <div class="floor-indicator">
+          <span class="floor-number">GUILD</span>
+          <span class="boss-badge">👑 BOSS</span>
+        </div>
+
+        <!-- Enemy HP -->
         <div class="hud-box enemy-hud boss-hud">
           <div class="hud-label">
             {$activeBossFight?.boss_name || 'Guild Boss'}
-            <span class="boss-tag major">GUILD BOSS</span>
+            <span class="boss-tag">BOSS</span>
           </div>
           <div class="hud-hp-bar" class:hp-flash={$combatState.lastDamageToEnemy}>
             <div
@@ -196,10 +210,15 @@
         </div>
       </div>
 
-      <!-- Main Arena: Big centered enemy -->
+      <!-- Main Arena -->
       <div class="battle-arena">
+        <!-- Dungeon decorations -->
+        <div class="dungeon-decor left">🔥</div>
+        <div class="dungeon-decor right">🔥</div>
+
         <div
-          class="monster-display is-boss is-major-boss"
+          class="monster-display"
+          class:is-boss={true}
           class:sprite-hit={$combatState.lastDamageToEnemy}
           class:sprite-attack={$combatState.enemyAction === 'attack'}
         >
@@ -240,16 +259,17 @@
         {/if}
       </div>
 
-      <!-- Player Stats Bar (below arena) -->
+      <!-- Player Stats Bar (below arena) - Dungeon style -->
       <div class="player-bar" class:bar-flash={$combatState.lastDamageToPlayer}>
         <div class="player-bar-content">
+          <!-- HP + MP stacked -->
           <div class="bars-stack">
             <div class="bar-row hp-row">
               <span class="bar-label">HP</span>
               <div class="bar-track">
                 <div
                   class="bar-fill hp-fill"
-                  style="width: {playerHpPercent}%"
+                  style="width: {playerHpPercent}%; background: {getHpBarColor($playerCombat.hp, $playerCombat.maxHp)}"
                 ></div>
               </div>
               <span class="bar-value">{$playerCombat.hp}/{$playerCombat.maxHp}</span>
@@ -270,6 +290,14 @@
               <span class="bar-value">{$playerCombat.mp}/{$playerCombat.maxMp}</span>
             </div>
           </div>
+          <!-- Guild damage display -->
+          {#if $activeBossFight?.participants && Object.keys($activeBossFight.participants).length > 0}
+            <div class="guild-damage-display">
+              {#each Object.entries($activeBossFight.participants).slice(0, 3) as [userId, data]}
+                <span class="damage-badge">{data.username}: {data.damage}</span>
+              {/each}
+            </div>
+          {/if}
         </div>
       </div>
 
@@ -309,7 +337,7 @@
               🧪 POTION <span class="item-count">({$playerCombat.potions})</span>
             </button>
             <button
-              class="action-btn run danger"
+              class="action-btn run"
               on:click={handleRetreat}
               disabled={!canAct}
             >
@@ -373,18 +401,6 @@
           </div>
         {/if}
       </div>
-
-      <!-- Participants -->
-      {#if $activeBossFight?.participants && Object.keys($activeBossFight.participants).length > 0}
-        <div class="participants-bar">
-          <span class="participants-label">Guild Damage:</span>
-          {#each Object.entries($activeBossFight.participants).slice(0, 5) as [userId, data]}
-            <span class="participant-badge">
-              {data.username}: {data.damage}
-            </span>
-          {/each}
-        </div>
-      {/if}
     </div>
   {/if}
 </div>
@@ -395,14 +411,18 @@
     inset: 0;
     background: var(--bg-primary);
     z-index: 1000;
-    overflow-y: auto;
-    padding: 20px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
 
   /* Shop Phase */
   .shop-phase {
     max-width: 500px;
     margin: 0 auto;
+    padding: 20px;
+    overflow-y: auto;
+    height: 100%;
   }
 
   .shop-header {
@@ -544,13 +564,12 @@
     cursor: pointer;
   }
 
-  /* Combat Phase - Dungeon Style */
+  /* Battle Screen - Dungeon Style */
   .battle-screen {
     display: flex;
     flex-direction: column;
     height: 100%;
-    max-width: 500px;
-    margin: 0 auto;
+    background: var(--bg-primary);
   }
 
   .battle-screen.screen-shake {
@@ -565,19 +584,40 @@
     80% { transform: translateX(3px); }
   }
 
-  /* Top HUD */
+  /* Top HUD - Dungeon style */
   .battle-hud {
     display: flex;
-    justify-content: center;
-    padding: 10px;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 10px 15px;
     gap: 10px;
+  }
+
+  .floor-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.4);
+    padding: 6px 12px;
+    border-radius: var(--radius-md);
+  }
+
+  .floor-number {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .boss-badge {
+    font-size: 0.75rem;
+    color: #fbbf24;
   }
 
   .hud-box {
     background: rgba(0, 0, 0, 0.6);
     border-radius: var(--radius-md);
     padding: 8px 12px;
-    min-width: 150px;
+    min-width: 140px;
   }
 
   .enemy-hud {
@@ -600,22 +640,18 @@
   }
 
   .boss-tag {
-    font-size: 0.6rem;
+    font-size: 0.55rem;
     padding: 1px 4px;
     border-radius: 2px;
-    background: var(--danger);
-    color: white;
-  }
-
-  .boss-tag.major {
     background: #fbbf24;
     color: #1a1a1a;
+    font-weight: 700;
   }
 
   .hud-hp-bar {
-    height: 10px;
+    height: 8px;
     background: var(--bg-tertiary);
-    border-radius: 5px;
+    border-radius: 4px;
     overflow: hidden;
     margin-bottom: 2px;
   }
@@ -632,20 +668,19 @@
   .hud-hp-fill {
     height: 100%;
     transition: width 0.3s ease;
-    background: linear-gradient(90deg, #ef4444, #f97316);
   }
 
   .hud-hp-fill.boss-hp {
-    background: linear-gradient(90deg, #fbbf24, #f97316);
+    background: linear-gradient(90deg, #ef4444, #f97316);
   }
 
   .hud-hp-text {
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     color: var(--text-muted);
     text-align: center;
   }
 
-  /* Battle Arena */
+  /* Battle Arena - Dungeon style */
   .battle-arena {
     flex: 1;
     display: flex;
@@ -653,10 +688,29 @@
     align-items: center;
     justify-content: center;
     position: relative;
-    min-height: 200px;
     background: linear-gradient(180deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
-    border-radius: var(--radius-lg);
-    margin: 0 10px;
+  }
+
+  .dungeon-decor {
+    position: absolute;
+    font-size: 1.5rem;
+    opacity: 0.6;
+    animation: flicker 2s ease-in-out infinite alternate;
+  }
+
+  .dungeon-decor.left {
+    left: 20px;
+    top: 40%;
+  }
+
+  .dungeon-decor.right {
+    right: 20px;
+    top: 40%;
+  }
+
+  @keyframes flicker {
+    0%, 100% { opacity: 0.6; transform: scale(1); }
+    50% { opacity: 0.8; transform: scale(1.1); }
   }
 
   .monster-display {
@@ -665,17 +719,11 @@
   }
 
   .monster-display.is-boss .monster-emoji {
-    font-size: 5rem;
-    filter: drop-shadow(0 0 20px rgba(251, 191, 36, 0.3));
-  }
-
-  .monster-display.is-major-boss .monster-emoji {
     font-size: 6rem;
-    filter: drop-shadow(0 0 30px rgba(251, 191, 36, 0.5));
+    filter: drop-shadow(0 0 30px rgba(251, 191, 36, 0.4));
   }
 
   .monster-emoji {
-    font-size: 4rem;
     display: block;
   }
 
@@ -731,8 +779,7 @@
     width: 100px;
     height: 100px;
     background: linear-gradient(45deg, transparent, rgba(255,255,255,0.8), transparent);
-    animation: slashEffect 0.3s ease-out;
-    opacity: 0;
+    animation: slashEffect 0.3s ease-out forwards;
   }
 
   @keyframes slashEffect {
@@ -742,8 +789,7 @@
 
   .battle-effect.shield {
     font-size: 4rem;
-    animation: shieldEffect 0.5s ease-out;
-    opacity: 0;
+    animation: shieldEffect 0.5s ease-out forwards;
   }
 
   @keyframes shieldEffect {
@@ -752,7 +798,7 @@
     100% { opacity: 0; transform: scale(1); }
   }
 
-  /* Combat Message Overlay */
+  /* Combat Message Overlay - Dungeon style */
   .combat-message-overlay {
     position: absolute;
     bottom: 10px;
@@ -864,13 +910,11 @@
     100% { transform: scale(1); }
   }
 
-  /* Player Bar */
+  /* Player Bar - Dungeon style */
   .player-bar {
     background: var(--bg-secondary);
-    border-radius: var(--radius-md);
-    padding: 12px;
-    margin: 0 10px;
-    transition: background 0.2s;
+    padding: 8px 15px;
+    border-top: 1px solid var(--border);
   }
 
   .player-bar.bar-flash {
@@ -884,14 +928,15 @@
 
   .player-bar-content {
     display: flex;
-    flex-direction: column;
-    gap: 8px;
+    align-items: center;
+    gap: 15px;
   }
 
   .bars-stack {
+    flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
   }
 
   .bar-row {
@@ -902,17 +947,17 @@
   }
 
   .bar-label {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 600;
-    width: 24px;
+    width: 20px;
     color: var(--text-muted);
   }
 
   .bar-track {
     flex: 1;
-    height: 14px;
+    height: 10px;
     background: var(--bg-tertiary);
-    border-radius: 7px;
+    border-radius: 5px;
     overflow: hidden;
   }
 
@@ -930,15 +975,15 @@
   }
 
   .bar-value {
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     color: var(--text-muted);
-    min-width: 50px;
+    min-width: 45px;
     text-align: right;
   }
 
   .bar-damage {
     position: absolute;
-    right: -5px;
+    right: 50px;
     top: -8px;
     font-size: 0.75rem;
     font-weight: 700;
@@ -946,11 +991,26 @@
     animation: floatUp 1s ease-out forwards;
   }
 
-  /* Action Panel */
+  .guild-damage-display {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .damage-badge {
+    font-size: 0.6rem;
+    padding: 2px 6px;
+    background: var(--bg-tertiary);
+    border-radius: 999px;
+    color: var(--text-muted);
+  }
+
+  /* Action Panel - Dungeon style */
   .action-panel {
-    padding: 10px;
+    padding: 10px 15px;
+    padding-bottom: 20px;
     position: relative;
-    flex-shrink: 0;
+    background: var(--bg-primary);
   }
 
   .action-grid {
@@ -963,14 +1023,15 @@
     grid-template-columns: repeat(3, 1fr);
   }
 
+  /* OUTLINED BUTTON STYLE - Matching Dungeon exactly */
   .action-btn {
-    padding: 14px 16px;
+    padding: 12px 16px;
     border: 2px solid var(--border);
     border-radius: var(--radius-md);
     background: var(--bg-primary);
     color: var(--text-primary);
     font-weight: 600;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     cursor: pointer;
     transition: all 0.15s ease;
     display: flex;
@@ -990,58 +1051,52 @@
   }
 
   .action-btn.attack {
-    border-color: var(--danger);
-    background: rgba(239, 68, 68, 0.1);
+    border-color: #ef4444;
     color: #ef4444;
   }
 
   .action-btn.attack:hover:not(:disabled) {
-    background: rgba(239, 68, 68, 0.2);
+    background: rgba(239, 68, 68, 0.1);
   }
 
   .action-btn.defend {
     border-color: #3b82f6;
-    background: rgba(59, 130, 246, 0.1);
     color: #3b82f6;
   }
 
   .action-btn.defend:hover:not(:disabled) {
-    background: rgba(59, 130, 246, 0.2);
+    background: rgba(59, 130, 246, 0.1);
   }
 
   .action-btn.spell {
     border-color: #8b5cf6;
-    background: rgba(139, 92, 246, 0.1);
     color: #8b5cf6;
   }
 
   .action-btn.spell:hover:not(:disabled) {
-    background: rgba(139, 92, 246, 0.2);
+    background: rgba(139, 92, 246, 0.1);
   }
 
   .action-btn.item {
     border-color: #22c55e;
-    background: rgba(34, 197, 94, 0.1);
     color: #22c55e;
   }
 
   .action-btn.item:hover:not(:disabled) {
-    background: rgba(34, 197, 94, 0.2);
+    background: rgba(34, 197, 94, 0.1);
   }
 
   .action-btn.run {
-    border-color: var(--text-muted);
-    color: var(--text-muted);
-  }
-
-  .action-btn.run.danger {
     border-color: #f97316;
     color: #f97316;
+  }
+
+  .action-btn.run:hover:not(:disabled) {
     background: rgba(249, 115, 22, 0.1);
   }
 
   .item-count {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     opacity: 0.8;
   }
 
@@ -1049,8 +1104,8 @@
   .spell-menu {
     position: absolute;
     bottom: 100%;
-    left: 10px;
-    right: 10px;
+    left: 15px;
+    right: 15px;
     background: var(--bg-secondary);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
@@ -1141,6 +1196,7 @@
     color: var(--text-muted);
   }
 
+  /* Result Screens */
   .result-screen {
     text-align: center;
     padding: 40px 20px;
@@ -1184,30 +1240,5 @@
     font-weight: 600;
     font-size: 1rem;
     cursor: pointer;
-  }
-
-  .participants-bar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
-    padding: 12px;
-    margin: 10px;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    font-size: 0.8rem;
-  }
-
-  .participants-label {
-    color: var(--text-muted);
-    font-weight: 500;
-  }
-
-  .participant-badge {
-    padding: 4px 10px;
-    background: var(--bg-tertiary);
-    border-radius: 999px;
-    color: var(--text-secondary);
   }
 </style>
