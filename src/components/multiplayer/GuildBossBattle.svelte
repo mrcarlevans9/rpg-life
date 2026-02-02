@@ -247,6 +247,8 @@
                   {#each displayedRolls as roll, i}
                     <span class="toast-die" class:rolling={!diceRevealed[i]} class:revealed={diceRevealed[i]}>{roll}</span>{#if i < displayedRolls.length - 1}<span class="toast-plus">+</span>{/if}
                   {/each}
+                  <span class="toast-plus">+</span>
+                  <span class="toast-base">10</span>
                 </span>
                 <span class="toast-arrow">→</span>
               {/if}
@@ -893,6 +895,18 @@
   .toast-plus {
     color: var(--text-muted);
     font-size: 0.75rem;
+  }
+
+  .toast-base {
+    background: var(--bg-tertiary);
+    border: 1px dashed var(--border);
+    border-radius: 3px;
+    padding: 2px 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    min-width: 20px;
+    text-align: center;
   }
 
   .toast-arrow {
