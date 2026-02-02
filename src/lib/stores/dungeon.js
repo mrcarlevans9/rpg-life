@@ -744,6 +744,17 @@ export async function playerAttack() {
   combatState.update(s => ({ ...s, lastDamageToEnemy: damage }));
   addLog('damage', `You deal ${damage} damage to ${monster.displayName}!`);
 
+  // Also damage skeleton ally if active (splash damage)
+  if (run.bossState?.skeletonActive && run.bossState.skeletonHp > 0) {
+    const skeletonDamage = Math.floor(damage * 0.5); // 50% splash damage
+    run.bossState.skeletonHp = Math.max(0, run.bossState.skeletonHp - skeletonDamage);
+    addLog('damage', `💀 Skeleton takes ${skeletonDamage} splash damage!`);
+    if (run.bossState.skeletonHp <= 0) {
+      run.bossState.skeletonActive = false;
+      addLog('victory', `💀 The skeleton crumbles to dust!`);
+    }
+  }
+
   currentRun.set(run);
 
   // Wait for damage animation
