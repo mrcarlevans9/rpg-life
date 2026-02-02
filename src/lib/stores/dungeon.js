@@ -463,6 +463,24 @@ export async function startRun() {
       bonusDamage: 0,
       defenseBonus: 0,
       goldBonus: 0
+    },
+    // Status effects from boss abilities
+    statusEffects: {
+      damageReduction: 0,      // Dark Knight Shield Bash
+      damageReductionTurns: 0,
+      extraDamageTaken: 0,     // Swamp Witch Hex
+      burnDamage: 0,           // Demon Lord Hellfire
+      burnTurns: 0,
+      stunned: false,          // Medusa Petrify, Fallen Titan
+      grabbed: false,          // Kraken Tentacle Grab
+      grabDamage: 0
+    },
+    // Boss-specific state
+    bossState: {
+      isCharging: false,       // Minotaur Charge
+      hasRevived: false,       // Dark Phoenix Rebirth
+      skeletonActive: false,   // Necromancer Summon
+      skeletonHp: 0
     }
   };
 
@@ -585,6 +603,79 @@ function addLog(type, message) {
   currentMessage.set(message);
 }
 
+// Process status effects at start of player's turn
+async function processStatusEffects(run) {
+  let canAct = true;
+
+  // Check stunned
+  if (run.statusEffects?.stunned) {
+    addLog('warning', `You're STUNNED and cannot act!`);
+    run.statusEffects.stunned = false; // Stun wears off after 1 turn
+    canAct = false;
+  }
+
+  // Check grabbed (Kraken)
+  if (run.statusEffects?.grabbed) {
+    addLog('warning', `You're GRABBED by tentacles! Try to break free!`);
+    canAct = false;
+  }
+
+  // Apply burn damage
+  if (run.statusEffects?.burnTurns > 0) {
+    const burnDmg = run.statusEffects.burnDamage;
+    run.playerHp = Math.max(0, run.playerHp - burnDmg);
+    run.statusEffects.burnTurns--;
+    addLog('enemy', `🔥 You take ${burnDmg} burn damage! (${run.statusEffects.burnTurns} turns left)`);
+    combatState.update(s => ({ ...s, lastDamageToPlayer: burnDmg }));
+    await delay(400);
+    combatState.update(s => ({ ...s, lastDamageToPlayer: null }));
+
+    if (run.playerHp <= 0) {
+      combatState.update(s => ({ ...s, playerDefeated: true }));
+      addLog('death', 'You have been defeated...');
+      await delay(800);
+      endRun(false);
+      return { canAct: false, playerDead: true };
+    }
+  }
+
+  // Decrement damage reduction turns
+  if (run.statusEffects?.damageReductionTurns > 0) {
+    run.statusEffects.damageReductionTurns--;
+    if (run.statusEffects.damageReductionTurns === 0) {
+      run.statusEffects.damageReduction = 0;
+      addLog('info', `Your strength returns to normal!`);
+    }
+  }
+
+  currentRun.set(run);
+  return { canAct, playerDead: false };
+}
+
+// Reset status effects for new monster encounter
+function resetStatusEffects(run) {
+  if (run.statusEffects) {
+    run.statusEffects = {
+      damageReduction: 0,
+      damageReductionTurns: 0,
+      extraDamageTaken: 0,
+      burnDamage: 0,
+      burnTurns: 0,
+      stunned: false,
+      grabbed: false,
+      grabDamage: 0
+    };
+  }
+  if (run.bossState) {
+    run.bossState = {
+      isCharging: false,
+      hasRevived: false,
+      skeletonActive: false,
+      skeletonHp: 0
+    };
+  }
+}
+
 export async function playerAttack() {
   const run = get(currentRun);
   if (!run) return;
@@ -596,6 +687,24 @@ export async function playerAttack() {
   if (room.type !== 'combat' && room.type !== 'boss') return;
 
   const monster = room.monster;
+
+  // Process status effects and check if player can act
+  const { canAct, playerDead } = await processStatusEffects(run);
+  if (playerDead) return;
+  if (!canAct) {
+    // Player is stunned/grabbed - skip to enemy turn
+    combatState.update(s => ({ ...s, isAnimating: true, turn: 'enemy' }));
+    await delay(600);
+    await monsterAttack(run, monster);
+    if (run.playerHp > 0) {
+      currentMessage.set('Your move!');
+      lastRoll.set({ rolls: [], total: 0, type: 'transition', critical: false });
+      await delay(600);
+    }
+    combatState.update(s => ({ ...s, isAnimating: false, turn: 'player' }));
+    currentRun.set(run);
+    return;
+  }
 
   // Clear "Your move!" message when player acts
   currentMessage.set('');
@@ -610,6 +719,12 @@ export async function playerAttack() {
 
   // Calculate damage with bonuses (permanent + temporary)
   let damage = total + run.bonusDamage + (run.tempBuffs?.bonusDamage || 0);
+
+  // Apply damage reduction from boss abilities (Dark Knight Shield Bash)
+  if (run.statusEffects?.damageReduction > 0) {
+    damage = Math.max(1, damage - run.statusEffects.damageReduction);
+    addLog('warning', `Your damage is reduced by ${run.statusEffects.damageReduction}!`);
+  }
 
   // Critical hit on doubles
   if (isDoubles) {
@@ -678,6 +793,24 @@ export async function playerDefend() {
 
   const monster = room.monster;
 
+  // Process status effects and check if player can act
+  const { canAct, playerDead } = await processStatusEffects(run);
+  if (playerDead) return;
+  if (!canAct) {
+    // Player is stunned/grabbed - skip to enemy turn
+    combatState.update(s => ({ ...s, isAnimating: true, turn: 'enemy' }));
+    await delay(600);
+    await monsterAttack(run, monster);
+    if (run.playerHp > 0) {
+      currentMessage.set('Your move!');
+      lastRoll.set({ rolls: [], total: 0, type: 'transition', critical: false });
+      await delay(600);
+    }
+    combatState.update(s => ({ ...s, isAnimating: false, turn: 'player' }));
+    currentRun.set(run);
+    return;
+  }
+
   // Clear "Your move!" message when player acts
   currentMessage.set('');
 
@@ -718,17 +851,331 @@ async function monsterAttack(run, monster) {
   // Start enemy attack animation
   combatState.update(s => ({ ...s, enemyAction: 'attack' }));
 
+  // Check for boss special abilities
+  if (monster.isBoss && monster.special) {
+    const usedSpecial = await handleBossSpecial(run, monster);
+    if (usedSpecial) return; // Special handled the attack
+  }
+
+  // Regular attack (or boss basic attack)
+  await performBasicAttack(run, monster);
+}
+
+// Handle boss special abilities
+async function handleBossSpecial(run, monster) {
+  const special = monster.key;
+  const hpPercent = monster.currentHp / monster.maxHp;
+
+  switch (special) {
+    // === MINI-BOSSES ===
+    case 'troll': // Regenerate - Heals 5 HP each turn
+      const healAmount = 5;
+      monster.currentHp = Math.min(monster.maxHp, monster.currentHp + healAmount);
+      addLog('boss', `🧌 ${monster.displayName} regenerates ${healAmount} HP!`);
+      await delay(400);
+      await performBasicAttack(run, monster);
+      return true;
+
+    case 'dark_knight': // Shield Bash - Reduces your damage by 2 for 2 turns
+      if (Math.random() < 0.4) { // 40% chance to use special
+        run.statusEffects.damageReduction = 2;
+        run.statusEffects.damageReductionTurns = 2;
+        addLog('boss', `🖤 ${monster.displayName} bashes you with their shield! Your damage is reduced!`);
+        lastRoll.set({ rolls: [], total: 0, type: 'special', critical: false });
+        await delay(600);
+        await performBasicAttack(run, monster);
+        return true;
+      }
+      return false;
+
+    case 'witch': // Hex - Curses you to take +3 damage
+      if (run.statusEffects.extraDamageTaken === 0 && Math.random() < 0.5) {
+        run.statusEffects.extraDamageTaken = 3;
+        addLog('boss', `🧙‍♀️ ${monster.displayName} hexes you! You take +3 damage from all attacks!`);
+        lastRoll.set({ rolls: [], total: 0, type: 'special', critical: false });
+        await delay(600);
+        return true; // Hex instead of attacking
+      }
+      return false;
+
+    case 'werewolf': // Frenzy - Attacks twice when below 50% HP
+      if (hpPercent < 0.5) {
+        addLog('boss', `🐺 ${monster.displayName} enters a FRENZY! Double attack!`);
+        await delay(400);
+        await performBasicAttack(run, monster);
+        if (run.playerHp > 0) {
+          await delay(300);
+          addLog('boss', `🐺 ${monster.displayName} strikes again!`);
+          await performBasicAttack(run, monster);
+        }
+        return true;
+      }
+      return false;
+
+    case 'necromancer': // Summon - Summons a skeleton ally
+      if (!run.bossState.skeletonActive && Math.random() < 0.3) {
+        run.bossState.skeletonActive = true;
+        run.bossState.skeletonHp = 20;
+        addLog('boss', `💀 ${monster.displayName} summons a Skeleton Warrior!`);
+        lastRoll.set({ rolls: [], total: 0, type: 'special', critical: false });
+        await delay(600);
+        return true;
+      }
+      // Skeleton attacks if active
+      if (run.bossState.skeletonActive) {
+        const skeleDamage = 5;
+        run.playerHp = Math.max(0, run.playerHp - skeleDamage);
+        addLog('enemy', `💀 Skeleton attacks for ${skeleDamage} damage!`);
+        combatState.update(s => ({ ...s, lastDamageToPlayer: skeleDamage }));
+        await delay(400);
+        combatState.update(s => ({ ...s, lastDamageToPlayer: null }));
+      }
+      return false; // Still do regular attack
+
+    case 'minotaur': // Charge - Next attack deals double damage
+      if (!run.bossState.isCharging && Math.random() < 0.35) {
+        run.bossState.isCharging = true;
+        addLog('boss', `🐂 ${monster.displayName} lowers their horns and CHARGES UP!`);
+        lastRoll.set({ rolls: [], total: 0, type: 'special', critical: false });
+        await delay(600);
+        return true; // Charging instead of attacking
+      }
+      if (run.bossState.isCharging) {
+        addLog('boss', `🐂 ${monster.displayName} unleashes a DEVASTATING CHARGE!`);
+        await delay(300);
+        await performBasicAttack(run, monster, 2.0); // Double damage
+        run.bossState.isCharging = false;
+        return true;
+      }
+      return false;
+
+    case 'medusa': // Petrify - Stuns you for 1 turn
+      if (!run.statusEffects.stunned && Math.random() < 0.25) {
+        run.statusEffects.stunned = true;
+        addLog('boss', `🐍 ${monster.displayName}'s gaze turns you to STONE! You're stunned!`);
+        lastRoll.set({ rolls: [], total: 0, type: 'special', critical: false });
+        await delay(600);
+        await performBasicAttack(run, monster);
+        return true;
+      }
+      return false;
+
+    case 'giant': // Stomp - Deals damage to your MP too
+      if (Math.random() < 0.4) {
+        addLog('boss', `👤 ${monster.displayName} STOMPS the ground!`);
+        await delay(300);
+        await performBasicAttack(run, monster);
+        if (run.playerHp > 0) {
+          const mpDamage = 10;
+          run.playerMp = Math.max(0, run.playerMp - mpDamage);
+          addLog('boss', `The shockwave drains ${mpDamage} MP!`);
+        }
+        return true;
+      }
+      return false;
+
+    // === MAJOR BOSSES ===
+    case 'dragon': // Fire Breath - Deals 25 damage, ignores defense
+      if (Math.random() < 0.35) {
+        const fireBreathDamage = 25;
+        run.isDefending = false; // Ignores defense
+        run.defenseAmount = 0;
+        addLog('boss', `🐉 ${monster.displayName} unleashes FIRE BREATH!`);
+        lastRoll.set({ rolls: [fireBreathDamage], total: fireBreathDamage, type: 'special', critical: false });
+        await delay(400);
+        run.playerHp = Math.max(0, run.playerHp - fireBreathDamage);
+        combatState.update(s => ({ ...s, lastDamageToPlayer: fireBreathDamage }));
+        addLog('crit', `Fire engulfs you for ${fireBreathDamage} damage! (Ignores defense)`);
+        currentRun.set(run);
+        await delay(500);
+        combatState.update(s => ({ ...s, enemyAction: null, lastDamageToPlayer: null }));
+        if (run.playerHp <= 0) {
+          combatState.update(s => ({ ...s, playerDefeated: true }));
+          addLog('death', 'You have been defeated...');
+          await delay(800);
+          endRun(false);
+        }
+        return true;
+      }
+      return false;
+
+    case 'lich': // Soul Drain - Steals 15 HP from you
+      if (Math.random() < 0.35) {
+        const drainAmount = 15;
+        addLog('boss', `☠️ ${monster.displayName} drains your SOUL!`);
+        lastRoll.set({ rolls: [drainAmount], total: drainAmount, type: 'special', critical: false });
+        await delay(400);
+        run.playerHp = Math.max(0, run.playerHp - drainAmount);
+        monster.currentHp = Math.min(monster.maxHp, monster.currentHp + drainAmount);
+        combatState.update(s => ({ ...s, lastDamageToPlayer: drainAmount }));
+        addLog('crit', `${drainAmount} HP stolen! The Lich heals!`);
+        currentRun.set(run);
+        await delay(500);
+        combatState.update(s => ({ ...s, enemyAction: null, lastDamageToPlayer: null }));
+        if (run.playerHp <= 0) {
+          combatState.update(s => ({ ...s, playerDefeated: true }));
+          addLog('death', 'You have been defeated...');
+          await delay(800);
+          endRun(false);
+        }
+        return true;
+      }
+      return false;
+
+    case 'demon_lord': // Hellfire - Burns for 8 damage over 3 turns
+      if (run.statusEffects.burnTurns === 0 && Math.random() < 0.4) {
+        run.statusEffects.burnDamage = 8;
+        run.statusEffects.burnTurns = 3;
+        addLog('boss', `👿 ${monster.displayName} engulfs you in HELLFIRE! You're burning!`);
+        lastRoll.set({ rolls: [], total: 0, type: 'special', critical: false });
+        await delay(600);
+        await performBasicAttack(run, monster);
+        return true;
+      }
+      return false;
+
+    case 'hydra': // Multi-Strike - Attacks 3 times for 8 damage each
+      if (Math.random() < 0.4) {
+        addLog('boss', `🐲 ${monster.displayName}'s heads strike in unison! MULTI-STRIKE!`);
+        await delay(400);
+        for (let i = 0; i < 3 && run.playerHp > 0; i++) {
+          let strikeDamage = 8;
+          if (run.isDefending && run.defenseAmount) {
+            strikeDamage = Math.max(0, strikeDamage - Math.floor(run.defenseAmount / 3));
+          }
+          run.playerHp = Math.max(0, run.playerHp - strikeDamage);
+          combatState.update(s => ({ ...s, lastDamageToPlayer: strikeDamage }));
+          addLog('enemy', `Head ${i + 1} strikes for ${strikeDamage} damage!`);
+          await delay(300);
+        }
+        run.isDefending = false;
+        run.defenseAmount = 0;
+        combatState.update(s => ({ ...s, enemyAction: null, lastDamageToPlayer: null }));
+        currentRun.set(run);
+        if (run.playerHp <= 0) {
+          combatState.update(s => ({ ...s, playerDefeated: true }));
+          addLog('death', 'You have been defeated...');
+          await delay(800);
+          endRun(false);
+        }
+        return true;
+      }
+      return false;
+
+    case 'titan': // Ground Slam - Stuns and deals 20 damage
+      if (!run.statusEffects.stunned && Math.random() < 0.3) {
+        const slamDamage = 20;
+        run.statusEffects.stunned = true;
+        addLog('boss', `🗿 ${monster.displayName} slams the ground! GROUND SLAM!`);
+        lastRoll.set({ rolls: [slamDamage], total: slamDamage, type: 'special', critical: false });
+        await delay(400);
+        let finalDamage = slamDamage;
+        if (run.isDefending && run.defenseAmount) {
+          finalDamage = Math.max(0, finalDamage - run.defenseAmount);
+          run.isDefending = false;
+          run.defenseAmount = 0;
+        }
+        run.playerHp = Math.max(0, run.playerHp - finalDamage);
+        combatState.update(s => ({ ...s, lastDamageToPlayer: finalDamage }));
+        addLog('crit', `The slam deals ${finalDamage} damage and stuns you!`);
+        currentRun.set(run);
+        await delay(500);
+        combatState.update(s => ({ ...s, enemyAction: null, lastDamageToPlayer: null }));
+        if (run.playerHp <= 0) {
+          combatState.update(s => ({ ...s, playerDefeated: true }));
+          addLog('death', 'You have been defeated...');
+          await delay(800);
+          endRun(false);
+        }
+        return true;
+      }
+      return false;
+
+    case 'phoenix': // Rebirth - Revives once with 50% HP (handled in monsterDefeated)
+      return false; // No special attack, just regular attack
+
+    case 'kraken': // Tentacle Grab - Immobilizes and deals 12 damage per turn
+      if (!run.statusEffects.grabbed && Math.random() < 0.35) {
+        run.statusEffects.grabbed = true;
+        run.statusEffects.grabDamage = 12;
+        addLog('boss', `🦑 ${monster.displayName}'s tentacles GRAB you! You're immobilized!`);
+        lastRoll.set({ rolls: [], total: 0, type: 'special', critical: false });
+        await delay(600);
+        return true;
+      }
+      if (run.statusEffects.grabbed) {
+        const grabDmg = run.statusEffects.grabDamage;
+        run.playerHp = Math.max(0, run.playerHp - grabDmg);
+        combatState.update(s => ({ ...s, lastDamageToPlayer: grabDmg }));
+        addLog('enemy', `🦑 Tentacles crush you for ${grabDmg} damage!`);
+        currentRun.set(run);
+        await delay(500);
+        combatState.update(s => ({ ...s, enemyAction: null, lastDamageToPlayer: null }));
+        // 30% chance to break free each turn
+        if (Math.random() < 0.3) {
+          run.statusEffects.grabbed = false;
+          addLog('info', 'You break free from the tentacles!');
+        }
+        if (run.playerHp <= 0) {
+          combatState.update(s => ({ ...s, playerDefeated: true }));
+          addLog('death', 'You have been defeated...');
+          await delay(800);
+          endRun(false);
+        }
+        return true;
+      }
+      return false;
+
+    case 'beholder': // Death Ray - Chance to deal 40 damage
+      if (Math.random() < 0.25) { // 25% chance for death ray
+        const deathRayDamage = 40;
+        addLog('boss', `👁️ ${monster.displayName}'s central eye glows... DEATH RAY!`);
+        lastRoll.set({ rolls: [deathRayDamage], total: deathRayDamage, type: 'special', critical: true });
+        await delay(400);
+        let finalDamage = deathRayDamage;
+        if (run.isDefending && run.defenseAmount) {
+          finalDamage = Math.max(0, finalDamage - run.defenseAmount);
+          run.isDefending = false;
+          run.defenseAmount = 0;
+        }
+        run.playerHp = Math.max(0, run.playerHp - finalDamage);
+        combatState.update(s => ({ ...s, lastDamageToPlayer: finalDamage }));
+        addLog('crit', `DEATH RAY deals ${finalDamage} damage!`);
+        currentRun.set(run);
+        await delay(500);
+        combatState.update(s => ({ ...s, enemyAction: null, lastDamageToPlayer: null }));
+        if (run.playerHp <= 0) {
+          combatState.update(s => ({ ...s, playerDefeated: true }));
+          addLog('death', 'You have been defeated...');
+          await delay(800);
+          endRun(false);
+        }
+        return true;
+      }
+      return false;
+  }
+
+  return false;
+}
+
+// Basic attack logic
+async function performBasicAttack(run, monster, damageMultiplier = 1.0) {
   // Monster rolls 2D6 (same as player)
   const rolls = rollD6(2);
   const total = rolls.reduce((a, b) => a + b, 0);
   const isDoubles = rolls[0] === rolls[1];
 
   // Calculate damage scaled by roll
-  let damage = Math.floor(monster.damage * (total / 7)); // 7 is average of 2D6
+  let damage = Math.floor(monster.damage * (total / 7) * damageMultiplier); // 7 is average of 2D6
   if (isDoubles) {
     damage = Math.floor(damage * 1.5); // Critical hit!
   }
   damage = Math.max(1, damage); // Minimum 1 damage
+
+  // Apply hex effect (extra damage taken)
+  if (run.statusEffects?.extraDamageTaken > 0) {
+    damage += run.statusEffects.extraDamageTaken;
+  }
 
   // Set lastRoll for enemy attack display
   lastRoll.set({ rolls, total, type: 'enemy', critical: isDoubles });
@@ -778,9 +1225,22 @@ async function monsterAttack(run, monster) {
 }
 
 async function monsterDefeated(run, room, monster) {
+  // Check for Phoenix Rebirth - revives once with 50% HP
+  if (monster.isBoss && monster.key === 'phoenix' && !run.bossState?.hasRevived) {
+    run.bossState.hasRevived = true;
+    monster.currentHp = Math.floor(monster.maxHp * 0.5);
+    addLog('boss', `🔥 The Dark Phoenix RISES FROM THE ASHES! It returns with ${monster.currentHp} HP!`);
+    combatState.update(s => ({ ...s, monsterDefeated: false }));
+    currentRun.set(run);
+    return; // Don't complete the fight, Phoenix lives again
+  }
+
   // Clear dice display from combat
   lastRoll.set({ rolls: [], total: 0, type: 'none', critical: false });
   currentMessage.set('');
+
+  // Reset status effects for next encounter
+  resetStatusEffects(run);
 
   // Calculate gold with temp bonus
   const goldBonus = run.tempBuffs?.goldBonus || 0;
