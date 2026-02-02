@@ -265,16 +265,17 @@ export async function playerAttack() {
   // Roll dice for damage
   const rolls = rollDice(2, 6);
   const rollTotal = rolls.reduce((a, b) => a + b, 0);
-  lastRoll.set({ rolls, total: rollTotal });
+
+  // Check for crit (doubles on dice)
+  const isCrit = rolls[0] === rolls[1];
+
+  lastRoll.set({ rolls, total: rollTotal, critical: isCrit });
 
   await delay(500);
 
   // Calculate damage
   const baseDamage = 10 + rollTotal;
   const bonusDamage = combat.bonusDamage + combat.tempBuffs.bonusDamage;
-
-  // Check for crit (doubles on dice)
-  const isCrit = rolls[0] === rolls[1];
   const critMultiplier = isCrit ? 1.5 + (combat.critBonus / 100) : 1;
 
   const totalDamage = Math.floor((baseDamage + bonusDamage) * critMultiplier);
