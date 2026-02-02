@@ -3,6 +3,14 @@ import { liveQuery } from 'dexie';
 import { db, MONSTERS, BOSSES, MONSTER_MODIFIERS, DUNGEON_UPGRADES, MERCHANT, MERCHANT_ITEMS } from '../db/index.js';
 import { playerData } from './player.js';
 import { pushDungeonUpdate, pushPlayerUpdate } from '../supabase/sync.js';
+import {
+  rollLootDrop,
+  addToPendingLoot,
+  clearPendingLoot,
+  extractPendingLoot,
+  pendingLootData,
+  equippedStats
+} from './equipment.js';
 
 // Create a store from a Dexie liveQuery
 function createLiveQueryStore(queryFn, defaultValue = null) {
@@ -423,12 +431,15 @@ export async function startRun() {
   const dungeon = await db.dungeon.get(1);
   const player = await db.player.get(1);
 
-  // Calculate max HP with upgrades
-  const baseMaxHp = 100;
-  const maxHp = baseMaxHp + (dungeon?.maxHpBonus || 0);
+  // Get equipment bonuses
+  const equipStats = get(equippedStats) || {};
 
-  // Calculate max MP with upgrades
-  const maxMp = BASE_MAX_MP + (dungeon?.maxMpBonus || 0);
+  // Calculate max HP with upgrades + equipment
+  const baseMaxHp = 100;
+  const maxHp = baseMaxHp + (dungeon?.maxHpBonus || 0) + (equipStats.maxHp || 0);
+
+  // Calculate max MP with upgrades + equipment
+  const maxMp = BASE_MAX_MP + (dungeon?.maxMpBonus || 0) + (equipStats.maxMp || 0);
 
   // Get gold, spells from PLAYER (syncs with cloud)
   const bankGold = player?.gold || 0;
@@ -508,13 +519,15 @@ export async function startRun() {
   return run;
 }
 
-export function endRun(victory = false) {
+export async function endRun(victory = false) {
   const run = get(currentRun);
   if (!run) return;
 
   if (victory) {
     gamePhase.set('victory');
   } else {
+    // On death, clear all pending loot - extraction mechanic!
+    await clearPendingLoot();
     gamePhase.set('defeat');
   }
 }
@@ -525,6 +538,15 @@ export async function collectRewards() {
 
   const dungeon = await db.dungeon.get(1);
   const player = await db.player.get(1);
+
+  // Extract pending loot to inventory - the extraction mechanic!
+  const { extracted, overflow } = await extractPendingLoot();
+  if (extracted.length > 0) {
+    console.log(`Extracted ${extracted.length} items from pending loot`);
+  }
+  if (overflow.length > 0) {
+    console.log(`${overflow.length} items lost - inventory full!`);
+  }
 
   // Calculate new stats
   const newGold = (player?.gold || 0) + run.goldCollected;
@@ -717,8 +739,16 @@ export async function playerAttack() {
   const total = rolls.reduce((a, b) => a + b, 0);
   const isDoubles = rolls[0] === rolls[1];
 
-  // Calculate damage with bonuses (permanent + temporary)
-  let damage = total + run.bonusDamage + (run.tempBuffs?.bonusDamage || 0);
+  // Get equipment bonuses
+  const equipStats = get(equippedStats) || {};
+
+  // Calculate damage with bonuses (permanent + temporary + equipment)
+  let damage = total + run.bonusDamage + (run.tempBuffs?.bonusDamage || 0) + (equipStats.damage || 0);
+
+  // Apply boss slayer bonus if fighting a boss
+  if (monster.isBoss && equipStats.bossSlayer > 0) {
+    damage += equipStats.bossSlayer;
+  }
 
   // Apply damage reduction from boss abilities (Dark Knight Shield Bash)
   if (run.statusEffects?.damageReduction > 0) {
@@ -726,10 +756,19 @@ export async function playerAttack() {
     addLog('warning', `Your damage is reduced by ${run.statusEffects.damageReduction}!`);
   }
 
-  // Critical hit on doubles
-  if (isDoubles) {
-    damage *= 2;
-    addLog('crit', `CRITICAL HIT! Rolled ${rolls[0]}+${rolls[1]} (doubles)!`);
+  // Check for equipment-based crit bonus
+  const critBonus = (equipStats.critChance || 0) / 100;
+  const hasEquipCrit = !isDoubles && Math.random() < critBonus;
+
+  // Critical hit on doubles or equipment crit
+  if (isDoubles || hasEquipCrit) {
+    const critMultiplier = 2 + ((equipStats.critDamage || 0) / 100);
+    damage = Math.floor(damage * critMultiplier);
+    if (isDoubles) {
+      addLog('crit', `CRITICAL HIT! Rolled ${rolls[0]}+${rolls[1]} (doubles)!`);
+    } else {
+      addLog('crit', `CRITICAL HIT! (Equipment bonus)!`);
+    }
   } else {
     addLog('roll', `You rolled ${rolls[0]}+${rolls[1]} = ${total}`);
   }
@@ -828,9 +867,10 @@ export async function playerDefend() {
   // Start defend animation
   combatState.update(s => ({ ...s, isAnimating: true, playerAction: 'defend', turn: 'animating' }));
 
-  // Roll 1D6 for defense (permanent + temporary bonus)
+  // Roll 1D6 for defense (permanent + temporary + equipment bonus)
   const rolls = rollD6(1);
-  const defenseAmount = rolls[0] + run.defenseBonus + (run.tempBuffs?.defenseBonus || 0);
+  const equipStats = get(equippedStats) || {};
+  const defenseAmount = rolls[0] + run.defenseBonus + (run.tempBuffs?.defenseBonus || 0) + (equipStats.defense || 0);
 
   addLog('defend', `You brace yourself! Blocking ${defenseAmount} damage.`);
 
@@ -1255,12 +1295,30 @@ async function monsterDefeated(run, room, monster) {
 
   // Calculate gold with temp bonus
   const goldBonus = run.tempBuffs?.goldBonus || 0;
-  const totalGold = monster.goldReward + goldBonus;
+  const equipGoldBonus = get(equippedStats)?.goldPerKill || 0;
+  const totalGold = monster.goldReward + goldBonus + equipGoldBonus;
 
-  if (goldBonus > 0) {
-    addLog('victory', `${monster.displayName} defeated! +${monster.goldReward} (+${goldBonus}) gold`);
+  if (goldBonus > 0 || equipGoldBonus > 0) {
+    const bonusText = [goldBonus > 0 ? `+${goldBonus}` : '', equipGoldBonus > 0 ? `+${equipGoldBonus}` : ''].filter(Boolean).join(' ');
+    addLog('victory', `${monster.displayName} defeated! +${monster.goldReward} (${bonusText}) gold`);
   } else {
     addLog('victory', `${monster.displayName} defeated! +${monster.goldReward} gold`);
+  }
+
+  // Roll for loot drop
+  const player = await db.player.get(1);
+  const taintedUnlocked = player?.taintedUnlocked || false;
+  let dropSource = 'monster';
+  if (monster.isBoss) {
+    dropSource = monster.isMajorBoss ? 'majorBoss' : 'miniBoss';
+  }
+
+  const lootDrop = rollLootDrop(dropSource, run.currentFloor, taintedUnlocked);
+  if (lootDrop) {
+    await addToPendingLoot(lootDrop);
+    const rarityEmoji = { common: '⚪', uncommon: '🟢', rare: '🔵', epic: '🟣', tainted: '🔴' };
+    addLog('loot', `${rarityEmoji[lootDrop.rarity] || '📦'} Found: ${lootDrop.name} (${lootDrop.rarity})`);
+    run.pendingLootCount = (run.pendingLootCount || 0) + 1;
   }
 
   run.goldCollected += totalGold;
@@ -1404,8 +1462,10 @@ export async function usePotion() {
     return false;
   }
 
-  // Use potion
-  const healAmount = run.potionHeal;
+  // Use potion with equipment bonus
+  const equipStats = get(equippedStats) || {};
+  const efficiencyBonus = 1 + ((equipStats.potionEfficiency || 0) / 100);
+  const healAmount = Math.floor(run.potionHeal * efficiencyBonus);
   const oldHp = run.playerHp;
   run.playerHp = Math.min(run.maxHp, run.playerHp + healAmount);
   const actualHeal = run.playerHp - oldHp;
@@ -1692,7 +1752,9 @@ export async function castSpell(spellIndex = 0) {
 // Regenerate mana (called after combat ends)
 function regenerateMana(run) {
   if (run.playerMp < run.maxMp) {
-    run.playerMp = Math.min(run.maxMp, run.playerMp + MP_REGEN_PER_TURN);
+    const equipStats = get(equippedStats) || {};
+    const manaRegen = MP_REGEN_PER_TURN + (equipStats.manaRegen || 0);
+    run.playerMp = Math.min(run.maxMp, run.playerMp + manaRegen);
   }
 }
 
