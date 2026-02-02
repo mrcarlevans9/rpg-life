@@ -40,9 +40,10 @@
   }
 
   // Watch for dice rolls
-  $: if ($lastRoll && $lastRoll.rolls.length > 0) {
+  $: if ($lastRoll && $lastRoll.rolls && $lastRoll.rolls.length > 0) {
     animateDiceRoll($lastRoll.rolls);
-  } else if ($lastRoll && $lastRoll.rolls.length === 0) {
+  } else {
+    // Clear dice display when lastRoll is null or empty
     displayedRolls = [];
     diceRevealed = [];
   }
