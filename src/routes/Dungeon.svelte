@@ -405,6 +405,17 @@
               {/if}
             {/key}
           </div>
+
+          <!-- Necromancer's Skeleton Ally -->
+          {#if $currentRun?.bossState?.skeletonActive}
+            <div class="skeleton-ally">
+              <span class="skeleton-emoji">💀</span>
+              <div class="skeleton-hp-bar">
+                <div class="skeleton-hp-fill" style="width: {($currentRun.bossState.skeletonHp / 20) * 100}%"></div>
+              </div>
+              <span class="skeleton-label">Skeleton</span>
+            </div>
+          {/if}
         {/if}
 
         <!-- Visual Effects -->
@@ -1511,6 +1522,63 @@
     0% { transform: scale(1); opacity: 1; }
     30% { transform: scale(1.3); filter: brightness(2); }
     100% { transform: scale(0) rotate(180deg); opacity: 0; }
+  }
+
+  /* Skeleton Ally (Necromancer summon) */
+  .skeleton-ally {
+    position: absolute;
+    right: 15%;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    animation: skeletonFloat 2s ease-in-out infinite, skeletonAppear 0.5s ease-out;
+  }
+
+  @keyframes skeletonAppear {
+    0% { opacity: 0; transform: translateY(-50%) scale(0); }
+    50% { transform: translateY(-50%) scale(1.2); }
+    100% { opacity: 1; transform: translateY(-50%) scale(1); }
+  }
+
+  @keyframes skeletonFloat {
+    0%, 100% { transform: translateY(-50%) translateX(0); }
+    50% { transform: translateY(-55%) translateX(3px); }
+  }
+
+  .skeleton-emoji {
+    font-size: 3rem;
+    filter: drop-shadow(0 0 10px rgba(200, 200, 200, 0.5));
+    animation: skeletonPulse 1s ease-in-out infinite;
+  }
+
+  @keyframes skeletonPulse {
+    0%, 100% { filter: drop-shadow(0 0 10px rgba(200, 200, 200, 0.5)); }
+    50% { filter: drop-shadow(0 0 20px rgba(200, 200, 200, 0.8)); }
+  }
+
+  .skeleton-hp-bar {
+    width: 50px;
+    height: 4px;
+    background: var(--bg-tertiary);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .skeleton-hp-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #888, #aaa);
+    transition: width 0.3s ease;
+  }
+
+  .skeleton-label {
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
   }
 
   /* Floating Damage */
