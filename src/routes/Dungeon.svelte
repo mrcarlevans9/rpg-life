@@ -39,7 +39,8 @@
   import { DUNGEON_UPGRADES } from '../lib/db/index.js';
   import { playerData } from '../lib/stores/player.js';
   import EquipmentInventory from '../components/game/EquipmentInventory.svelte';
-  import { pendingLootData } from '../lib/stores/equipment.js';
+  import { pendingLootData, equippedItems, equipmentData } from '../lib/stores/equipment.js';
+  import { SLOT_TYPES, RARITIES } from '../lib/db/index.js';
 
   let showShop = false;
   let showSpellEditor = false;
@@ -350,6 +351,41 @@
           {/each}
         </div>
         <p class="spell-hint">Unlock more slots at levels 10, 25, 50 or buy from shop</p>
+      </Card>
+
+      <!-- Equipment Loadout -->
+      <Card class="equipment-card">
+        <div class="equipment-header">
+          <h3>⚔️ Equipment</h3>
+          <button class="manage-btn" on:click={() => showEquipment = true}>Manage</button>
+        </div>
+        <div class="equipment-slots-grid">
+          {#each SLOT_TYPES as slotType}
+            {@const equipped = $equippedItems?.[slotType]}
+            <button
+              class="equipment-slot"
+              class:empty={!equipped}
+              style={equipped ? `--rarity-color: ${RARITIES[equipped.rarity]?.color || '#9ca3af'}` : ''}
+              on:click={() => showEquipment = true}
+            >
+              <span class="slot-icon">
+                {#if slotType === 'weapon'}⚔️{:else if slotType === 'armor'}🛡️{:else}💍{/if}
+              </span>
+              {#if equipped}
+                <span class="slot-name" style="color: {RARITIES[equipped.rarity]?.color || '#fff'}">{equipped.name}</span>
+                <span class="slot-rarity">{RARITIES[equipped.rarity]?.name || equipped.rarity}</span>
+              {:else}
+                <span class="slot-empty-text">{slotType}</span>
+              {/if}
+            </button>
+          {/each}
+        </div>
+        <p class="equipment-hint">
+          {($equipmentData || []).length} items in inventory
+          {#if ($pendingLootData || []).length > 0}
+            • <span class="pending-text">{$pendingLootData.length} pending extraction</span>
+          {/if}
+        </p>
       </Card>
     </div>
   {/if}
@@ -2959,6 +2995,106 @@
     font-size: 0.75rem;
     color: var(--text-muted);
     margin-top: var(--spacing-sm);
+  }
+
+  /* ========== EQUIPMENT CARD ========== */
+  :global(.equipment-card) {
+    padding: var(--spacing-md);
+  }
+
+  .equipment-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-md);
+  }
+
+  .equipment-header h3 {
+    margin: 0;
+    color: #6366f1;
+  }
+
+  .manage-btn {
+    background: rgba(99, 102, 241, 0.2);
+    border: 1px solid #6366f1;
+    color: #6366f1;
+    padding: 4px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .manage-btn:hover {
+    background: rgba(99, 102, 241, 0.3);
+  }
+
+  .equipment-slots-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--spacing-sm);
+  }
+
+  .equipment-slot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: var(--spacing-sm);
+    background: var(--bg-secondary);
+    border: 2px dashed var(--border-color);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.2s;
+    min-height: 70px;
+    text-align: center;
+  }
+
+  .equipment-slot:hover {
+    border-color: #6366f1;
+    background: rgba(99, 102, 241, 0.1);
+  }
+
+  .equipment-slot:not(.empty) {
+    border-style: solid;
+    border-color: var(--rarity-color, #6366f1);
+    background: rgba(99, 102, 241, 0.05);
+  }
+
+  .equipment-slot .slot-icon {
+    font-size: 1.2rem;
+  }
+
+  .equipment-slot .slot-name {
+    font-size: 0.75rem;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+
+  .equipment-slot .slot-rarity {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+  }
+
+  .equipment-slot .slot-empty-text {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: capitalize;
+  }
+
+  .equipment-hint {
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: var(--spacing-sm);
+  }
+
+  .equipment-hint .pending-text {
+    color: #fbbf24;
   }
 
   /* ========== MERCHANT ENCOUNTER ========== */
