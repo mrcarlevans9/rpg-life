@@ -13,11 +13,11 @@
     demoteMember,
     transferLeadership,
     getActiveBossFight,
-    startBossFight,
-    dealBossDamage
+    startBossFight
   } from '../../lib/services/guildService.js';
   import Card from '../common/Card.svelte';
   import ProgressBar from '../common/ProgressBar.svelte';
+  import GuildBossBattle from './GuildBossBattle.svelte';
 
   const dispatch = createEventDispatcher();
 
@@ -28,6 +28,9 @@
   let searchQuery = '';
   let loading = false;
   let actionLoading = null;
+
+  // Battle mode
+  let inBattle = false;
 
   // Create guild form
   let newGuildName = '';
@@ -239,28 +242,15 @@
     }
   }
 
-  async function handleAttackBoss() {
+  function enterBattle() {
     if (!activeBoss) return;
+    inBattle = true;
+  }
 
-    actionLoading = 'boss';
-    try {
-      // Calculate damage based on player stats (simplified for now)
-      const baseDamage = Math.floor(50 + Math.random() * 50);
-      const result = await dealBossDamage(activeBoss.id, baseDamage);
-
-      if (result.success) {
-        activeBoss = result.bossFight;
-        if (result.wasDefeated) {
-          alert('Boss defeated! Great teamwork!');
-        }
-      } else {
-        alert(result.error || 'Failed to attack');
-      }
-    } catch (err) {
-      console.error('Failed to attack boss:', err);
-    } finally {
-      actionLoading = null;
-    }
+  async function handleBattleExit() {
+    inBattle = false;
+    // Refresh boss data after battle
+    activeBoss = await getActiveBossFight();
   }
 
   function getRoleBadgeClass(role) {
@@ -458,10 +448,9 @@
 
               <button
                 class="btn-attack"
-                on:click={handleAttackBoss}
-                disabled={actionLoading === 'boss'}
+                on:click={enterBattle}
               >
-                {actionLoading === 'boss' ? 'Attacking...' : 'Attack Boss!'}
+                ⚔️ Enter Battle
               </button>
 
               {#if Object.keys(activeBoss.participants || {}).length > 0}
@@ -606,6 +595,11 @@
     Back
   </button>
 </div>
+
+<!-- Guild Boss Battle Overlay -->
+{#if inBattle && activeBoss}
+  <GuildBossBattle bossFight={activeBoss} on:exit={handleBattleExit} />
+{/if}
 
 <style>
   .guild-panel {
