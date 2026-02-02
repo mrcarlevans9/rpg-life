@@ -75,23 +75,26 @@
 
 <style>
   .notification-banner {
+    position: fixed;
+    top: var(--header-height);
+    left: 0;
+    right: 0;
+    z-index: 90;
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
     width: 100%;
     padding: var(--spacing-sm) var(--spacing-md);
-    background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(139, 92, 246, 0.15));
-    border: 1px solid rgba(99, 102, 241, 0.3);
-    border-left: none;
-    border-right: none;
-    color: var(--text-primary);
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.9), rgba(139, 92, 246, 0.9));
+    border-bottom: 1px solid rgba(99, 102, 241, 0.5);
+    color: white;
     font-size: 0.875rem;
     cursor: pointer;
     transition: all var(--transition-fast);
   }
 
   .notification-banner:hover {
-    background: linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(139, 92, 246, 0.25));
+    background: linear-gradient(135deg, rgba(99, 102, 241, 1), rgba(139, 92, 246, 1));
   }
 
   .notification-icon {
@@ -103,8 +106,9 @@
   }
 
   .notification-action {
-    color: var(--accent);
+    color: white;
     font-weight: 600;
+    text-decoration: underline;
   }
 
   .dismiss-btn {
@@ -113,23 +117,22 @@
     justify-content: center;
     width: 24px;
     height: 24px;
-    background: rgba(0, 0, 0, 0.2);
+    background: rgba(255, 255, 255, 0.2);
     border: none;
     border-radius: var(--radius-sm);
-    color: var(--text-muted);
+    color: white;
     font-size: 0.75rem;
     cursor: pointer;
     transition: all var(--transition-fast);
   }
 
   .dismiss-btn:hover {
-    background: rgba(0, 0, 0, 0.3);
-    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.3);
   }
 
   @media (min-width: 1024px) {
     .notification-banner {
-      margin-left: var(--sidebar-width);
+      left: var(--sidebar-width);
     }
   }
 </style>
