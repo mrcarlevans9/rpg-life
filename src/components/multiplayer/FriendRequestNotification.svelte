@@ -61,7 +61,7 @@
 </script>
 
 {#if pendingCount > 0 && !dismissed}
-  <button class="notification-banner" on:click={handleClick}>
+  <div class="notification-banner" on:click={handleClick} on:keypress={(e) => e.key === 'Enter' && handleClick()} role="button" tabindex="0">
     <span class="notification-icon">👋</span>
     <span class="notification-text">
       You have {pendingCount} pending friend request{pendingCount > 1 ? 's' : ''}!
@@ -70,7 +70,7 @@
     <button class="dismiss-btn" on:click={dismiss} aria-label="Dismiss">
       ✕
     </button>
-  </button>
+  </div>
 {/if}
 
 <style>
