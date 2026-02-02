@@ -6,6 +6,7 @@
   let pendingCount = 0;
   let dismissed = false;
   let checkInterval;
+  let lastDismissedCount = 0;
 
   async function checkPendingRequests() {
     if (!$authUser) {
@@ -15,16 +16,15 @@
 
     try {
       const pending = await getPendingRequests();
-      pendingCount = pending?.length || 0;
+      const newCount = pending?.length || 0;
 
-      // Reset dismissed if count changed (new request came in)
-      if (pendingCount > 0) {
-        const lastCount = parseInt(sessionStorage.getItem('lastPendingCount') || '0');
-        if (pendingCount > lastCount) {
-          dismissed = false;
-        }
-        sessionStorage.setItem('lastPendingCount', pendingCount.toString());
+      // If count increased, show the banner again
+      if (newCount > lastDismissedCount) {
+        dismissed = false;
       }
+
+      pendingCount = newCount;
+      console.log('Pending friend requests:', pendingCount, 'dismissed:', dismissed);
     } catch (error) {
       console.error('Failed to check pending requests:', error);
     }
@@ -33,16 +33,19 @@
   function handleClick() {
     // Navigate to multiplayer page (friends tab)
     window.location.hash = '#/multiplayer';
+    lastDismissedCount = pendingCount;
     dismissed = true;
   }
 
   function dismiss(e) {
     e.stopPropagation();
+    lastDismissedCount = pendingCount;
     dismissed = true;
   }
 
   onMount(() => {
-    checkPendingRequests();
+    // Small delay to ensure auth is ready
+    setTimeout(checkPendingRequests, 500);
     // Check every 30 seconds for new requests
     checkInterval = setInterval(checkPendingRequests, 30000);
   });
@@ -53,7 +56,7 @@
 
   // Re-check when auth state changes
   $: if ($authUser) {
-    checkPendingRequests();
+    setTimeout(checkPendingRequests, 100);
   }
 </script>
 
