@@ -38,11 +38,14 @@
   } from '../lib/stores/dungeon.js';
   import { DUNGEON_UPGRADES } from '../lib/db/index.js';
   import { playerData } from '../lib/stores/player.js';
+  import EquipmentInventory from '../components/game/EquipmentInventory.svelte';
+  import { pendingLootData } from '../lib/stores/equipment.js';
 
   let showShop = false;
   let showSpellEditor = false;
   let showSpellMenu = false;
   let showInventoryMenu = false;
+  let showEquipment = false;
 
   // Derived: expedition inventory items
   $: expeditionInventory = $dungeonData?.expeditionInventory || [];
@@ -293,6 +296,9 @@
         <Button variant="secondary" on:click={() => showShop = true}>
           Shop
         </Button>
+        <Button variant="secondary" on:click={() => showEquipment = true}>
+          Equipment
+        </Button>
       </div>
 
       <!-- Spell Slots -->
@@ -536,6 +542,13 @@
                 🎒 ITEMS <span class="item-count">({expeditionInventory.length})</span>
               </button>
             {/if}
+            <button
+              class="action-btn item gear"
+              on:click={() => showEquipment = true}
+              disabled={$combatState.isAnimating}
+            >
+              ⚙️ GEAR {#if ($pendingLootData || []).length > 0}<span class="item-count pending">({$pendingLootData.length} pending)</span>{/if}
+            </button>
             {#if canRetreat()}
               <!-- Safe retreat - floor complete, keep all gold -->
               <button
@@ -1062,6 +1075,9 @@
     </div>
   {/if}
 </div>
+
+<!-- Equipment Inventory Modal -->
+<EquipmentInventory bind:isOpen={showEquipment} on:close={() => showEquipment = false} />
 
 <style>
   .dungeon-page {
@@ -2191,6 +2207,20 @@
   .item-count {
     font-size: 0.6rem;
     opacity: 0.8;
+  }
+
+  .item-count.pending {
+    color: #fbbf24;
+    opacity: 1;
+    font-weight: 600;
+  }
+
+  .action-btn.gear {
+    background: linear-gradient(135deg, #6366f1, #4f46e5);
+  }
+
+  .action-btn.gear:hover:not(:disabled) {
+    background: linear-gradient(135deg, #818cf8, #6366f1);
   }
 
   .gold-display {
