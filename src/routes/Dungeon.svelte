@@ -47,6 +47,34 @@
   let showInventoryMenu = false;
   let showEquipment = false;
 
+  // Nested menu state: 'main' | 'fight' | 'spells' | 'items' | 'expedition' | 'status'
+  let activeMenu = 'main';
+
+  // Reset menu when entering combat or combat ends
+  $: if ($currentMonster || !$currentRun) {
+    activeMenu = 'main';
+  }
+
+  // Helper to check if there are any active status effects to show
+  function hasStatusEffects(run) {
+    if (!run) return false;
+    const buffs = run.tempBuffs || {};
+    const status = run.statusEffects || {};
+    const boss = run.bossState || {};
+    return (
+      buffs.bonusDamage > 0 ||
+      buffs.defenseBonus > 0 ||
+      buffs.goldBonus > 0 ||
+      status.damageReductionTurns > 0 ||
+      status.extraDamageTaken > 0 ||
+      status.burnTurns > 0 ||
+      status.stunned ||
+      status.grabbed ||
+      boss.isCharging ||
+      boss.skeletonActive
+    );
+  }
+
   // Derived: expedition inventory items
   $: expeditionInventory = $dungeonData?.expeditionInventory || [];
 
@@ -498,12 +526,13 @@
 
       <!-- Action Panel -->
       <div class="action-panel">
-        <!-- Action Buttons -->
-          <div class="action-grid" class:has-spells={($currentRun?.customSpells || []).filter(s => s).length > 0}>
+        <!-- Nested Menu Combat UI -->
+        {#if activeMenu === 'main'}
+          <div class="action-grid main-menu">
             {#if $currentMonster}
               <button
                 class="action-btn attack"
-                on:click={playerAttack}
+                on:click={() => activeMenu = 'fight'}
                 disabled={$combatState.isAnimating}
               >
                 ⚔️ FIGHT
@@ -515,20 +544,102 @@
               >
                 🛡️ DEFEND
               </button>
-              {#if ($currentRun?.customSpells || []).filter(s => s).length > 0}
-                <button
-                  class="action-btn spell"
-                  on:click={() => showSpellMenu = !showSpellMenu}
-                  disabled={$combatState.isAnimating}
-                >
-                  ✨ CAST
-                  <span class="item-count">({$currentRun?.playerMp || 0} MP)</span>
-                </button>
-              {/if}
             {/if}
             <button
               class="action-btn item"
-              on:click={usePotion}
+              on:click={() => activeMenu = 'items'}
+              disabled={$combatState.isAnimating}
+            >
+              🎒 ITEMS
+              {#if runPotions > 0 || expeditionInventory.length > 0 || ($pendingLootData || []).length > 0}
+                <span class="item-count">
+                  ({runPotions + expeditionInventory.length}{#if ($pendingLootData || []).length > 0}+{$pendingLootData.length}{/if})
+                </span>
+              {/if}
+            </button>
+            {#if hasStatusEffects($currentRun)}
+              <button
+                class="action-btn status"
+                on:click={() => activeMenu = 'status'}
+                disabled={$combatState.isAnimating}
+              >
+                📊 STATUS
+              </button>
+            {/if}
+            {#if canRetreat()}
+              <button
+                class="action-btn run safe"
+                on:click={retreat}
+                disabled={$combatState.isAnimating}
+              >
+                🚪 LEAVE <span class="item-count">(safe)</span>
+              </button>
+            {:else if $currentMonster}
+              <button
+                class="action-btn run danger"
+                on:click={emergencyRetreat}
+                disabled={$combatState.isAnimating}
+              >
+                🏃 FLEE <span class="item-count">(½ gold)</span>
+              </button>
+            {/if}
+          </div>
+
+        {:else if activeMenu === 'fight'}
+          <div class="action-grid submenu">
+            <button
+              class="action-btn attack"
+              on:click={() => { playerAttack(); activeMenu = 'main'; }}
+              disabled={$combatState.isAnimating}
+            >
+              🎲 ATTACK
+            </button>
+            {#if ($currentRun?.customSpells || []).filter(s => s).length > 0}
+              <button
+                class="action-btn spell"
+                on:click={() => activeMenu = 'spells'}
+                disabled={$combatState.isAnimating}
+              >
+                ✨ SPELLS <span class="item-count">({$currentRun?.playerMp || 0} MP)</span>
+              </button>
+            {/if}
+            <button
+              class="action-btn back"
+              on:click={() => activeMenu = 'main'}
+              disabled={$combatState.isAnimating}
+            >
+              ← BACK
+            </button>
+          </div>
+
+        {:else if activeMenu === 'spells'}
+          <div class="action-grid submenu spell-list">
+            {#each ($currentRun?.customSpells || []) as spell, i}
+              {#if spell}
+                <button
+                  class="action-btn spell-item"
+                  on:click={() => { castSpell(i); activeMenu = 'main'; }}
+                  disabled={$combatState.isAnimating || $currentRun.playerMp < spell.manaCost}
+                >
+                  ✨ {spell.name}
+                  <span class="spell-stats">{spell.damage} DMG / {spell.manaCost} MP</span>
+                </button>
+              {/if}
+            {/each}
+            <button
+              class="action-btn back"
+              on:click={() => activeMenu = 'fight'}
+              disabled={$combatState.isAnimating}
+            >
+              ← BACK
+            </button>
+          </div>
+
+        {:else if activeMenu === 'items'}
+          <div class="action-grid submenu">
+            <button
+              class="action-btn item potion"
+              on:click={() => { usePotion(); activeMenu = 'main'; }}
               disabled={runPotions <= 0 || $currentRun?.playerHp >= $currentRun?.maxHp || $combatState.isAnimating}
             >
               🧪 POTION <span class="item-count">({runPotions})</span>
@@ -536,95 +647,95 @@
             {#if expeditionInventory.length > 0}
               <button
                 class="action-btn item inventory"
-                on:click={() => showInventoryMenu = !showInventoryMenu}
+                on:click={() => activeMenu = 'expedition'}
                 disabled={$combatState.isAnimating}
               >
-                🎒 ITEMS <span class="item-count">({expeditionInventory.length})</span>
+                🎒 EXPEDITION <span class="item-count">({expeditionInventory.length})</span>
               </button>
             {/if}
             <button
               class="action-btn item gear"
-              on:click={() => showEquipment = true}
+              on:click={() => { showEquipment = true; activeMenu = 'main'; }}
               disabled={$combatState.isAnimating}
             >
-              ⚙️ GEAR {#if ($pendingLootData || []).length > 0}<span class="item-count pending">({$pendingLootData.length} pending)</span>{/if}
+              ⚙️ EQUIPMENT
+              {#if ($pendingLootData || []).length > 0}
+                <span class="item-count pending">({$pendingLootData.length} pending)</span>
+              {/if}
             </button>
-            {#if canRetreat()}
-              <!-- Safe retreat - floor complete, keep all gold -->
-              <button
-                class="action-btn run safe"
-                on:click={retreat}
-                disabled={$combatState.isAnimating}
-              >
-                🚪 LEAVE
-                <span class="item-count">(safe)</span>
-              </button>
-            {:else if $currentMonster}
-              <!-- Emergency retreat - in combat, lose half gold -->
-              <button
-                class="action-btn run danger"
-                on:click={emergencyRetreat}
-                disabled={$combatState.isAnimating}
-              >
-                🏃 FLEE
-                <span class="item-count">(½ gold)</span>
-              </button>
-            {/if}
+            <button
+              class="action-btn back"
+              on:click={() => activeMenu = 'main'}
+              disabled={$combatState.isAnimating}
+            >
+              ← BACK
+            </button>
           </div>
 
-          <!-- Spell Selection Menu -->
-          {#if showSpellMenu && $currentMonster}
-            <div class="spell-menu">
-              <div class="spell-menu-header">
-                <span>Select Spell</span>
-                <button class="spell-menu-close" on:click={() => showSpellMenu = false}>×</button>
-              </div>
-              <div class="spell-menu-list">
-                {#each ($currentRun?.customSpells || []) as spell, i}
-                  {#if spell}
-                    <button
-                      class="spell-menu-item"
-                      on:click={() => { castSpell(i); showSpellMenu = false; }}
-                      disabled={$currentRun.playerMp < spell.manaCost}
-                    >
-                      <span class="spell-menu-icon">✨</span>
-                      <div class="spell-menu-info">
-                        <span class="spell-menu-name">{spell.name}</span>
-                        <span class="spell-menu-stats">{spell.damage} DMG</span>
-                      </div>
-                      <span class="spell-menu-cost" class:insufficient={$currentRun.playerMp < spell.manaCost}>
-                        {spell.manaCost} MP
-                      </span>
-                    </button>
-                  {/if}
-                {/each}
-              </div>
-            </div>
-          {/if}
+        {:else if activeMenu === 'expedition'}
+          <div class="action-grid submenu expedition-list">
+            {#each expeditionInventory as item}
+              <button
+                class="action-btn item expedition-item"
+                on:click={async () => { await useExpeditionItem(item.id); activeMenu = 'main'; }}
+                disabled={$combatState.isAnimating}
+              >
+                {item.emoji} {item.name}
+                <span class="item-desc">{item.description}</span>
+              </button>
+            {/each}
+            <button
+              class="action-btn back"
+              on:click={() => activeMenu = 'items'}
+              disabled={$combatState.isAnimating}
+            >
+              ← BACK
+            </button>
+          </div>
 
-          <!-- Expedition Inventory Menu -->
-          {#if showInventoryMenu && expeditionInventory.length > 0}
-            <div class="inventory-menu">
-              <div class="inventory-menu-header">
-                <span>🎒 Expedition Items</span>
-                <button class="inventory-menu-close" on:click={() => showInventoryMenu = false}>×</button>
-              </div>
-              <div class="inventory-menu-list">
-                {#each expeditionInventory as item}
-                  <button
-                    class="inventory-menu-item"
-                    on:click={async () => { await useExpeditionItem(item.id); showInventoryMenu = false; }}
-                  >
-                    <span class="inventory-menu-icon">{item.emoji}</span>
-                    <div class="inventory-menu-info">
-                      <span class="inventory-menu-name">{item.name}</span>
-                      <span class="inventory-menu-desc">{item.description}</span>
-                    </div>
-                  </button>
-                {/each}
-              </div>
+        {:else if activeMenu === 'status'}
+          <div class="status-panel">
+            <h4>Status Effects</h4>
+            <div class="status-list">
+              {#if $currentRun?.tempBuffs?.bonusDamage > 0}
+                <div class="status-item buff">⚔️ +{$currentRun.tempBuffs.bonusDamage} Damage</div>
+              {/if}
+              {#if $currentRun?.tempBuffs?.defenseBonus > 0}
+                <div class="status-item buff">🛡️ +{$currentRun.tempBuffs.defenseBonus} Defense</div>
+              {/if}
+              {#if $currentRun?.tempBuffs?.goldBonus > 0}
+                <div class="status-item buff">💰 +{$currentRun.tempBuffs.goldBonus} Gold/kill</div>
+              {/if}
+              {#if $currentRun?.statusEffects?.damageReductionTurns > 0}
+                <div class="status-item debuff">💔 -{$currentRun.statusEffects.damageReduction} Damage ({$currentRun.statusEffects.damageReductionTurns} turns)</div>
+              {/if}
+              {#if $currentRun?.statusEffects?.extraDamageTaken > 0}
+                <div class="status-item debuff">🔮 +{$currentRun.statusEffects.extraDamageTaken} Damage Taken (Hex)</div>
+              {/if}
+              {#if $currentRun?.statusEffects?.burnTurns > 0}
+                <div class="status-item debuff">🔥 {$currentRun.statusEffects.burnDamage} Burn/turn ({$currentRun.statusEffects.burnTurns} turns)</div>
+              {/if}
+              {#if $currentRun?.statusEffects?.stunned}
+                <div class="status-item debuff">⚡ Stunned!</div>
+              {/if}
+              {#if $currentRun?.statusEffects?.grabbed}
+                <div class="status-item debuff">🦑 Grabbed!</div>
+              {/if}
+              {#if $currentRun?.bossState?.isCharging}
+                <div class="status-item warning">🐂 Boss is charging!</div>
+              {/if}
+              {#if $currentRun?.bossState?.skeletonActive}
+                <div class="status-item enemy">💀 Skeleton Ally ({$currentRun.bossState.skeletonHp} HP)</div>
+              {/if}
             </div>
-          {/if}
+            <button
+              class="action-btn back"
+              on:click={() => activeMenu = 'main'}
+            >
+              ← BACK
+            </button>
+          </div>
+        {/if}
       </div>
     </div>
   {/if}
@@ -1900,6 +2011,23 @@
     gap: 8px;
   }
 
+  .action-grid.main-menu {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .action-grid.submenu {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .action-grid.spell-list,
+  .action-grid.expedition-list {
+    grid-template-columns: 1fr;
+    gap: 6px;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
   .action-grid.has-spells {
     grid-template-columns: repeat(3, 1fr);
   }
@@ -1993,6 +2121,119 @@
 
   .action-btn.spell:hover:not(:disabled) {
     background: rgba(139, 92, 246, 0.1);
+  }
+
+  .action-btn.back {
+    border-color: #6b7280;
+    color: #9ca3af;
+    font-size: 0.75rem;
+  }
+
+  .action-btn.back:hover:not(:disabled) {
+    background: rgba(107, 114, 128, 0.1);
+    color: white;
+  }
+
+  .action-btn.status {
+    border-color: #f59e0b;
+    color: #f59e0b;
+  }
+
+  .action-btn.status:hover:not(:disabled) {
+    background: rgba(245, 158, 11, 0.1);
+  }
+
+  .action-btn.spell-item {
+    border-color: #8b5cf6;
+    color: #a78bfa;
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+    padding: 10px 12px;
+  }
+
+  .action-btn.spell-item:hover:not(:disabled) {
+    background: rgba(139, 92, 246, 0.15);
+  }
+
+  .action-btn.spell-item:disabled {
+    opacity: 0.4;
+    border-color: #4b5563;
+    color: #6b7280;
+  }
+
+  .spell-stats {
+    font-size: 0.7rem;
+    color: #9ca3af;
+    margin-top: 2px;
+  }
+
+  .action-btn.expedition-item {
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+    padding: 10px 12px;
+  }
+
+  .item-desc {
+    font-size: 0.7rem;
+    color: #9ca3af;
+    margin-top: 2px;
+  }
+
+  /* Status Panel */
+  .status-panel {
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .status-panel h4 {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #9ca3af;
+    text-transform: uppercase;
+  }
+
+  .status-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 150px;
+    overflow-y: auto;
+  }
+
+  .status-item {
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    font-size: 0.8rem;
+  }
+
+  .status-item.buff {
+    background: rgba(34, 197, 94, 0.15);
+    color: #4ade80;
+    border-left: 2px solid #22c55e;
+  }
+
+  .status-item.debuff {
+    background: rgba(239, 68, 68, 0.15);
+    color: #fca5a5;
+    border-left: 2px solid #ef4444;
+  }
+
+  .status-item.warning {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fcd34d;
+    border-left: 2px solid #f59e0b;
+  }
+
+  .status-item.enemy {
+    background: rgba(139, 92, 246, 0.15);
+    color: #c4b5fd;
+    border-left: 2px solid #8b5cf6;
   }
 
   /* ===== SPELL SELECTION MENU ===== */
