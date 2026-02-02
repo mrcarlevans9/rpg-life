@@ -116,11 +116,6 @@
 
   $: canAct = !$combatState.isAnimating && $battlePhase === 'combat';
 
-  // Get dice face
-  function getDiceFace(value) {
-    const faces = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
-    return faces[value] || '⚀';
-  }
 </script>
 
 <div class="guild-boss-battle">
@@ -180,154 +175,204 @@
     </div>
 
   {:else if $battlePhase === 'combat' || $battlePhase === 'victory' || $battlePhase === 'defeat'}
-    <!-- COMBAT PHASE -->
-    <div class="combat-phase">
-      <!-- Boss Section -->
-      <div class="boss-section">
-        <div class="boss-display">
-          <span class="boss-emoji" class:shake={$combatState.lastDamageToEnemy}>
-            {$activeBossFight?.boss_emoji || '👹'}
-          </span>
-          {#if $combatState.lastDamageToEnemy}
-            <span class="damage-number enemy-damage">-{$combatState.lastDamageToEnemy}</span>
-          {/if}
-        </div>
-
-        <div class="boss-info">
-          <span class="boss-name">{$activeBossFight?.boss_name || 'Guild Boss'}</span>
-          <div class="boss-hp-bar">
-            <div class="hp-bar-fill" style="width: {bossHpPercent}%"></div>
-            <span class="hp-text">
-              {$activeBossFight?.boss_current_hp || 0} / {$activeBossFight?.boss_max_hp || 0}
-            </span>
+    <!-- COMBAT PHASE - Dungeon Style -->
+    <div class="battle-screen" class:screen-shake={$combatState.lastDamageToPlayer}>
+      <!-- Top HUD: Boss HP -->
+      <div class="battle-hud">
+        <div class="hud-box enemy-hud boss-hud">
+          <div class="hud-label">
+            {$activeBossFight?.boss_name || 'Guild Boss'}
+            <span class="boss-tag major">GUILD BOSS</span>
+          </div>
+          <div class="hud-hp-bar" class:hp-flash={$combatState.lastDamageToEnemy}>
+            <div
+              class="hud-hp-fill boss-hp"
+              style="width: {bossHpPercent}%"
+            ></div>
+          </div>
+          <div class="hud-hp-text">
+            <span>{$activeBossFight?.boss_current_hp || 0}/{$activeBossFight?.boss_max_hp || 0}</span>
           </div>
         </div>
       </div>
 
-      <!-- Message Box -->
-      <div class="message-box">
-        <p>{$currentMessage || 'Your turn!'}</p>
-      </div>
-
-      <!-- Dice Display -->
-      {#if displayedRolls.length > 0}
-        <div class="dice-display">
-          {#each displayedRolls as roll, i}
-            <span class="die" class:revealed={diceRevealed[i]}>
-              {getDiceFace(roll)}
-            </span>
-          {/each}
-        </div>
-      {/if}
-
-      <!-- Player Section -->
-      <div class="player-section">
-        <div class="player-stats">
-          <div class="stat-bar">
-            <span class="stat-label">HP</span>
-            <div class="bar hp-bar">
-              <div class="bar-fill hp-fill" style="width: {playerHpPercent}%"></div>
-            </div>
-            <span class="stat-value">{$playerCombat.hp}/{$playerCombat.maxHp}</span>
-          </div>
-          <div class="stat-bar">
-            <span class="stat-label">MP</span>
-            <div class="bar mp-bar">
-              <div class="bar-fill mp-fill" style="width: {playerMpPercent}%"></div>
-            </div>
-            <span class="stat-value">{$playerCombat.mp}/{$playerCombat.maxMp}</span>
-          </div>
+      <!-- Main Arena: Big centered enemy -->
+      <div class="battle-arena">
+        <div
+          class="monster-display is-boss is-major-boss"
+          class:sprite-hit={$combatState.lastDamageToEnemy}
+          class:sprite-attack={$combatState.enemyAction === 'attack'}
+        >
+          <span class="monster-emoji">{$activeBossFight?.boss_emoji || '👹'}</span>
+          {#key $combatState.lastDamageToEnemy}
+            {#if $combatState.lastDamageToEnemy}
+              <div class="floating-damage">-{$combatState.lastDamageToEnemy}</div>
+            {/if}
+          {/key}
         </div>
 
-        {#if $combatState.lastDamageToPlayer}
-          <span class="damage-number player-damage">-{$combatState.lastDamageToPlayer}</span>
+        <!-- Visual Effects -->
+        {#if $combatState.playerAction === 'attack'}
+          <div class="battle-effect slash"></div>
         {/if}
-      </div>
+        {#if $combatState.playerAction === 'defend'}
+          <div class="battle-effect shield">🛡️</div>
+        {/if}
 
-      <!-- Action Buttons -->
-      {#if $battlePhase === 'combat'}
-        <div class="action-buttons">
-          <button
-            class="action-btn attack"
-            on:click={playerAttack}
-            disabled={!canAct}
-          >
-            ⚔️ Attack
-          </button>
-
-          <button
-            class="action-btn defend"
-            on:click={playerDefend}
-            disabled={!canAct}
-          >
-            🛡️ Defend
-          </button>
-
-          <button
-            class="action-btn potion"
-            on:click={usePotion}
-            disabled={!canAct || $playerCombat.potions <= 0}
-          >
-            🧪 Potion ({$playerCombat.potions})
-          </button>
-
-          <button
-            class="action-btn spell"
-            on:click={() => showSpellMenu = !showSpellMenu}
-            disabled={!canAct || !$playerCombat.customSpells?.length}
-          >
-            ✨ Spells
-          </button>
-        </div>
-
-        <!-- Spell Menu -->
-        {#if showSpellMenu && $playerCombat.customSpells?.length}
-          <div class="spell-menu">
-            {#each $playerCombat.customSpells as spell, i}
-              {#if spell}
-                <button
-                  class="spell-btn"
-                  on:click={() => handleCastSpell(spell)}
-                  disabled={$playerCombat.mp < spell.manaCost}
-                >
-                  <span class="spell-name">{spell.name}</span>
-                  <span class="spell-cost">{spell.manaCost} MP</span>
-                  <span class="spell-damage">{spell.damage} dmg</span>
-                </button>
+        <!-- Combat Message Overlay (bottom of arena) -->
+        {#if ($combatState.isAnimating || $combatState.turn === 'player') && $currentMessage}
+          <div class="combat-message-overlay">
+            <div class="combat-toast" class:crit={$lastRoll?.critical}>
+              {#if displayedRolls.length > 0}
+                <span class="toast-dice">
+                  {#each displayedRolls as roll, i}
+                    <span class="toast-die" class:rolling={!diceRevealed[i]} class:revealed={diceRevealed[i]}>{roll}</span>{#if i < displayedRolls.length - 1}<span class="toast-plus">+</span>{/if}
+                  {/each}
+                </span>
+                <span class="toast-arrow">→</span>
               {/if}
-            {/each}
+              <span class="toast-message">{$currentMessage}</span>
+              {#if $lastRoll?.critical}
+                <span class="toast-crit">CRIT!</span>
+              {/if}
+            </div>
           </div>
         {/if}
+      </div>
 
-        <button class="btn-retreat" on:click={handleRetreat}>
-          🏃 Retreat
-        </button>
-
-      {:else if $battlePhase === 'victory'}
-        <div class="result-screen victory">
-          <h2>🎉 Victory!</h2>
-          <p>The guild boss has been defeated!</p>
-          <p class="contribution">
-            Your damage: {$activeBossFight?.participants?.[$playerData?.id]?.damage || 'N/A'}
-          </p>
-          <button class="btn-exit" on:click={handleExit}>
-            Continue
-          </button>
+      <!-- Player Stats Bar (below arena) -->
+      <div class="player-bar" class:bar-flash={$combatState.lastDamageToPlayer}>
+        <div class="player-bar-content">
+          <div class="bars-stack">
+            <div class="bar-row hp-row">
+              <span class="bar-label">HP</span>
+              <div class="bar-track">
+                <div
+                  class="bar-fill hp-fill"
+                  style="width: {playerHpPercent}%"
+                ></div>
+              </div>
+              <span class="bar-value">{$playerCombat.hp}/{$playerCombat.maxHp}</span>
+              {#key $combatState.lastDamageToPlayer}
+                {#if $combatState.lastDamageToPlayer}
+                  <span class="bar-damage">-{$combatState.lastDamageToPlayer}</span>
+                {/if}
+              {/key}
+            </div>
+            <div class="bar-row mp-row">
+              <span class="bar-label">MP</span>
+              <div class="bar-track">
+                <div
+                  class="bar-fill mp-fill"
+                  style="width: {playerMpPercent}%"
+                ></div>
+              </div>
+              <span class="bar-value">{$playerCombat.mp}/{$playerCombat.maxMp}</span>
+            </div>
+          </div>
         </div>
+      </div>
 
-      {:else if $battlePhase === 'defeat'}
-        <div class="result-screen defeat">
-          <h2>💀 Defeated</h2>
-          <p>You have fallen, but the boss remains weakened!</p>
-          <p class="boss-hp-remaining">
-            Boss HP: {$activeBossFight?.boss_current_hp} / {$activeBossFight?.boss_max_hp}
-          </p>
-          <p class="encourage">Your guildmates can continue the fight!</p>
-          <button class="btn-exit" on:click={handleExit}>
-            Return to Guild
-          </button>
-        </div>
-      {/if}
+      <!-- Action Panel -->
+      <div class="action-panel">
+        {#if $battlePhase === 'combat'}
+          <div class="action-grid" class:has-spells={$playerCombat.customSpells?.filter(s => s).length > 0}>
+            <button
+              class="action-btn attack"
+              on:click={playerAttack}
+              disabled={!canAct}
+            >
+              ⚔️ FIGHT
+            </button>
+            <button
+              class="action-btn defend"
+              on:click={playerDefend}
+              disabled={!canAct}
+            >
+              🛡️ DEFEND
+            </button>
+            {#if $playerCombat.customSpells?.filter(s => s).length > 0}
+              <button
+                class="action-btn spell"
+                on:click={() => showSpellMenu = !showSpellMenu}
+                disabled={!canAct}
+              >
+                ✨ CAST
+                <span class="item-count">({$playerCombat.mp} MP)</span>
+              </button>
+            {/if}
+            <button
+              class="action-btn item"
+              on:click={usePotion}
+              disabled={!canAct || $playerCombat.potions <= 0}
+            >
+              🧪 POTION <span class="item-count">({$playerCombat.potions})</span>
+            </button>
+            <button
+              class="action-btn run danger"
+              on:click={handleRetreat}
+              disabled={!canAct}
+            >
+              🏃 FLEE
+            </button>
+          </div>
+
+          <!-- Spell Selection Menu -->
+          {#if showSpellMenu && $playerCombat.customSpells?.length}
+            <div class="spell-menu">
+              <div class="spell-menu-header">
+                <span>Select Spell</span>
+                <button class="spell-menu-close" on:click={() => showSpellMenu = false}>×</button>
+              </div>
+              <div class="spell-menu-list">
+                {#each $playerCombat.customSpells as spell, i}
+                  {#if spell}
+                    <button
+                      class="spell-menu-item"
+                      on:click={() => handleCastSpell(spell)}
+                      disabled={$playerCombat.mp < spell.manaCost}
+                    >
+                      <span class="spell-menu-icon">✨</span>
+                      <div class="spell-menu-info">
+                        <span class="spell-menu-name">{spell.name}</span>
+                        <span class="spell-menu-stats">{spell.damage} DMG</span>
+                      </div>
+                      <span class="spell-menu-cost" class:insufficient={$playerCombat.mp < spell.manaCost}>
+                        {spell.manaCost} MP
+                      </span>
+                    </button>
+                  {/if}
+                {/each}
+              </div>
+            </div>
+          {/if}
+
+        {:else if $battlePhase === 'victory'}
+          <div class="result-screen victory">
+            <h2>🎉 Victory!</h2>
+            <p>The guild boss has been defeated!</p>
+            <p class="contribution">
+              Your damage: {$activeBossFight?.participants?.[$playerData?.id]?.damage || 'N/A'}
+            </p>
+            <button class="btn-exit" on:click={handleExit}>
+              Continue
+            </button>
+          </div>
+
+        {:else if $battlePhase === 'defeat'}
+          <div class="result-screen defeat">
+            <h2>💀 Defeated</h2>
+            <p>You have fallen, but the boss remains weakened!</p>
+            <p class="boss-hp-remaining">
+              Boss HP: {$activeBossFight?.boss_current_hp} / {$activeBossFight?.boss_max_hp}
+            </p>
+            <p class="encourage">Your guildmates can continue the fight!</p>
+            <button class="btn-exit" on:click={handleExit}>
+              Return to Guild
+            </button>
+          </div>
+        {/if}
+      </div>
 
       <!-- Participants -->
       {#if $activeBossFight?.participants && Object.keys($activeBossFight.participants).length > 0}
@@ -499,166 +544,375 @@
     cursor: pointer;
   }
 
-  /* Combat Phase */
-  .combat-phase {
-    max-width: 500px;
-    margin: 0 auto;
+  /* Combat Phase - Dungeon Style */
+  .battle-screen {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    height: 100%;
+    max-width: 500px;
+    margin: 0 auto;
   }
 
-  .boss-section {
-    text-align: center;
-    padding: 20px;
-    background: var(--bg-secondary);
-    border-radius: 16px;
-    position: relative;
+  .battle-screen.screen-shake {
+    animation: screenShake 0.3s ease-in-out;
   }
 
-  .boss-display {
-    position: relative;
-    display: inline-block;
-  }
-
-  .boss-emoji {
-    font-size: 5rem;
-    display: block;
-    transition: transform 0.1s;
-  }
-
-  .boss-emoji.shake {
-    animation: shake 0.3s ease-in-out;
-  }
-
-  @keyframes shake {
+  @keyframes screenShake {
     0%, 100% { transform: translateX(0); }
-    25% { transform: translateX(-10px); }
-    75% { transform: translateX(10px); }
+    20% { transform: translateX(-5px); }
+    40% { transform: translateX(5px); }
+    60% { transform: translateX(-3px); }
+    80% { transform: translateX(3px); }
   }
 
-  .damage-number {
+  /* Top HUD */
+  .battle-hud {
+    display: flex;
+    justify-content: center;
+    padding: 10px;
+    gap: 10px;
+  }
+
+  .hud-box {
+    background: rgba(0, 0, 0, 0.6);
+    border-radius: var(--radius-md);
+    padding: 8px 12px;
+    min-width: 150px;
+  }
+
+  .enemy-hud {
+    border: 1px solid var(--danger);
+  }
+
+  .boss-hud {
+    border-color: #fbbf24;
+    background: rgba(251, 191, 36, 0.1);
+  }
+
+  .hud-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+  }
+
+  .boss-tag {
+    font-size: 0.6rem;
+    padding: 1px 4px;
+    border-radius: 2px;
+    background: var(--danger);
+    color: white;
+  }
+
+  .boss-tag.major {
+    background: #fbbf24;
+    color: #1a1a1a;
+  }
+
+  .hud-hp-bar {
+    height: 10px;
+    background: var(--bg-tertiary);
+    border-radius: 5px;
+    overflow: hidden;
+    margin-bottom: 2px;
+  }
+
+  .hud-hp-bar.hp-flash {
+    animation: hpFlash 0.3s ease-out;
+  }
+
+  @keyframes hpFlash {
+    0%, 100% { filter: brightness(1); }
+    50% { filter: brightness(1.5); }
+  }
+
+  .hud-hp-fill {
+    height: 100%;
+    transition: width 0.3s ease;
+    background: linear-gradient(90deg, #ef4444, #f97316);
+  }
+
+  .hud-hp-fill.boss-hp {
+    background: linear-gradient(90deg, #fbbf24, #f97316);
+  }
+
+  .hud-hp-text {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-align: center;
+  }
+
+  /* Battle Arena */
+  .battle-arena {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    min-height: 200px;
+    background: linear-gradient(180deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+    border-radius: var(--radius-lg);
+    margin: 0 10px;
+  }
+
+  .monster-display {
+    position: relative;
+    transition: transform 0.2s ease;
+  }
+
+  .monster-display.is-boss .monster-emoji {
+    font-size: 5rem;
+    filter: drop-shadow(0 0 20px rgba(251, 191, 36, 0.3));
+  }
+
+  .monster-display.is-major-boss .monster-emoji {
+    font-size: 6rem;
+    filter: drop-shadow(0 0 30px rgba(251, 191, 36, 0.5));
+  }
+
+  .monster-emoji {
+    font-size: 4rem;
+    display: block;
+  }
+
+  .monster-display.sprite-hit {
+    animation: spriteHit 0.3s ease-out;
+  }
+
+  .monster-display.sprite-attack {
+    animation: spriteAttack 0.4s ease-out;
+  }
+
+  @keyframes spriteHit {
+    0% { transform: translateX(0); filter: brightness(2); }
+    25% { transform: translateX(-15px); }
+    50% { transform: translateX(10px); }
+    75% { transform: translateX(-5px); }
+    100% { transform: translateX(0); filter: brightness(1); }
+  }
+
+  @keyframes spriteAttack {
+    0% { transform: scale(1) translateY(0); }
+    30% { transform: scale(1.1) translateY(-10px); }
+    60% { transform: scale(1.2) translateY(20px); }
+    100% { transform: scale(1) translateY(0); }
+  }
+
+  .floating-damage {
     position: absolute;
+    top: -20px;
+    right: -20px;
     font-size: 1.5rem;
     font-weight: 700;
-    animation: floatUp 1s forwards;
-  }
-
-  .enemy-damage {
-    top: 0;
-    right: -20px;
     color: #ef4444;
-  }
-
-  .player-damage {
-    color: #ef4444;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    animation: floatUp 1s ease-out forwards;
+    pointer-events: none;
   }
 
   @keyframes floatUp {
-    0% { opacity: 1; transform: translateY(0); }
-    100% { opacity: 0; transform: translateY(-30px); }
+    0% { opacity: 1; transform: translateY(0) scale(1); }
+    50% { transform: translateY(-20px) scale(1.2); }
+    100% { opacity: 0; transform: translateY(-40px) scale(0.8); }
   }
 
-  .boss-info {
-    margin-top: 12px;
-  }
-
-  .boss-name {
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    display: block;
-    margin-bottom: 8px;
-  }
-
-  .boss-hp-bar {
-    position: relative;
-    height: 24px;
-    background: var(--bg-tertiary);
-    border-radius: 12px;
-    overflow: hidden;
-  }
-
-  .hp-bar-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #ef4444, #f97316);
-    transition: width 0.3s ease;
-  }
-
-  .hp-text {
+  /* Battle Effects */
+  .battle-effect {
     position: absolute;
-    inset: 0;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  .battle-effect.slash {
+    width: 100px;
+    height: 100px;
+    background: linear-gradient(45deg, transparent, rgba(255,255,255,0.8), transparent);
+    animation: slashEffect 0.3s ease-out;
+    opacity: 0;
+  }
+
+  @keyframes slashEffect {
+    0% { opacity: 1; transform: translateX(-50px) rotate(-45deg); }
+    100% { opacity: 0; transform: translateX(50px) rotate(-45deg); }
+  }
+
+  .battle-effect.shield {
+    font-size: 4rem;
+    animation: shieldEffect 0.5s ease-out;
+    opacity: 0;
+  }
+
+  @keyframes shieldEffect {
+    0% { opacity: 0; transform: scale(0.5); }
+    50% { opacity: 1; transform: scale(1.2); }
+    100% { opacity: 0; transform: scale(1); }
+  }
+
+  /* Combat Message Overlay */
+  .combat-message-overlay {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    right: 10px;
+    z-index: 30;
+    pointer-events: none;
+  }
+
+  .combat-toast {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: white;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.85);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    animation: toastSlide 0.2s ease-out;
   }
 
-  .message-box {
-    padding: 16px 20px;
-    background: var(--bg-secondary);
-    border: 2px solid var(--border);
-    border-radius: 12px;
+  .combat-toast.crit {
+    border-left-color: #fbbf24;
+    background: rgba(251, 191, 36, 0.15);
+  }
+
+  @keyframes toastSlide {
+    from { opacity: 0; transform: translateX(-10px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .toast-dice {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .toast-die {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 2px 6px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    min-width: 20px;
     text-align: center;
   }
 
-  .message-box p {
-    color: var(--text-primary);
-    font-size: 1rem;
-    margin: 0;
+  .combat-toast.crit .toast-die {
+    background: #fbbf24;
+    border-color: #fbbf24;
+    color: #1a1a1a;
   }
 
-  .dice-display {
-    display: flex;
-    justify-content: center;
-    gap: 12px;
+  .toast-die.rolling {
+    animation: diceRoll 0.1s infinite;
+    opacity: 0.7;
+    color: var(--text-muted);
   }
 
-  .die {
-    font-size: 2.5rem;
-    opacity: 0.5;
-    transition: all 0.2s;
-  }
-
-  .die.revealed {
+  .toast-die.revealed {
+    animation: diceReveal 0.3s ease-out;
     opacity: 1;
-    transform: scale(1.1);
   }
 
-  .player-section {
-    padding: 16px;
+  @keyframes diceRoll {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    25% { transform: translateY(-2px) rotate(-3deg); }
+    50% { transform: translateY(0) rotate(0deg); }
+    75% { transform: translateY(2px) rotate(3deg); }
+  }
+
+  @keyframes diceReveal {
+    0% { transform: scale(1.3) rotate(-10deg); opacity: 0.5; }
+    50% { transform: scale(1.1) rotate(5deg); }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
+  }
+
+  .toast-plus {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+  }
+
+  .toast-arrow {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+  }
+
+  .toast-message {
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    font-weight: 500;
+    flex: 1;
+  }
+
+  .toast-crit {
+    background: #fbbf24;
+    color: #1a1a1a;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    animation: critPulse 0.3s ease-out;
+  }
+
+  @keyframes critPulse {
+    0% { transform: scale(1.3); }
+    100% { transform: scale(1); }
+  }
+
+  /* Player Bar */
+  .player-bar {
     background: var(--bg-secondary);
-    border-radius: 12px;
-    position: relative;
+    border-radius: var(--radius-md);
+    padding: 12px;
+    margin: 0 10px;
+    transition: background 0.2s;
   }
 
-  .player-stats {
+  .player-bar.bar-flash {
+    animation: barFlash 0.3s ease-out;
+  }
+
+  @keyframes barFlash {
+    0%, 100% { background: var(--bg-secondary); }
+    50% { background: rgba(239, 68, 68, 0.3); }
+  }
+
+  .player-bar-content {
     display: flex;
     flex-direction: column;
     gap: 8px;
   }
 
-  .stat-bar {
+  .bars-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .bar-row {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
+    position: relative;
   }
 
-  .stat-label {
-    width: 30px;
+  .bar-label {
+    font-size: 0.75rem;
     font-weight: 600;
-    font-size: 0.85rem;
-    color: var(--text-secondary);
+    width: 24px;
+    color: var(--text-muted);
   }
 
-  .bar {
+  .bar-track {
     flex: 1;
-    height: 16px;
+    height: 14px;
     background: var(--bg-tertiary);
-    border-radius: 8px;
+    border-radius: 7px;
     overflow: hidden;
   }
 
@@ -675,28 +929,59 @@
     background: linear-gradient(90deg, #3b82f6, #6366f1);
   }
 
-  .stat-value {
-    width: 70px;
-    text-align: right;
-    font-size: 0.85rem;
-    font-weight: 500;
+  .bar-value {
+    font-size: 0.7rem;
     color: var(--text-muted);
+    min-width: 50px;
+    text-align: right;
   }
 
-  .action-buttons {
+  .bar-damage {
+    position: absolute;
+    right: -5px;
+    top: -8px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #ef4444;
+    animation: floatUp 1s ease-out forwards;
+  }
+
+  /* Action Panel */
+  .action-panel {
+    padding: 10px;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .action-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .action-grid.has-spells {
+    grid-template-columns: repeat(3, 1fr);
   }
 
   .action-btn {
-    padding: 14px;
-    border: none;
-    border-radius: 12px;
-    font-size: 1rem;
+    padding: 14px 16px;
+    border: 2px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--bg-primary);
+    color: var(--text-primary);
     font-weight: 600;
+    font-size: 0.95rem;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .action-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
   }
 
   .action-btn:disabled {
@@ -705,75 +990,155 @@
   }
 
   .action-btn.attack {
-    background: linear-gradient(135deg, #ef4444, #dc2626);
-    color: white;
+    border-color: var(--danger);
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+  }
+
+  .action-btn.attack:hover:not(:disabled) {
+    background: rgba(239, 68, 68, 0.2);
   }
 
   .action-btn.defend {
-    background: linear-gradient(135deg, #3b82f6, #2563eb);
-    color: white;
+    border-color: #3b82f6;
+    background: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
   }
 
-  .action-btn.potion {
-    background: linear-gradient(135deg, #22c55e, #16a34a);
-    color: white;
+  .action-btn.defend:hover:not(:disabled) {
+    background: rgba(59, 130, 246, 0.2);
   }
 
   .action-btn.spell {
-    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
-    color: white;
+    border-color: #8b5cf6;
+    background: rgba(139, 92, 246, 0.1);
+    color: #8b5cf6;
   }
 
+  .action-btn.spell:hover:not(:disabled) {
+    background: rgba(139, 92, 246, 0.2);
+  }
+
+  .action-btn.item {
+    border-color: #22c55e;
+    background: rgba(34, 197, 94, 0.1);
+    color: #22c55e;
+  }
+
+  .action-btn.item:hover:not(:disabled) {
+    background: rgba(34, 197, 94, 0.2);
+  }
+
+  .action-btn.run {
+    border-color: var(--text-muted);
+    color: var(--text-muted);
+  }
+
+  .action-btn.run.danger {
+    border-color: #f97316;
+    color: #f97316;
+    background: rgba(249, 115, 22, 0.1);
+  }
+
+  .item-count {
+    font-size: 0.75rem;
+    opacity: 0.8;
+  }
+
+  /* Spell Menu */
   .spell-menu {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 12px;
+    position: absolute;
+    bottom: 100%;
+    left: 10px;
+    right: 10px;
     background: var(--bg-secondary);
-    border-radius: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    margin-bottom: 8px;
+    z-index: 50;
   }
 
-  .spell-btn {
+  .spell-menu-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 12px;
+    padding: 8px 12px;
     background: var(--bg-tertiary);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    cursor: pointer;
-  }
-
-  .spell-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .spell-name {
+    font-size: 0.85rem;
     font-weight: 600;
     color: var(--text-primary);
   }
 
-  .spell-cost {
-    color: #3b82f6;
-    font-size: 0.85rem;
-  }
-
-  .spell-damage {
-    color: #ef4444;
-    font-size: 0.85rem;
-  }
-
-  .btn-retreat {
-    width: 100%;
-    padding: 12px;
-    background: var(--bg-tertiary);
+  .spell-menu-close {
+    background: none;
+    border: none;
     color: var(--text-muted);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    font-weight: 500;
+    font-size: 1.25rem;
     cursor: pointer;
-    margin-top: 8px;
+    padding: 0 4px;
+  }
+
+  .spell-menu-list {
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  .spell-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 12px;
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s;
+  }
+
+  .spell-menu-item:last-child {
+    border-bottom: none;
+  }
+
+  .spell-menu-item:hover:not(:disabled) {
+    background: var(--bg-tertiary);
+  }
+
+  .spell-menu-item:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .spell-menu-icon {
+    font-size: 1.25rem;
+  }
+
+  .spell-menu-info {
+    flex: 1;
+  }
+
+  .spell-menu-name {
+    display: block;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+  }
+
+  .spell-menu-stats {
+    font-size: 0.75rem;
+    color: #ef4444;
+  }
+
+  .spell-menu-cost {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #3b82f6;
+  }
+
+  .spell-menu-cost.insufficient {
+    color: var(--text-muted);
   }
 
   .result-screen {
@@ -827,8 +1192,10 @@
     gap: 8px;
     align-items: center;
     padding: 12px;
+    margin: 10px;
     background: var(--bg-secondary);
-    border-radius: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
     font-size: 0.8rem;
   }
 
