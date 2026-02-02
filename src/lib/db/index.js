@@ -1,4 +1,22 @@
-import { db, ACHIEVEMENTS, UNLOCKABLES, TITLES, MONSTERS, BOSSES, MONSTER_MODIFIERS, DUNGEON_UPGRADES, MERCHANT, MERCHANT_ITEMS } from './schema.js';
+import {
+  db,
+  ACHIEVEMENTS,
+  UNLOCKABLES,
+  TITLES,
+  MONSTERS,
+  BOSSES,
+  MONSTER_MODIFIERS,
+  DUNGEON_UPGRADES,
+  MERCHANT,
+  MERCHANT_ITEMS,
+  SLOT_TYPES,
+  RARITIES,
+  ATTRIBUTES,
+  TAINTED_ITEMS,
+  ITEM_NAMES,
+  DROP_CHANCES,
+  BASE_SELL_VALUES
+} from './schema.js';
 
 // Initialize database with default data
 export async function initializeDB() {
@@ -34,7 +52,11 @@ export async function initializeDB() {
       purchasedSpellSlot: false,
       // Dungeon stats (syncs with cloud)
       highestFloor: 0,
-      totalKills: 0
+      totalKills: 0,
+      // Equipment system
+      inventorySlots: 15,      // Max equipment slots (can be expanded)
+      taintedUnlocked: false,  // Unlocks at level 15
+      taintedTeased: false     // Show teaser at level 10
     });
 
     // Create default avatar
@@ -229,6 +251,17 @@ export async function initializeDB() {
       playerUpdates.totalKills = dungeonForMigration.totalKills || 0;
     }
 
+    // Add equipment system fields if missing
+    if (player.inventorySlots === undefined) {
+      playerUpdates.inventorySlots = 15;
+    }
+    if (player.taintedUnlocked === undefined) {
+      playerUpdates.taintedUnlocked = false;
+    }
+    if (player.taintedTeased === undefined) {
+      playerUpdates.taintedTeased = false;
+    }
+
     if (Object.keys(playerUpdates).length > 0) {
       await db.player.update(1, playerUpdates);
       console.log('Migrated dungeon data to player:', playerUpdates);
@@ -237,4 +270,22 @@ export async function initializeDB() {
 }
 
 // Export db and constants
-export { db, ACHIEVEMENTS, UNLOCKABLES, TITLES, MONSTERS, BOSSES, MONSTER_MODIFIERS, DUNGEON_UPGRADES, MERCHANT, MERCHANT_ITEMS };
+export {
+  db,
+  ACHIEVEMENTS,
+  UNLOCKABLES,
+  TITLES,
+  MONSTERS,
+  BOSSES,
+  MONSTER_MODIFIERS,
+  DUNGEON_UPGRADES,
+  MERCHANT,
+  MERCHANT_ITEMS,
+  SLOT_TYPES,
+  RARITIES,
+  ATTRIBUTES,
+  TAINTED_ITEMS,
+  ITEM_NAMES,
+  DROP_CHANCES,
+  BASE_SELL_VALUES
+};

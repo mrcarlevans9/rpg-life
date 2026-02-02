@@ -4,7 +4,7 @@ import Dexie from 'dexie';
 export const db = new Dexie('RPGLifeDB');
 
 // Define the database schema
-db.version(6).stores({
+db.version(7).stores({
   // Player profile - single row (id: 1)
   player: '++id',
 
@@ -42,7 +42,16 @@ db.version(6).stores({
   dailyStats: '++id, &date',
 
   // Dungeon data - single row (id: 1)
-  dungeon: '++id'
+  dungeon: '++id',
+
+  // Equipment inventory
+  equipment: '++id, remoteId, slot, rarity, equipped',
+
+  // Pending loot (not yet extracted from dungeon)
+  pendingLoot: '++id, slot, rarity',
+
+  // Guild quest progress tracking
+  guildQuestProgress: '++id, visibleQuestId'
 });
 
 // Achievement definitions
@@ -237,5 +246,291 @@ export const DUNGEON_UPGRADES = [
   { key: 'spell_slot', name: 'Arcane Tome', description: '+1 Spell Slot (permanent)', cost: 500, effect: { spellSlot: 1 } },
   { key: 'auto_potion', name: 'Potion Satchel', description: 'Start each run with 1 potion (permanent)', cost: 500, effect: { autoPotion: true } }
 ];
+
+// ============ EQUIPMENT SYSTEM CONSTANTS ============
+
+// Equipment slot types
+export const SLOT_TYPES = ['weapon', 'armor', 'accessory'];
+
+// Equipment rarities with drop weights and attribute counts
+export const RARITIES = {
+  common:   { name: 'Common',   color: '#9ca3af', weight: 50, minAttrs: 1, maxAttrs: 1, sellMultiplier: 0.1 },
+  uncommon: { name: 'Uncommon', color: '#22c55e', weight: 30, minAttrs: 1, maxAttrs: 2, sellMultiplier: 0.15 },
+  rare:     { name: 'Rare',     color: '#3b82f6', weight: 15, minAttrs: 2, maxAttrs: 2, sellMultiplier: 0.25 },
+  epic:     { name: 'Epic',     color: '#a855f7', weight: 4,  minAttrs: 2, maxAttrs: 3, sellMultiplier: 0.4 },
+  tainted:  { name: 'Tainted',  color: '#dc2626', weight: 1,  minAttrs: 1, maxAttrs: 1, sellMultiplier: 0.5 }
+};
+
+// Attribute definitions by category
+export const ATTRIBUTES = {
+  // === OFFENSIVE ===
+  damage:       { name: 'Damage',       slots: ['weapon'], min: 1, max: 5, description: '+{value} damage' },
+  critChance:   { name: 'Crit Chance',  slots: ['weapon', 'accessory'], min: 3, max: 15, description: '+{value}% crit chance' },
+  critDamage:   { name: 'Crit Damage',  slots: ['weapon'], min: 10, max: 25, description: '+{value}% crit damage' },
+  armorPierce:  { name: 'Armor Pierce', slots: ['weapon'], min: 1, max: 3, description: 'Ignore {value} defense' },
+  doubleStrike: { name: 'Double Strike', slots: ['weapon'], min: 5, max: 15, description: '{value}% chance to hit twice' },
+  firstBlood:   { name: 'First Blood', slots: ['weapon'], min: 3, max: 8, description: '+{value} damage on first hit' },
+  executioner:  { name: 'Executioner', slots: ['weapon'], min: 5, max: 15, description: '+{value} damage vs enemies below 25% HP' },
+  bossSlayer:   { name: 'Boss Slayer', slots: ['weapon', 'accessory'], min: 2, max: 6, description: '+{value} damage vs bosses' },
+  giantKiller:  { name: 'Giant Killer', slots: ['weapon'], min: 3, max: 8, description: '+{value} damage vs Giant enemies' },
+
+  // === DEFENSIVE ===
+  defense:      { name: 'Defense',      slots: ['armor'], min: 1, max: 4, description: '+{value} defense' },
+  maxHp:        { name: 'Max HP',       slots: ['armor', 'accessory'], min: 5, max: 20, description: '+{value} max HP' },
+  blockChance:  { name: 'Block Chance', slots: ['armor'], min: 5, max: 15, description: '{value}% chance to block attack' },
+  thorns:       { name: 'Thorns',       slots: ['armor'], min: 1, max: 5, description: 'Reflect {value} damage when hit' },
+  resistFire:   { name: 'Fire Resist',  slots: ['armor'], min: 20, max: 50, description: '-{value}% fire/burn damage' },
+  resistStun:   { name: 'Stun Resist',  slots: ['armor', 'accessory'], min: 15, max: 40, description: '{value}% chance to ignore stun' },
+  secondWind:   { name: 'Second Wind',  slots: ['armor'], min: 1, max: 1, description: 'Once per run, survive lethal hit with 1 HP' },
+  fortify:      { name: 'Fortify',      slots: ['armor'], min: 1, max: 3, description: '+{value} extra defense when Defending' },
+
+  // === RESOURCE & ECONOMY ===
+  goldPerKill:      { name: 'Gold per Kill',    slots: ['weapon', 'armor', 'accessory'], min: 1, max: 4, description: '+{value} gold per kill' },
+  maxMp:            { name: 'Max MP',           slots: ['accessory'], min: 5, max: 20, description: '+{value} max MP' },
+  manaRegen:        { name: 'Mana Regen',       slots: ['accessory'], min: 1, max: 3, description: '+{value} MP restored per turn' },
+  potionCapacity:   { name: 'Potion Capacity',  slots: ['armor', 'accessory'], min: 1, max: 2, description: 'Carry +{value} potions' },
+  potionEfficiency: { name: 'Potion Efficiency', slots: ['accessory'], min: 15, max: 30, description: 'Potions heal +{value}%' },
+  scavenger:        { name: 'Scavenger',        slots: ['accessory'], min: 10, max: 25, description: '+{value}% gold from chests' },
+
+  // === GUILD & PVP ===
+  guildBossDamage:   { name: 'Guild Boss Damage', slots: ['weapon', 'accessory'], min: 2, max: 8, description: '+{value} damage vs guild bosses' },
+  contributionBonus: { name: 'Contribution',      slots: ['accessory'], min: 5, max: 15, description: '+{value}% guild quest credit' },
+  pvpDamage:         { name: 'PvP Damage',        slots: ['weapon'], min: 2, max: 5, description: '+{value} damage in PvP' },
+  pvpDefense:        { name: 'PvP Defense',       slots: ['armor'], min: 1, max: 3, description: '+{value} defense in PvP' },
+
+  // === UTILITY ===
+  xpBonus:        { name: 'XP Bonus',       slots: ['accessory'], min: 5, max: 15, description: '+{value}% XP from dungeon' },
+  treasureHunter: { name: 'Treasure Hunter', slots: ['accessory'], min: 5, max: 15, description: '+{value}% better loot rarity' },
+  quickFeet:      { name: 'Quick Feet',     slots: ['armor'], min: 10, max: 20, description: '+{value}% chance to flee safely' },
+  momentum:       { name: 'Momentum',       slots: ['weapon'], min: 1, max: 1, description: '+1 damage per floor (max 10), resets on hit' },
+  lucky:          { name: 'Lucky',          slots: ['accessory'], min: 1, max: 1, description: 'Reroll one dice per combat' },
+  ambush:         { name: 'Ambush',         slots: ['weapon'], min: 5, max: 10, description: '+{value} damage if you attack first' }
+};
+
+// Tainted (cursed) items - unique items with powerful bonuses and permanent drawbacks
+export const TAINTED_ITEMS = {
+  weapons: [
+    {
+      key: 'bloodthirst_blade',
+      name: 'Bloodthirst Blade',
+      emoji: '🗡️',
+      slot: 'weapon',
+      bonuses: [{ type: 'damage', value: 5 }],
+      penalties: [{ type: 'selfDamageOnAttack', value: 2, description: 'Lose 2 HP per attack' }],
+      floorMin: 20
+    },
+    {
+      key: 'cursed_reaper',
+      name: 'Cursed Reaper',
+      emoji: '⚰️',
+      slot: 'weapon',
+      bonuses: [{ type: 'execute', value: 15, description: 'Instant kill enemies below 15% HP' }],
+      penalties: [{ type: 'maxHp', value: -10, description: '-10 max HP' }],
+      floorMin: 25
+    },
+    {
+      key: 'glass_cannon',
+      name: 'Glass Cannon',
+      emoji: '💎',
+      slot: 'weapon',
+      bonuses: [{ type: 'damage', value: 6 }, { type: 'critChance', value: 10 }],
+      penalties: [{ type: 'defense', value: -3, description: '-3 defense' }],
+      floorMin: 20
+    },
+    {
+      key: 'soul_eater',
+      name: 'Soul Eater',
+      emoji: '👁️',
+      slot: 'weapon',
+      bonuses: [{ type: 'damage', value: 3 }, { type: 'lifestealOnKill', value: 2, description: 'Heal 2 HP on kill' }],
+      penalties: [{ type: 'noPotions', value: true, description: "Can't use potions" }],
+      floorMin: 25
+    },
+    {
+      key: 'gamblers_edge',
+      name: "Gambler's Edge",
+      emoji: '🎰',
+      slot: 'weapon',
+      bonuses: [{ type: 'critDamageMultiplier', value: 3, description: 'Crits deal 3× damage' }],
+      penalties: [{ type: 'nonCritPenalty', value: -2, description: 'Non-crits deal -2 damage' }],
+      floorMin: 20
+    },
+    {
+      key: 'berserker_axe',
+      name: 'Berserker Axe',
+      emoji: '🪓',
+      slot: 'weapon',
+      bonuses: [{ type: 'damagePerHitTaken', value: 2, description: '+2 damage per hit taken this combat' }],
+      penalties: [{ type: 'noDefend', value: true, description: "Can't use Defend" }],
+      floorMin: 22
+    },
+    {
+      key: 'hexblade',
+      name: 'Hexblade',
+      emoji: '🔮',
+      slot: 'weapon',
+      bonuses: [{ type: 'damage', value: 4 }, { type: 'critChance', value: 15 }],
+      penalties: [{ type: 'goldPerKill', value: -3, description: '-3 gold per kill' }],
+      floorMin: 20
+    },
+    {
+      key: 'vampiric_fang',
+      name: 'Vampiric Fang',
+      emoji: '🧛',
+      slot: 'weapon',
+      bonuses: [{ type: 'lifesteal', value: 20, description: 'Lifesteal 20% of damage dealt' }],
+      penalties: [{ type: 'bossDamageTaken', value: 5, description: '+5 damage taken from bosses' }],
+      floorMin: 25
+    }
+  ],
+  armor: [
+    {
+      key: 'martyrs_plate',
+      name: "Martyr's Plate",
+      emoji: '⛨',
+      slot: 'armor',
+      bonuses: [{ type: 'defense', value: 5 }, { type: 'maxHp', value: 20 }],
+      penalties: [{ type: 'damage', value: -2, description: '-2 damage dealt' }],
+      floorMin: 20
+    },
+    {
+      key: 'specters_shroud',
+      name: "Specter's Shroud",
+      emoji: '👻',
+      slot: 'armor',
+      bonuses: [{ type: 'dodgeChance', value: 25, description: '25% dodge chance' }],
+      penalties: [{ type: 'maxHp', value: -15, description: '-15 max HP' }],
+      floorMin: 22
+    },
+    {
+      key: 'greed_mail',
+      name: 'Greed Mail',
+      emoji: '💰',
+      slot: 'armor',
+      bonuses: [{ type: 'goldPerKill', value: 5 }],
+      penalties: [{ type: 'defense', value: -2, description: '-2 defense' }],
+      floorMin: 20
+    },
+    {
+      key: 'thorned_carapace',
+      name: 'Thorned Carapace',
+      emoji: '🦔',
+      slot: 'armor',
+      bonuses: [{ type: 'thornsDamage', value: 50, description: 'Reflect 50% damage taken' }],
+      penalties: [{ type: 'maxHealPercent', value: 70, description: "Can't heal above 70% HP" }],
+      floorMin: 25
+    },
+    {
+      key: 'featherweight_vest',
+      name: 'Featherweight Vest',
+      emoji: '🪶',
+      slot: 'armor',
+      bonuses: [{ type: 'alwaysFirst', value: true, description: 'Always act first' }, { type: 'fleeChance', value: 20 }],
+      penalties: [{ type: 'defense', value: -3, description: '-3 defense' }],
+      floorMin: 20
+    },
+    {
+      key: 'pact_armor',
+      name: 'Pact Armor',
+      emoji: '📜',
+      slot: 'armor',
+      bonuses: [{ type: 'defense', value: 3 }, { type: 'maxMp', value: 10 }],
+      penalties: [{ type: 'mpDrainPerTurn', value: 1, description: 'Lose 1 MP per turn' }],
+      floorMin: 22
+    }
+  ],
+  accessories: [
+    {
+      key: 'greedy_ring',
+      name: 'Greedy Ring',
+      emoji: '💍',
+      slot: 'accessory',
+      bonuses: [{ type: 'goldMultiplier', value: 2, description: 'Double gold drops' }],
+      penalties: [{ type: 'merchantMarkup', value: 50, description: 'Merchants charge +50%' }],
+      floorMin: 20
+    },
+    {
+      key: 'adrenaline_charm',
+      name: 'Adrenaline Charm',
+      emoji: '💓',
+      slot: 'accessory',
+      bonuses: [{ type: 'lowHpDamage', value: 4, description: '+4 damage when below 25% HP' }],
+      penalties: [{ type: 'potionEfficiency', value: -50, description: 'Potions heal 50% less' }],
+      floorMin: 22
+    },
+    {
+      key: 'chaos_pendant',
+      name: 'Chaos Pendant',
+      emoji: '🌀',
+      slot: 'accessory',
+      bonuses: [{ type: 'damage', value: 3 }],
+      penalties: [{ type: 'randomStatLoss', value: 2, description: 'Random stat reduced by 2 each floor' }],
+      floorMin: 25
+    },
+    {
+      key: 'gamblers_coin',
+      name: "Gambler's Coin",
+      emoji: '🪙',
+      slot: 'accessory',
+      bonuses: [{ type: 'doubleRewardChance', value: 50, description: '50% chance for double rewards' }],
+      penalties: [{ type: 'noRewardChance', value: 50, description: '50% chance for nothing' }],
+      floorMin: 20
+    },
+    {
+      key: 'temporal_loop',
+      name: 'Temporal Loop',
+      emoji: '⏰',
+      slot: 'accessory',
+      bonuses: [{ type: 'deathRetry', value: 1, description: 'Retry one death per run' }],
+      penalties: [{ type: 'goldLossOnRetry', value: 25, description: 'Lose 25% gold on retry' }],
+      floorMin: 25
+    },
+    {
+      key: 'dark_pact_sigil',
+      name: 'Dark Pact Sigil',
+      emoji: '🔯',
+      slot: 'accessory',
+      bonuses: [{ type: 'xpBonus', value: 30, description: '+30% XP from dungeon' }],
+      penalties: [{ type: 'guildContribution', value: -50, description: '-50% guild quest contribution' }],
+      floorMin: 20
+    }
+  ]
+};
+
+// Item name generators by slot and rarity
+export const ITEM_NAMES = {
+  weapon: {
+    prefixes: ['Iron', 'Steel', 'Silver', 'Golden', 'Ancient', 'Forged', 'Battle', 'War', 'Sharp', 'Keen'],
+    bases: ['Sword', 'Blade', 'Dagger', 'Axe', 'Mace', 'Hammer', 'Spear', 'Staff', 'Scimitar', 'Claymore'],
+    suffixes: ['of Might', 'of Power', 'of Fury', 'of the Hunt', 'of Slaying', 'of Valor', 'of Glory', 'of Ruin']
+  },
+  armor: {
+    prefixes: ['Iron', 'Steel', 'Plated', 'Reinforced', 'Heavy', 'Light', 'Blessed', 'Enchanted', 'Guardian', 'Warded'],
+    bases: ['Chestplate', 'Mail', 'Vest', 'Armor', 'Cuirass', 'Hauberk', 'Breastplate', 'Tunic', 'Robe', 'Plate'],
+    suffixes: ['of Protection', 'of Fortitude', 'of the Sentinel', 'of Warding', 'of Resilience', 'of the Guardian']
+  },
+  accessory: {
+    prefixes: ['Silver', 'Golden', 'Enchanted', 'Mystic', 'Ancient', 'Blessed', 'Charmed', 'Runic', 'Glowing', 'Radiant'],
+    bases: ['Ring', 'Amulet', 'Pendant', 'Charm', 'Talisman', 'Brooch', 'Medallion', 'Necklace', 'Band', 'Sigil'],
+    suffixes: ['of Wisdom', 'of Fortune', 'of the Mage', 'of Insight', 'of Luck', 'of Power', 'of the Sage']
+  }
+};
+
+// Drop chances by source
+export const DROP_CHANCES = {
+  monster: { common: 0.08, uncommon: 0.04, rare: 0.02, epic: 0.005 },  // Regular monster
+  miniBoss: { common: 0.25, uncommon: 0.15, rare: 0.08, epic: 0.02 },  // Mini-boss
+  majorBoss: { common: 0.5, uncommon: 0.3, rare: 0.2, epic: 0.1 },     // Major boss (guaranteed at least uncommon)
+  taintedChest: { tainted: 0.5 }  // Rare cursed chest encounter
+};
+
+// Base sell values by rarity (gold)
+export const BASE_SELL_VALUES = {
+  common: 5,
+  uncommon: 15,
+  rare: 40,
+  epic: 100,
+  tainted: 75
+};
 
 export default db;
