@@ -39,7 +39,7 @@
   import { DUNGEON_UPGRADES } from '../lib/db/index.js';
   import { playerData } from '../lib/stores/player.js';
   import EquipmentInventory from '../components/game/EquipmentInventory.svelte';
-  import { pendingLootData, equippedItems, equipmentData } from '../lib/stores/equipment.js';
+  import { pendingLootData, equippedItems, equipmentData, equippedStats } from '../lib/stores/equipment.js';
   import { SLOT_TYPES, RARITIES } from '../lib/db/index.js';
 
   let showShop = false;
@@ -81,6 +81,16 @@
 
   // Derived: total potions available in current run (0 outside dungeon)
   $: runPotions = $currentRun ? getTotalPotions($currentRun) : 0;
+
+  // Derived: total damage bonus for display in combat toast
+  $: totalDamageBonus = ($currentRun?.bonusDamage || 0) +
+                        ($currentRun?.tempBuffs?.bonusDamage || 0) +
+                        ($equippedStats?.damage || 0);
+
+  // Derived: total defense bonus for display
+  $: totalDefenseBonus = ($currentRun?.defenseBonus || 0) +
+                         ($currentRun?.tempBuffs?.defenseBonus || 0) +
+                         ($equippedStats?.defense || 0);
 
   // Dice rolling animation state
   let displayedRolls = [];
@@ -500,7 +510,36 @@
         {#if ($combatState.isAnimating || $combatState.turn === 'player') && $currentMessage}
           <div class="combat-message-overlay">
             <div class="combat-toast" class:crit={$lastRoll?.critical}>
-              {#if displayedRolls.length > 0}
+              {#if displayedRolls.length > 0 && $lastRoll?.type === 'attack'}
+                <span class="toast-dice">
+                  {#each displayedRolls as roll, i}
+                    <span class="toast-die" class:rolling={!diceRevealed[i]} class:revealed={diceRevealed[i]}>{roll}</span>{#if i < displayedRolls.length - 1}<span class="toast-plus">+</span>{/if}
+                  {/each}
+                  {#if totalDamageBonus > 0}
+                    <span class="toast-plus">+</span>
+                    <span class="toast-bonus">{totalDamageBonus} bonus</span>
+                  {/if}
+                </span>
+                <span class="toast-arrow">→</span>
+              {:else if displayedRolls.length > 0 && $lastRoll?.type === 'defend'}
+                <span class="toast-dice">
+                  {#each displayedRolls as roll, i}
+                    <span class="toast-die" class:rolling={!diceRevealed[i]} class:revealed={diceRevealed[i]}>{roll}</span>{#if i < displayedRolls.length - 1}<span class="toast-plus">+</span>{/if}
+                  {/each}
+                  {#if totalDefenseBonus > 0}
+                    <span class="toast-plus">+</span>
+                    <span class="toast-bonus">{totalDefenseBonus} bonus</span>
+                  {/if}
+                </span>
+                <span class="toast-arrow">→</span>
+              {:else if displayedRolls.length > 0 && $lastRoll?.type === 'enemy'}
+                <span class="toast-dice enemy-dice">
+                  {#each displayedRolls as roll, i}
+                    <span class="toast-die enemy" class:rolling={!diceRevealed[i]} class:revealed={diceRevealed[i]}>{roll}</span>{#if i < displayedRolls.length - 1}<span class="toast-plus">+</span>{/if}
+                  {/each}
+                </span>
+                <span class="toast-arrow">→</span>
+              {:else if displayedRolls.length > 0}
                 <span class="toast-dice">
                   {#each displayedRolls as roll, i}
                     <span class="toast-die" class:rolling={!diceRevealed[i]} class:revealed={diceRevealed[i]}>{roll}</span>{#if i < displayedRolls.length - 1}<span class="toast-plus">+</span>{/if}
@@ -2017,6 +2056,29 @@
   .toast-arrow {
     color: var(--text-muted);
     font-size: 0.8rem;
+  }
+
+  .toast-bonus {
+    background: var(--bg-tertiary);
+    border: 1px dashed var(--border);
+    border-radius: 3px;
+    padding: 2px 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #22c55e;
+    min-width: 20px;
+    text-align: center;
+  }
+
+  .toast-die.enemy {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: #ef4444;
+    color: #fca5a5;
+  }
+
+  .combat-toast.crit .toast-bonus {
+    color: #fbbf24;
+    border-color: #fbbf24;
   }
 
   .toast-message {
