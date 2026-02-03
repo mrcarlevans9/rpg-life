@@ -10,6 +10,12 @@ import {
   DROP_CHANCES,
   BASE_SELL_VALUES
 } from '../db/index.js';
+import {
+  pushEquipmentCreate,
+  pushEquipmentUpdate,
+  pushEquipmentDelete,
+  pushPlayerUpdate
+} from '../supabase/sync.js';
 
 // ============ STORES ============
 
@@ -297,7 +303,11 @@ export async function extractPendingLoot() {
       // Remove pendingLoot-specific id before adding to equipment
       const { id, ...itemData } = item;
       const newId = await db.equipment.add(itemData);
-      extracted.push({ ...itemData, id: newId });
+      const newItem = { ...itemData, id: newId };
+      extracted.push(newItem);
+
+      // Sync to cloud
+      pushEquipmentCreate(newItem);
     } else {
       overflow.push(item);
     }
@@ -321,10 +331,14 @@ export async function equipItem(itemId) {
 
   if (currentEquipped) {
     await db.equipment.update(currentEquipped.id, { equipped: false });
+    // Sync unequip to cloud
+    pushEquipmentUpdate(currentEquipped.id, { equipped: false });
   }
 
   // Equip new item
   await db.equipment.update(itemId, { equipped: true });
+  // Sync equip to cloud
+  pushEquipmentUpdate(itemId, { equipped: true });
 
   return { success: true, unequipped: currentEquipped };
 }
@@ -335,6 +349,9 @@ export async function unequipItem(itemId) {
   if (!item) return { success: false, error: 'Item not found' };
 
   await db.equipment.update(itemId, { equipped: false });
+  // Sync to cloud
+  pushEquipmentUpdate(itemId, { equipped: false });
+
   return { success: true };
 }
 
@@ -351,9 +368,15 @@ export async function sellItem(itemId) {
 
   // Add gold to player
   const player = await db.player.get(1);
-  await db.player.update(1, { gold: (player?.gold || 0) + finalValue });
+  const newGold = (player?.gold || 0) + finalValue;
+  await db.player.update(1, { gold: newGold });
+  // Sync gold to cloud
+  pushPlayerUpdate({ gold: newGold });
 
-  // Remove item
+  // Sync delete to cloud before removing locally
+  pushEquipmentDelete(itemId);
+
+  // Remove item locally
   await db.equipment.delete(itemId);
 
   return { success: true, goldEarned: finalValue };
