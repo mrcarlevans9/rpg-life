@@ -1276,6 +1276,8 @@
     display: flex;
     flex-direction: column;
     gap: var(--spacing-lg);
+    max-width: 100%;
+    overflow: hidden;
   }
 
   .player-stats-grid {
@@ -2934,6 +2936,8 @@
   /* ========== SPELL SLOTS CARD ========== */
   :global(.spell-slots-card) {
     padding: var(--spacing-md);
+    overflow: hidden;
+    max-width: 100%;
   }
 
   :global(.spell-slots-card) h3 {
@@ -3000,6 +3004,8 @@
   /* ========== EQUIPMENT CARD ========== */
   :global(.equipment-card) {
     padding: var(--spacing-md);
+    overflow: hidden;
+    max-width: 100%;
   }
 
   .equipment-header {
@@ -3012,17 +3018,19 @@
   .equipment-header h3 {
     margin: 0;
     color: #6366f1;
+    font-size: 1rem;
   }
 
   .manage-btn {
     background: rgba(99, 102, 241, 0.2);
     border: 1px solid #6366f1;
     color: #6366f1;
-    padding: 4px 12px;
+    padding: 4px 10px;
     border-radius: var(--radius-sm);
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     cursor: pointer;
     transition: all 0.2s;
+    flex-shrink: 0;
   }
 
   .manage-btn:hover {
@@ -3032,22 +3040,24 @@
   .equipment-slots-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: var(--spacing-sm);
+    gap: var(--spacing-xs);
   }
 
   .equipment-slot {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
-    padding: var(--spacing-sm);
+    gap: 2px;
+    padding: var(--spacing-xs);
     background: var(--bg-secondary);
     border: 2px dashed var(--border-color);
     border-radius: var(--radius-sm);
     cursor: pointer;
     transition: all 0.2s;
-    min-height: 70px;
+    min-height: 60px;
+    min-width: 0;
     text-align: center;
+    overflow: hidden;
   }
 
   .equipment-slot:hover {
@@ -3062,35 +3072,38 @@
   }
 
   .equipment-slot .slot-icon {
-    font-size: 1.2rem;
+    font-size: 1rem;
+    flex-shrink: 0;
   }
 
   .equipment-slot .slot-name {
-    font-size: 0.75rem;
+    font-size: 0.65rem;
     font-weight: 600;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     max-width: 100%;
+    width: 100%;
+    line-height: 1.2;
   }
 
   .equipment-slot .slot-rarity {
-    font-size: 0.65rem;
+    font-size: 0.55rem;
     color: var(--text-muted);
     text-transform: uppercase;
   }
 
   .equipment-slot .slot-empty-text {
-    font-size: 0.75rem;
+    font-size: 0.65rem;
     color: var(--text-muted);
     text-transform: capitalize;
   }
 
   .equipment-hint {
     text-align: center;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     color: var(--text-muted);
-    margin-top: var(--spacing-sm);
+    margin-top: var(--spacing-xs);
   }
 
   .equipment-hint .pending-text {
