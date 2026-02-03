@@ -724,9 +724,186 @@ export async function fullSync() {
     await syncBoard();
     await syncTasks();
     await syncDungeon();
+    await syncEquipment();
     console.log('Full sync complete');
   } catch (error) {
     console.error('Full sync error:', error);
+  }
+}
+
+// ============ Equipment Sync ============
+export async function syncEquipment() {
+  const userId = getUserId();
+  if (!userId) return null;
+
+  try {
+    // Get remote equipment
+    const { data: remoteEquipment, error } = await supabase
+      .from('equipment')
+      .select('*')
+      .eq('user_id', userId);
+
+    if (error) {
+      console.error('Error fetching remote equipment:', error);
+      return null;
+    }
+
+    // Get local equipment
+    const localEquipment = await db.equipment.toArray();
+
+    if (remoteEquipment && remoteEquipment.length > 0) {
+      // Remote exists - sync to local
+      // Clear local and replace with remote
+      await db.equipment.clear();
+
+      for (const item of remoteEquipment) {
+        await db.equipment.add({
+          id: item.local_id,
+          remoteId: item.id,
+          slot: item.slot,
+          rarity: item.rarity,
+          name: item.name,
+          emoji: item.emoji,
+          equipped: item.equipped,
+          bonuses: item.bonuses || [],
+          tainted: item.tainted || false,
+          penalties: item.penalties || []
+        });
+      }
+      console.log(`Synced ${remoteEquipment.length} equipment items from cloud`);
+      return remoteEquipment;
+    } else if (localEquipment.length > 0) {
+      // No remote but local exists - push local to remote
+      for (const item of localEquipment) {
+        await pushEquipmentCreate(item);
+      }
+      console.log(`Pushed ${localEquipment.length} local equipment items to cloud`);
+      return localEquipment;
+    }
+
+    return [];
+  } catch (error) {
+    console.error('Sync equipment error:', error);
+    return null;
+  }
+}
+
+export async function pushEquipmentCreate(item) {
+  const userId = getUserId();
+  if (!userId) return null;
+
+  try {
+    const { data, error } = await supabase
+      .from('equipment')
+      .insert({
+        user_id: userId,
+        local_id: item.id,
+        slot: item.slot,
+        rarity: item.rarity,
+        name: item.name,
+        emoji: item.emoji || null,
+        equipped: item.equipped || false,
+        bonuses: item.bonuses || [],
+        tainted: item.tainted || false,
+        penalties: item.penalties || []
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Push equipment create failed:', error);
+      return null;
+    }
+
+    // Update local item with remote ID
+    if (data) {
+      await db.equipment.update(item.id, { remoteId: data.id });
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Push equipment create error:', error);
+    return null;
+  }
+}
+
+export async function pushEquipmentUpdate(localId, updates) {
+  const userId = getUserId();
+  if (!userId) return;
+
+  try {
+    // Get the item to find its remote ID
+    const item = await db.equipment.get(localId);
+    if (!item) return;
+
+    const remoteUpdates = {};
+    if (updates.equipped !== undefined) remoteUpdates.equipped = updates.equipped;
+    if (updates.slot !== undefined) remoteUpdates.slot = updates.slot;
+    if (updates.name !== undefined) remoteUpdates.name = updates.name;
+
+    if (Object.keys(remoteUpdates).length > 0) {
+      remoteUpdates.updated_at = new Date().toISOString();
+
+      if (item.remoteId) {
+        // Update by remote ID
+        const { error } = await supabase
+          .from('equipment')
+          .update(remoteUpdates)
+          .eq('id', item.remoteId);
+
+        if (error) {
+          console.error('Push equipment update failed:', error);
+        }
+      } else {
+        // No remote ID, update by user_id and local_id
+        const { error } = await supabase
+          .from('equipment')
+          .update(remoteUpdates)
+          .eq('user_id', userId)
+          .eq('local_id', localId);
+
+        if (error) {
+          console.error('Push equipment update failed:', error);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Push equipment update error:', error);
+  }
+}
+
+export async function pushEquipmentDelete(localId) {
+  const userId = getUserId();
+  if (!userId) return;
+
+  try {
+    // Get the item to find its remote ID
+    const item = await db.equipment.get(localId);
+
+    if (item?.remoteId) {
+      // Delete by remote ID
+      const { error } = await supabase
+        .from('equipment')
+        .delete()
+        .eq('id', item.remoteId);
+
+      if (error) {
+        console.error('Push equipment delete failed:', error);
+      }
+    } else {
+      // Delete by user_id and local_id
+      const { error } = await supabase
+        .from('equipment')
+        .delete()
+        .eq('user_id', userId)
+        .eq('local_id', localId);
+
+      if (error) {
+        console.error('Push equipment delete failed:', error);
+      }
+    }
+  } catch (error) {
+    console.error('Push equipment delete error:', error);
   }
 }
 
@@ -748,6 +925,14 @@ export async function resetRemoteData() {
       .delete()
       .eq('user_id', userId);
     if (tasksError) console.error('Error deleting tasks:', tasksError);
+
+    // Delete all equipment
+    const { error: equipmentError } = await supabase
+      .from('equipment')
+      .delete()
+      .eq('user_id', userId);
+    if (equipmentError) console.error('Error deleting equipment:', equipmentError);
+    else console.log('Equipment cleared');
 
     // Delete player_snapshots
     const { error: snapshotError } = await supabase
@@ -895,6 +1080,8 @@ export async function resetRemoteData() {
     });
 
     await db.tasks.clear();
+    await db.equipment.clear();
+    await db.pendingLoot.clear();
     await db.board.update(1, {
       columns: ['To Do', 'In Progress', 'Done'],
       updatedAt: new Date().toISOString()
