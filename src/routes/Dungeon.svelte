@@ -512,7 +512,7 @@ import { pendingLootData, equippedItems, equipmentData, equippedStats } from '..
             <div class="combat-toast" class:crit={$lastRoll?.critical}>
               {#if displayedRolls.length > 0 && $lastRoll?.type === 'attack'}
                 <span class="toast-dice">
-                  <span class="toast-base">10</span>
+                  <span class="toast-base">5</span>
                   <span class="toast-plus">+</span>
                   {#each displayedRolls as roll, i}
                     <span class="toast-die" class:rolling={!diceRevealed[i]} class:revealed={diceRevealed[i]}>{roll}</span>{#if i < displayedRolls.length - 1}<span class="toast-plus">+</span>{/if}
