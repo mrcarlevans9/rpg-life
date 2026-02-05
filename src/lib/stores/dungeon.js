@@ -749,7 +749,7 @@ export async function playerAttack() {
   const stats = get(statBonuses) || {};
 
   // Base damage + dice roll + bonuses (permanent + temporary + equipment + power stat)
-  const baseDamage = 10;
+  const baseDamage = 5;
   const powerBonus = Math.floor(stats.baseDamage || 0);
   let damage = baseDamage + total + run.bonusDamage + (run.tempBuffs?.bonusDamage || 0) + (equipStats.damage || 0) + powerBonus;
 

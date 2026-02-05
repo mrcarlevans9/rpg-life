@@ -274,7 +274,7 @@ export async function playerAttack() {
   await delay(500);
 
   // Calculate damage
-  const baseDamage = 10 + rollTotal;
+  const baseDamage = 5 + rollTotal;
   const bonusDamage = combat.bonusDamage + combat.tempBuffs.bonusDamage;
   const critMultiplier = isCrit ? 1.5 + (combat.critBonus / 100) : 1;
 
