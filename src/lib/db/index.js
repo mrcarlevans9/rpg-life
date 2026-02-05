@@ -15,7 +15,10 @@ import {
   TAINTED_ITEMS,
   ITEM_NAMES,
   DROP_CHANCES,
-  BASE_SELL_VALUES
+  BASE_SELL_VALUES,
+  STAT_CONFIG,
+  POINTS_PER_LEVEL,
+  RESPEC_BASE_COST
 } from './schema.js';
 
 // Initialize database with default data
@@ -56,7 +59,17 @@ export async function initializeDB() {
       // Equipment system
       inventorySlots: 15,      // Max equipment slots (can be expanded)
       taintedUnlocked: false,  // Unlocks at level 15
-      taintedTeased: false     // Show teaser at level 10
+      taintedTeased: false,    // Show teaser at level 10
+      // Stat allocation system
+      unspentStatPoints: 0,
+      stats: {
+        vitality: 0,
+        power: 0,
+        arcana: 0,
+        agility: 0,
+        fortune: 0
+      },
+      totalStatPointsEarned: 0
     });
 
     // Create default avatar
@@ -267,6 +280,63 @@ export async function initializeDB() {
       console.log('Migrated dungeon data to player:', playerUpdates);
     }
   }
+
+  // Migrate stat allocation system for existing players
+  const playerForStatMigration = await db.player.get(1);
+  if (playerForStatMigration) {
+    const statUpdates = {};
+
+    // Add stat fields if missing
+    if (playerForStatMigration.stats === undefined) {
+      statUpdates.stats = {
+        vitality: 0,
+        power: 0,
+        arcana: 0,
+        agility: 0,
+        fortune: 0
+      };
+    }
+
+    if (playerForStatMigration.unspentStatPoints === undefined) {
+      statUpdates.unspentStatPoints = 0;
+    }
+
+    if (playerForStatMigration.totalStatPointsEarned === undefined) {
+      statUpdates.totalStatPointsEarned = 0;
+    }
+
+    // Calculate retroactive stat points for existing leveled players
+    if (Object.keys(statUpdates).length > 0) {
+      // Calculate player's level from XP
+      const totalXP = playerForStatMigration.totalXP || 0;
+      const calculateLevel = (xp) => {
+        let level = 1;
+        let xpForNext = 100;
+        let remaining = xp;
+        while (remaining >= xpForNext) {
+          remaining -= xpForNext;
+          level++;
+          xpForNext = Math.floor(100 * Math.pow(1.15, level - 1));
+        }
+        return level;
+      };
+      const currentLevel = calculateLevel(totalXP);
+
+      // Award retroactive points (2 per level after level 1)
+      const owedPoints = (currentLevel - 1) * POINTS_PER_LEVEL;
+      const alreadyEarned = playerForStatMigration.totalStatPointsEarned || 0;
+      const retroactivePoints = owedPoints - alreadyEarned;
+
+      if (retroactivePoints > 0) {
+        statUpdates.unspentStatPoints = (statUpdates.unspentStatPoints || playerForStatMigration.unspentStatPoints || 0) + retroactivePoints;
+        statUpdates.totalStatPointsEarned = owedPoints;
+        console.log(`Awarded ${retroactivePoints} retroactive stat points for level ${currentLevel} player`);
+      }
+
+      await db.player.update(1, statUpdates);
+      console.log('Migrated stat allocation system:', statUpdates);
+    }
+  }
 }
 
 // Export db and constants
@@ -287,5 +357,8 @@ export {
   TAINTED_ITEMS,
   ITEM_NAMES,
   DROP_CHANCES,
-  BASE_SELL_VALUES
+  BASE_SELL_VALUES,
+  STAT_CONFIG,
+  POINTS_PER_LEVEL,
+  RESPEC_BASE_COST
 };

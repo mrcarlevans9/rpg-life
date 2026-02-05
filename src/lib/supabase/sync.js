@@ -48,7 +48,17 @@ export async function syncPlayer() {
         customSpells: remotePlayer.custom_spells || [],
         purchasedSpellSlot: remotePlayer.purchased_spell_slot || false,
         highestFloor: remotePlayer.highest_floor || 0,
-        totalKills: remotePlayer.total_kills || 0
+        totalKills: remotePlayer.total_kills || 0,
+        // Stat allocation system
+        unspentStatPoints: remotePlayer.unspent_stat_points || 0,
+        stats: {
+          vitality: remotePlayer.stat_vitality || 0,
+          power: remotePlayer.stat_power || 0,
+          arcana: remotePlayer.stat_arcana || 0,
+          agility: remotePlayer.stat_agility || 0,
+          fortune: remotePlayer.stat_fortune || 0
+        },
+        totalStatPointsEarned: remotePlayer.total_stat_points_earned || 0
       };
 
       // Update local with remote data
@@ -73,7 +83,17 @@ export async function syncPlayer() {
         customSpells: [],
         purchasedSpellSlot: false,
         highestFloor: 0,
-        totalKills: 0
+        totalKills: 0,
+        // Stat allocation system
+        unspentStatPoints: 0,
+        stats: {
+          vitality: 0,
+          power: 0,
+          arcana: 0,
+          agility: 0,
+          fortune: 0
+        },
+        totalStatPointsEarned: 0
       };
 
       // Update local with defaults (clears any previous user's data)
@@ -94,7 +114,15 @@ export async function syncPlayer() {
         custom_spells: [],
         purchased_spell_slot: false,
         highest_floor: 0,
-        total_kills: 0
+        total_kills: 0,
+        // Stat allocation system
+        unspent_stat_points: 0,
+        stat_vitality: 0,
+        stat_power: 0,
+        stat_arcana: 0,
+        stat_agility: 0,
+        stat_fortune: 0,
+        total_stat_points_earned: 0
       });
 
       if (insertError) {
@@ -132,6 +160,14 @@ export async function pushPlayerUpdate(updates) {
     // Dungeon stats
     if (updates.highestFloor !== undefined) remoteUpdates.highest_floor = updates.highestFloor;
     if (updates.totalKills !== undefined) remoteUpdates.total_kills = updates.totalKills;
+    // Stat allocation system
+    if (updates.unspent_stat_points !== undefined) remoteUpdates.unspent_stat_points = updates.unspent_stat_points;
+    if (updates.stat_vitality !== undefined) remoteUpdates.stat_vitality = updates.stat_vitality;
+    if (updates.stat_power !== undefined) remoteUpdates.stat_power = updates.stat_power;
+    if (updates.stat_arcana !== undefined) remoteUpdates.stat_arcana = updates.stat_arcana;
+    if (updates.stat_agility !== undefined) remoteUpdates.stat_agility = updates.stat_agility;
+    if (updates.stat_fortune !== undefined) remoteUpdates.stat_fortune = updates.stat_fortune;
+    if (updates.total_stat_points_earned !== undefined) remoteUpdates.total_stat_points_earned = updates.total_stat_points_earned;
 
     if (Object.keys(remoteUpdates).length > 0) {
       // Use upsert to create row if it doesn't exist

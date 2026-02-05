@@ -2,15 +2,19 @@
   import AvatarDisplay from '../components/avatar/AvatarDisplay.svelte';
   import XPBar from '../components/player/XPBar.svelte';
   import StreakCounter from '../components/player/StreakCounter.svelte';
+  import StatAllocationPanel from '../components/player/StatAllocationPanel.svelte';
+  import RespecModal from '../components/player/RespecModal.svelte';
   import Card from '../components/common/Card.svelte';
   import Button from '../components/common/Button.svelte';
-  import { playerData, xpProgress, currentLevel } from '../lib/stores/player.js';
+  import { playerData, xpProgress, currentLevel, unspentStatPoints } from '../lib/stores/player.js';
   import { todaysTasks } from '../lib/stores/tasks.js';
   import { expeditionGoalProgress } from '../lib/stores/expeditions.js';
   import { avatarData } from '../lib/stores/avatar.js';
   import { TITLES } from '../lib/db/schema.js';
 
   $: equippedTitle = TITLES.find(t => t.key === $avatarData?.equippedTitle);
+
+  let showRespecModal = false;
 </script>
 
 <div class="dashboard">
@@ -63,6 +67,21 @@
     </Card>
   </section>
 
+  <!-- Stat Allocation Panel - show prominently if unspent points -->
+  {#if $unspentStatPoints > 0}
+    <section class="stat-allocation-section highlight">
+      <div class="stat-notification">
+        <span class="notification-icon">✨</span>
+        <span class="notification-text">You have {$unspentStatPoints} unspent stat points!</span>
+      </div>
+      <StatAllocationPanel on:respec={() => showRespecModal = true} />
+    </section>
+  {:else}
+    <section class="stat-allocation-section">
+      <StatAllocationPanel on:respec={() => showRespecModal = true} />
+    </section>
+  {/if}
+
   <section class="quick-actions">
     <h2>Quick Actions</h2>
     <div class="actions-grid">
@@ -109,6 +128,11 @@
     </section>
   {/if}
 </div>
+
+<!-- Respec Modal -->
+{#if showRespecModal}
+  <RespecModal on:close={() => showRespecModal = false} />
+{/if}
 
 <style>
   .dashboard {
@@ -277,5 +301,41 @@
     padding: var(--spacing-sm);
     color: var(--accent);
     font-weight: 500;
+  }
+
+  /* Stat Allocation Section */
+  .stat-allocation-section {
+    margin-bottom: var(--spacing-xl);
+  }
+
+  .stat-allocation-section.highlight {
+    animation: highlight-pulse 2s ease-in-out;
+  }
+
+  @keyframes highlight-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.9; }
+  }
+
+  .stat-notification {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    margin-bottom: var(--spacing-sm);
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(139, 92, 246, 0.15));
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: var(--radius-md);
+  }
+
+  .notification-icon {
+    font-size: 1.25rem;
+  }
+
+  .notification-text {
+    font-weight: 600;
+    color: #6366f1;
+    font-size: 0.9rem;
   }
 </style>

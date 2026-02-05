@@ -1,7 +1,7 @@
 import { writable, derived, get } from 'svelte/store';
 import { liveQuery } from 'dexie';
 import { db, MONSTERS, BOSSES, MONSTER_MODIFIERS, DUNGEON_UPGRADES, MERCHANT, MERCHANT_ITEMS } from '../db/index.js';
-import { playerData } from './player.js';
+import { playerData, statBonuses } from './player.js';
 import { pushDungeonUpdate, pushPlayerUpdate } from '../supabase/sync.js';
 import {
   rollLootDrop,
@@ -434,12 +434,15 @@ export async function startRun() {
   // Get equipment bonuses
   const equipStats = get(equippedStats) || {};
 
-  // Calculate max HP with upgrades + equipment
-  const baseMaxHp = 100;
-  const maxHp = baseMaxHp + (dungeon?.maxHpBonus || 0) + (equipStats.maxHp || 0);
+  // Get stat allocation bonuses
+  const stats = get(statBonuses) || {};
 
-  // Calculate max MP with upgrades + equipment
-  const maxMp = BASE_MAX_MP + (dungeon?.maxMpBonus || 0) + (equipStats.maxMp || 0);
+  // Calculate max HP with upgrades + equipment + vitality stat
+  const baseMaxHp = 100;
+  const maxHp = baseMaxHp + (dungeon?.maxHpBonus || 0) + (equipStats.maxHp || 0) + Math.floor(stats.maxHp || 0);
+
+  // Calculate max MP with upgrades + equipment + arcana stat
+  const maxMp = BASE_MAX_MP + (dungeon?.maxMpBonus || 0) + (equipStats.maxMp || 0) + Math.floor(stats.maxMp || 0);
 
   // Get gold, spells from PLAYER (syncs with cloud)
   const bankGold = player?.gold || 0;
@@ -742,9 +745,13 @@ export async function playerAttack() {
   // Get equipment bonuses
   const equipStats = get(equippedStats) || {};
 
-  // Base damage + dice roll + bonuses (permanent + temporary + equipment)
+  // Get stat allocation bonuses
+  const stats = get(statBonuses) || {};
+
+  // Base damage + dice roll + bonuses (permanent + temporary + equipment + power stat)
   const baseDamage = 10;
-  let damage = baseDamage + total + run.bonusDamage + (run.tempBuffs?.bonusDamage || 0) + (equipStats.damage || 0);
+  const powerBonus = Math.floor(stats.baseDamage || 0);
+  let damage = baseDamage + total + run.bonusDamage + (run.tempBuffs?.bonusDamage || 0) + (equipStats.damage || 0) + powerBonus;
 
   // Apply boss slayer bonus if fighting a boss
   if (monster.isBoss && equipStats.bossSlayer > 0) {
@@ -1212,6 +1219,21 @@ async function handleBossSpecial(run, monster) {
 
 // Basic attack logic
 async function performBasicAttack(run, monster, damageMultiplier = 1.0) {
+  // Get stat allocation bonuses for dodge check
+  const stats = get(statBonuses) || {};
+  const equipStats = get(equippedStats) || {};
+
+  // Check for dodge (agility stat + equipment)
+  const totalDodgeChance = (stats.dodgeChance || 0) + (equipStats.dodgeChance || 0);
+  if (totalDodgeChance > 0 && Math.random() * 100 < totalDodgeChance) {
+    addLog('dodge', `💨 You dodge ${monster.displayName}'s attack!`);
+    lastRoll.set({ rolls: [], total: 0, type: 'dodge', critical: false });
+    currentMessage.set(`Dodged!`);
+    await delay(600);
+    combatState.update(s => ({ ...s, enemyAction: null }));
+    return; // Attack completely missed
+  }
+
   // Monster rolls 2D6 (same as player)
   const rolls = rollD6(2);
   const total = rolls.reduce((a, b) => a + b, 0);
@@ -1314,7 +1336,12 @@ async function monsterDefeated(run, room, monster) {
     dropSource = monster.isMajorBoss ? 'majorBoss' : 'miniBoss';
   }
 
-  const lootDrop = rollLootDrop(dropSource, run.currentFloor, taintedUnlocked);
+  // Get fortune bonus from stats + equipment
+  const stats = get(statBonuses) || {};
+  const equipStats = get(equippedStats) || {};
+  const fortuneBonus = (stats.rarityBonus || 0) + (equipStats.treasureHunter || 0);
+
+  const lootDrop = rollLootDrop(dropSource, run.currentFloor, taintedUnlocked, fortuneBonus);
   if (lootDrop) {
     await addToPendingLoot(lootDrop);
     const rarityEmoji = { common: '⚪', uncommon: '🟢', rare: '🔵', epic: '🟣', tainted: '🔴' };

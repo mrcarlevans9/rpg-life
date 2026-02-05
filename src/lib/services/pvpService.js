@@ -1,6 +1,7 @@
 import { supabase } from '../supabase/client.js';
 import { db } from '../db/index.js';
 import { calculateLevel } from './xpService.js';
+import { calculateStatBonus } from '../stores/player.js';
 
 // ============ SNAPSHOT MANAGEMENT ============
 
@@ -16,11 +17,25 @@ async function getPlayerCombatStats() {
 
   const level = calculateLevel(player.totalXP || 0);
 
-  // Base stats + upgrades
-  const maxHp = 100 + (dungeon?.maxHpBonus || 0);
-  const attack = 10 + (dungeon?.bonusDamage || 0);
+  // Get player stats
+  const stats = player.stats || {
+    vitality: 0,
+    power: 0,
+    arcana: 0,
+    agility: 0,
+    fortune: 0
+  };
+
+  // Calculate stat bonuses
+  const vitalityBonus = Math.floor(calculateStatBonus('vitality', stats.vitality));
+  const powerBonus = calculateStatBonus('power', stats.power);
+  const agilityBonus = calculateStatBonus('agility', stats.agility);
+
+  // Base stats + upgrades + stat allocation bonuses
+  const maxHp = 100 + (dungeon?.maxHpBonus || 0) + vitalityBonus;
+  const attack = 10 + (dungeon?.bonusDamage || 0) + Math.floor(powerBonus);
   const defense = 5 + (dungeon?.defenseBonus || 0);
-  const speed = 10 + Math.floor(level / 5); // Speed scales with level
+  const speed = 10 + Math.floor(level / 5) + Math.floor(agilityBonus); // Agility adds to speed in PvP
   const critChance = 10 + (dungeon?.critBonus || 0);
 
   return {
@@ -33,7 +48,9 @@ async function getPlayerCombatStats() {
     critChance,
     customSpells: player.customSpells || [],
     upgrades: dungeon?.upgrades || [],
-    equippedTitle: avatar?.equippedTitle || 'rookie'
+    equippedTitle: avatar?.equippedTitle || 'rookie',
+    // Include raw stat values for display
+    stats
   };
 }
 
@@ -63,7 +80,13 @@ export async function updateSnapshot() {
     speed: stats.speed,
     crit_chance: stats.critChance,
     custom_spells: stats.customSpells,
-    upgrades: stats.upgrades
+    upgrades: stats.upgrades,
+    // Stat allocation values
+    stat_vitality: stats.stats?.vitality || 0,
+    stat_power: stats.stats?.power || 0,
+    stat_arcana: stats.stats?.arcana || 0,
+    stat_agility: stats.stats?.agility || 0,
+    stat_fortune: stats.stats?.fortune || 0
   };
 
   const { data, error } = await supabase
