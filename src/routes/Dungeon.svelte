@@ -512,12 +512,14 @@ import { pendingLootData, equippedItems, equipmentData, equippedStats } from '..
             <div class="combat-toast" class:crit={$lastRoll?.critical}>
               {#if displayedRolls.length > 0 && $lastRoll?.type === 'attack'}
                 <span class="toast-dice">
+                  <span class="toast-base">10</span>
+                  <span class="toast-plus">+</span>
                   {#each displayedRolls as roll, i}
                     <span class="toast-die" class:rolling={!diceRevealed[i]} class:revealed={diceRevealed[i]}>{roll}</span>{#if i < displayedRolls.length - 1}<span class="toast-plus">+</span>{/if}
                   {/each}
                   {#if totalDamageBonus > 0}
                     <span class="toast-plus">+</span>
-                    <span class="toast-bonus">{totalDamageBonus} bonus</span>
+                    <span class="toast-bonus">{totalDamageBonus}</span>
                   {/if}
                 </span>
                 <span class="toast-arrow">→</span>
@@ -2068,6 +2070,18 @@ import { pendingLootData, equippedItems, equipmentData, equippedStats } from '..
     font-size: 0.75rem;
     font-weight: 600;
     color: #22c55e;
+    min-width: 20px;
+    text-align: center;
+  }
+
+  .toast-base {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 2px 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
     min-width: 20px;
     text-align: center;
   }
