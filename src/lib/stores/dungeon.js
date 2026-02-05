@@ -742,8 +742,9 @@ export async function playerAttack() {
   // Get equipment bonuses
   const equipStats = get(equippedStats) || {};
 
-  // Calculate damage with bonuses (permanent + temporary + equipment)
-  let damage = total + run.bonusDamage + (run.tempBuffs?.bonusDamage || 0) + (equipStats.damage || 0);
+  // Base damage + dice roll + bonuses (permanent + temporary + equipment)
+  const baseDamage = 10;
+  let damage = baseDamage + total + run.bonusDamage + (run.tempBuffs?.bonusDamage || 0) + (equipStats.damage || 0);
 
   // Apply boss slayer bonus if fighting a boss
   if (monster.isBoss && equipStats.bossSlayer > 0) {
