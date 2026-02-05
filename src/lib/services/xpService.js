@@ -1,4 +1,4 @@
-import { db } from '../db/index.js';
+import { db, POINTS_PER_LEVEL } from '../db/index.js';
 
 // Base XP values by priority
 const BASE_XP = {
@@ -119,6 +119,20 @@ export async function addXP(amount, source) {
 
   // Check for level up
   const leveledUp = newLevel > oldLevel;
+  let statPointsAwarded = 0;
+
+  // Award stat points on level up
+  if (leveledUp) {
+    const levelsGained = newLevel - oldLevel;
+    statPointsAwarded = levelsGained * POINTS_PER_LEVEL;
+
+    // Update player's unspent stat points and total earned
+    const updatedPlayer = await db.player.get(1);
+    await db.player.update(1, {
+      unspentStatPoints: (updatedPlayer?.unspentStatPoints || 0) + statPointsAwarded,
+      totalStatPointsEarned: (updatedPlayer?.totalStatPointsEarned || 0) + statPointsAwarded
+    });
+  }
 
   return {
     amount,
@@ -126,6 +140,7 @@ export async function addXP(amount, source) {
     oldLevel,
     newLevel,
     leveledUp,
+    statPointsAwarded,
     xpProgress: getXPProgress(newTotalXP)
   };
 }

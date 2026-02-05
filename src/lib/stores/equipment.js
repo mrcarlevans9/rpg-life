@@ -246,7 +246,7 @@ export function generateTaintedItem(slot, floor) {
 }
 
 // Roll for loot drop
-export function rollLootDrop(source = 'monster', floor = 1, taintedUnlocked = false) {
+export function rollLootDrop(source = 'monster', floor = 1, taintedUnlocked = false, fortuneBonus = 0) {
   const chances = DROP_CHANCES[source];
   if (!chances) return null;
 
@@ -261,11 +261,17 @@ export function rollLootDrop(source = 'monster', floor = 1, taintedUnlocked = fa
     }
   }
 
+  // Apply fortune bonus: increases chances of higher rarities
+  // Fortune bonus shifts the roll down, making it easier to hit higher rarity thresholds
+  const fortuneMultiplier = 1 + (fortuneBonus / 100);
+
   // Roll for regular rarities (in reverse order: epic -> rare -> uncommon -> common)
   const rarityOrder = ['epic', 'rare', 'uncommon', 'common'];
   for (const rarity of rarityOrder) {
     if (chances[rarity]) {
-      cumulative += chances[rarity];
+      // Fortune bonus increases all rarity chances
+      const adjustedChance = chances[rarity] * fortuneMultiplier;
+      cumulative += adjustedChance;
       if (roll < cumulative) {
         const slot = SLOT_TYPES[Math.floor(Math.random() * SLOT_TYPES.length)];
         return generateItem(slot, rarity, source === 'monster' ? 'dungeon_drop' : 'boss_drop', floor);

@@ -249,6 +249,65 @@ export const DUNGEON_UPGRADES = [
 
 // ============ EQUIPMENT SYSTEM CONSTANTS ============
 
+// Stat allocation configuration
+export const STAT_CONFIG = {
+  vitality: {
+    label: 'Vitality',
+    icon: '❤️',
+    description: '+3 Max HP per point',
+    perPoint: 3,
+    diminishedPerPoint: 1.5,
+    softCap: 20,
+    hardCap: null,
+    effectKey: 'maxHp'
+  },
+  power: {
+    label: 'Power',
+    icon: '⚔️',
+    description: '+0.5 Base Damage per point',
+    perPoint: 0.5,
+    diminishedPerPoint: 0.25,
+    softCap: 20,
+    hardCap: null,
+    effectKey: 'baseDamage'
+  },
+  arcana: {
+    label: 'Arcana',
+    icon: '🔮',
+    description: '+2 Max MP per point',
+    perPoint: 2,
+    diminishedPerPoint: 1,
+    softCap: 20,
+    hardCap: null,
+    effectKey: 'maxMp'
+  },
+  agility: {
+    label: 'Agility',
+    icon: '💨',
+    description: '+0.5% Dodge per point',
+    perPoint: 0.5,
+    diminishedPerPoint: 0,
+    softCap: 50,
+    hardCap: 50,
+    effectKey: 'dodgeChance',
+    maxEffect: 25
+  },
+  fortune: {
+    label: 'Fortune',
+    icon: '🍀',
+    description: '+1% Loot Rarity per point',
+    perPoint: 1,
+    diminishedPerPoint: 0,
+    softCap: 30,
+    hardCap: 30,
+    effectKey: 'rarityBonus',
+    maxEffect: 30
+  }
+};
+
+export const POINTS_PER_LEVEL = 2;
+export const RESPEC_BASE_COST = 100; // × player level
+
 // Equipment slot types
 export const SLOT_TYPES = ['weapon', 'armor', 'accessory'];
 
