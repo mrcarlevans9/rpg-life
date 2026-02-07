@@ -590,12 +590,14 @@ import { pendingLootData, equippedItems, equipmentData, equippedStats } from '..
               <span class="bar-value">{$currentRun?.playerMp}/{$currentRun?.maxMp}</span>
             </div>
           </div>
-          <!-- Gold Display -->
+          <!-- Gold & XP Display -->
           <div class="gold-section">
             <div class="gold-stash">
               <span class="gold-bank" title="Safe in bank">🏦 {$currentRun?.bankGold || 0}</span>
               <span class="gold-divider">|</span>
               <span class="gold-run" title="This run (at risk)">💰 +{$currentRun?.goldCollected || 0}</span>
+              <span class="gold-divider">|</span>
+              <span class="xp-run" title="XP this run (at risk)">✨ +{$currentRun?.pendingXP || 0}</span>
             </div>
           </div>
         </div>
@@ -1048,6 +1050,10 @@ import { pendingLootData, equippedItems, equipmentData, equippedStats } from '..
             <span class="stat-value">🪙 {$currentRun?.goldCollected || 0}</span>
           </div>
           <div class="result-stat">
+            <span class="stat-label">XP Earned</span>
+            <span class="stat-value">✨ {$currentRun?.pendingXP || 0}</span>
+          </div>
+          <div class="result-stat">
             <span class="stat-label">Monsters Slain</span>
             <span class="stat-value">💀 {$currentRun?.monstersKilled || 0}</span>
           </div>
@@ -1073,7 +1079,11 @@ import { pendingLootData, equippedItems, equipmentData, equippedStats } from '..
         <div class="result-stats">
           <div class="result-stat lost">
             <span class="stat-label">Gold Lost</span>
-            <span class="stat-value">🪙 {$currentRun?.goldCollected || 0}</span>
+            <span class="stat-value">🪙 {$currentRun?.lostRewards?.goldLost || 0}</span>
+          </div>
+          <div class="result-stat lost">
+            <span class="stat-label">XP Lost</span>
+            <span class="stat-value">✨ {$currentRun?.lostRewards?.xpLost || 0}</span>
           </div>
           <div class="result-stat">
             <span class="stat-label">Monsters Slain</span>
@@ -1955,6 +1965,10 @@ import { pendingLootData, equippedItems, equipmentData, equippedStats } from '..
 
   .gold-run {
     color: #fbbf24;
+  }
+
+  .xp-run {
+    color: #a78bfa;
   }
 
   /* Action Panel */
