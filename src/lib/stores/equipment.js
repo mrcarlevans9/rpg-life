@@ -295,7 +295,8 @@ export async function clearPendingLoot() {
 }
 
 // Extract pending loot to inventory (on successful extraction)
-export async function extractPendingLoot() {
+// extractionRate: 1.0 = 100% of items, 0.5 = 50% of items (flee penalty)
+export async function extractPendingLoot(extractionRate = 1.0) {
   const pending = await db.pendingLoot.toArray();
   const player = await db.player.get(1);
   const currentCount = await db.equipment.count();
@@ -303,8 +304,19 @@ export async function extractPendingLoot() {
 
   const extracted = [];
   const overflow = [];
+  const lost = [];
 
-  for (const item of pending) {
+  // If extraction rate < 1, randomly lose some items
+  let itemsToProcess = pending;
+  if (extractionRate < 1.0 && pending.length > 0) {
+    const itemsToKeep = Math.max(1, Math.floor(pending.length * extractionRate));
+    // Shuffle and take the kept amount (at least 1 if any exist)
+    const shuffled = [...pending].sort(() => Math.random() - 0.5);
+    itemsToProcess = shuffled.slice(0, itemsToKeep);
+    lost.push(...shuffled.slice(itemsToKeep));
+  }
+
+  for (const item of itemsToProcess) {
     if (currentCount + extracted.length < maxSlots) {
       // Remove pendingLoot-specific id before adding to equipment
       const { id, ...itemData } = item;
@@ -321,7 +333,7 @@ export async function extractPendingLoot() {
 
   await db.pendingLoot.clear();
 
-  return { extracted, overflow };
+  return { extracted, overflow, lost };
 }
 
 // Equip an item (swap if slot occupied)

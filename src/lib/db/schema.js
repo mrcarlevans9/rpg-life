@@ -308,6 +308,23 @@ export const STAT_CONFIG = {
 export const POINTS_PER_LEVEL = 2;
 export const RESPEC_BASE_COST = 100; // × player level
 
+// Dungeon XP rewards
+export const DUNGEON_XP = {
+  tier1Monster: 5,      // Floors 1-10
+  tier2Monster: 10,     // Floors 11-20
+  tier3Monster: 15,     // Floors 21+
+  miniBoss: 25,
+  majorBoss: 50,
+  floorBonusMultiplier: 2  // XP = floor number × this
+};
+
+// Extraction rates for dungeon rewards (XP, gold, loot)
+export const EXTRACTION_RATES = {
+  death: 0,
+  flee: 0.5,
+  victory: 1.0
+};
+
 // Equipment slot types
 export const SLOT_TYPES = ['weapon', 'armor', 'accessory'];
 

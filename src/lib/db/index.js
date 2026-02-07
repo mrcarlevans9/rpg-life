@@ -18,7 +18,9 @@ import {
   BASE_SELL_VALUES,
   STAT_CONFIG,
   POINTS_PER_LEVEL,
-  RESPEC_BASE_COST
+  RESPEC_BASE_COST,
+  DUNGEON_XP,
+  EXTRACTION_RATES
 } from './schema.js';
 
 // Initialize database with default data
@@ -360,5 +362,7 @@ export {
   BASE_SELL_VALUES,
   STAT_CONFIG,
   POINTS_PER_LEVEL,
-  RESPEC_BASE_COST
+  RESPEC_BASE_COST,
+  DUNGEON_XP,
+  EXTRACTION_RATES
 };

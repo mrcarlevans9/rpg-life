@@ -1,6 +1,7 @@
 import { writable, derived, get } from 'svelte/store';
 import { liveQuery } from 'dexie';
-import { db, MONSTERS, BOSSES, MONSTER_MODIFIERS, DUNGEON_UPGRADES, MERCHANT, MERCHANT_ITEMS } from '../db/index.js';
+import { db, MONSTERS, BOSSES, MONSTER_MODIFIERS, DUNGEON_UPGRADES, MERCHANT, MERCHANT_ITEMS, DUNGEON_XP, EXTRACTION_RATES } from '../db/index.js';
+import { addXP } from '../services/xpService.js';
 import { playerData, statBonuses } from './player.js';
 import { pushDungeonUpdate, pushPlayerUpdate } from '../supabase/sync.js';
 import {
@@ -204,6 +205,34 @@ function rollDice(count = 2, sides = 6) {
 
 function rollD6(count = 2) {
   return rollDice(count, 6);
+}
+
+// ============ Dungeon XP Calculation ============
+
+// Get base XP for defeating a monster based on its tier and boss status
+function getMonsterBaseXP(monster, floorNumber) {
+  if (monster.isBoss) {
+    return monster.isMajorBoss ? DUNGEON_XP.majorBoss : DUNGEON_XP.miniBoss;
+  }
+  // Determine tier based on floor
+  if (floorNumber >= 21) return DUNGEON_XP.tier3Monster;
+  if (floorNumber >= 11) return DUNGEON_XP.tier2Monster;
+  return DUNGEON_XP.tier1Monster;
+}
+
+// Calculate XP with equipment bonuses applied
+function calculateEarnedXP(baseXP) {
+  const equipStats = get(equippedStats) || {};
+  // xpBonus is percentage (e.g., 10 = +10%)
+  // darkPactXpBonus from tainted items (e.g., 30 = +30%)
+  const xpBonusPercent = (equipStats.xpBonus || 0) + (equipStats.darkPactXpBonus || 0);
+  return Math.floor(baseXP * (1 + xpBonusPercent / 100));
+}
+
+// Get floor clear bonus XP
+function getFloorClearXP(floorNumber) {
+  const baseXP = floorNumber * DUNGEON_XP.floorBonusMultiplier;
+  return calculateEarnedXP(baseXP);
 }
 
 // ============ Monster Generation ============
@@ -497,7 +526,9 @@ export async function startRun() {
       skeletonHp: 0
     },
     // Equipment-triggered effects (once per run)
-    secondWindUsed: false      // Second Wind armor effect
+    secondWindUsed: false,     // Second Wind armor effect
+    // Dungeon XP system
+    pendingXP: 0               // XP earned this run, not yet banked
   };
 
   // Lock scroll immediately when entering dungeon
@@ -529,9 +560,18 @@ export async function endRun(victory = false) {
   if (!run) return;
 
   if (victory) {
+    run.exitType = 'victory';
+    currentRun.set(run);
     gamePhase.set('victory');
   } else {
-    // On death, clear all pending loot - extraction mechanic!
+    // On death, lose all gold, XP, and loot - extraction mechanic!
+    const lostGold = run.goldCollected;
+    const lostXP = run.pendingXP || 0;
+    run.lostRewards = { goldLost: lostGold, xpLost: lostXP };
+    run.goldCollected = 0;
+    run.pendingXP = 0;
+    run.exitType = 'death';
+    currentRun.set(run);
     await clearPendingLoot();
     gamePhase.set('defeat');
   }
@@ -545,12 +585,21 @@ export async function collectRewards() {
   const player = await db.player.get(1);
 
   // Extract pending loot to inventory - the extraction mechanic!
-  const { extracted, overflow } = await extractPendingLoot();
+  // Flee = 50% of items extracted, Victory = 100%
+  const extractRate = run.exitType === 'flee' ? EXTRACTION_RATES.flee : EXTRACTION_RATES.victory;
+  const { extracted, overflow } = await extractPendingLoot(extractRate);
   if (extracted.length > 0) {
     console.log(`Extracted ${extracted.length} items from pending loot`);
   }
   if (overflow.length > 0) {
     console.log(`${overflow.length} items lost - inventory full!`);
+  }
+
+  // Award XP from dungeon run (already reduced if fled)
+  const xpToAward = run.pendingXP || 0;
+  if (xpToAward > 0) {
+    const source = run.exitType === 'victory' ? 'dungeon_victory' : 'dungeon_flee';
+    await addXP(xpToAward, source);
   }
 
   // Calculate new stats
@@ -570,6 +619,7 @@ export async function collectRewards() {
   // Update dungeon analytics (local only - for detailed tracking)
   const dungeonUpdates = {
     totalGoldEarned: (dungeon?.totalGoldEarned || 0) + run.goldCollected,
+    totalXPEarned: (dungeon?.totalXPEarned || 0) + xpToAward,
     bossesDefeated: run.currentFloor === 10 && get(gamePhase) === 'victory'
       ? (dungeon?.bossesDefeated || 0) + 1
       : dungeon?.bossesDefeated || 0
@@ -585,41 +635,51 @@ export async function collectRewards() {
   combatLog.set([]);
 }
 
-// Safe retreat - after completing a floor, keep all gold
+// Safe retreat - after completing a floor, keep all gold/XP/loot
 export async function retreat() {
   const run = get(currentRun);
   if (!run) return;
 
+  run.exitType = 'victory'; // Safe retreat = full rewards like victory
+  currentRun.set(run);
+
   gamePhase.set('retreat');
-  addLog('info', `You safely retreat with ${run.goldCollected} gold!`);
+  addLog('info', `You safely retreat with ${run.goldCollected} gold and ${run.pendingXP || 0} XP!`);
 
   // Collect full rewards on safe retreat
   await collectRewards();
 }
 
-// Emergency retreat - can use anytime, but lose half your gold
+// Emergency retreat - can use anytime, but lose half your gold/XP/loot
 export async function emergencyRetreat() {
   const run = get(currentRun);
   if (!run) return;
 
-  // Calculate gold penalty
-  const goldLost = Math.floor(run.goldCollected / 2);
+  // Calculate gold penalty (50% lost)
+  const goldLost = Math.floor(run.goldCollected * (1 - EXTRACTION_RATES.flee));
   const goldKept = run.goldCollected - goldLost;
 
-  // Update run with reduced gold
+  // Calculate XP penalty (50% lost)
+  const xpLost = Math.floor((run.pendingXP || 0) * (1 - EXTRACTION_RATES.flee));
+  const xpKept = (run.pendingXP || 0) - xpLost;
+
+  // Update run with reduced gold and XP
   run.goldCollected = goldKept;
+  run.pendingXP = xpKept;
+  run.exitType = 'flee';
+  run.lostRewards = { goldLost, xpLost };
   currentRun.set(run);
 
   gamePhase.set('retreat');
 
-  if (goldLost > 0) {
-    addLog('warning', `Emergency retreat! You lost ${goldLost} gold in your haste!`);
-    addLog('info', `You escape with ${goldKept} gold.`);
+  if (goldLost > 0 || xpLost > 0) {
+    addLog('warning', `Emergency retreat! You lost ${goldLost} gold and ${xpLost} XP in your haste!`);
+    addLog('info', `You escape with ${goldKept} gold and ${xpKept} XP.`);
   } else {
     addLog('info', `You flee the dungeon!`);
   }
 
-  // Collect reduced rewards
+  // Collect reduced rewards (loot extraction also at 50%)
   await collectRewards();
 }
 
@@ -1363,11 +1423,16 @@ async function monsterDefeated(run, room, monster) {
   const equipGoldBonus = get(equippedStats)?.goldPerKill || 0;
   const totalGold = monster.goldReward + goldBonus + equipGoldBonus;
 
+  // Calculate XP earned
+  const baseXP = getMonsterBaseXP(monster, run.currentFloor);
+  const earnedXP = calculateEarnedXP(baseXP);
+  run.pendingXP = (run.pendingXP || 0) + earnedXP;
+
   if (goldBonus > 0 || equipGoldBonus > 0) {
     const bonusText = [goldBonus > 0 ? `+${goldBonus}` : '', equipGoldBonus > 0 ? `+${equipGoldBonus}` : ''].filter(Boolean).join(' ');
-    addLog('victory', `${monster.displayName} defeated! +${monster.goldReward} (${bonusText}) gold`);
+    addLog('victory', `${monster.displayName} defeated! +${monster.goldReward} (${bonusText}) gold, +${earnedXP} XP`);
   } else {
-    addLog('victory', `${monster.displayName} defeated! +${monster.goldReward} gold`);
+    addLog('victory', `${monster.displayName} defeated! +${monster.goldReward} gold, +${earnedXP} XP`);
   }
 
   // Roll for loot drop
@@ -1483,6 +1548,11 @@ function advanceRoom(run) {
     }
   } else {
     // Floor complete - advance to next floor (no limit!)
+    // Award floor clear bonus XP
+    const floorBonusXP = getFloorClearXP(run.currentFloor);
+    run.pendingXP = (run.pendingXP || 0) + floorBonusXP;
+    addLog('info', `Floor ${run.currentFloor} cleared! +${floorBonusXP} XP`);
+
     // Only show end-of-floor merchant if no mid-floor merchant appeared
     if (!run.floor.hasMidFloorMerchant) {
       // Customize greeting based on whether boss was just defeated
