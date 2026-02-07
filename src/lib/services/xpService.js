@@ -1,4 +1,5 @@
 import { db, POINTS_PER_LEVEL } from '../db/index.js';
+import { pushPlayerUpdate } from '../supabase/sync.js';
 
 // Base XP values by priority
 const BASE_XP = {
@@ -133,6 +134,14 @@ export async function addXP(amount, source) {
       totalStatPointsEarned: (updatedPlayer?.totalStatPointsEarned || 0) + statPointsAwarded
     });
   }
+
+  // Push XP update to cloud (async, don't block)
+  const finalPlayer = await db.player.get(1);
+  pushPlayerUpdate({
+    totalXP: finalPlayer.totalXP,
+    unspentStatPoints: finalPlayer.unspentStatPoints,
+    totalStatPointsEarned: finalPlayer.totalStatPointsEarned
+  }).catch(err => console.error('Failed to push XP update:', err));
 
   return {
     amount,
