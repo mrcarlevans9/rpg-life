@@ -495,7 +495,9 @@ export async function startRun() {
       hasRevived: false,       // Dark Phoenix Rebirth
       skeletonActive: false,   // Necromancer Summon
       skeletonHp: 0
-    }
+    },
+    // Equipment-triggered effects (once per run)
+    secondWindUsed: false      // Second Wind armor effect
   };
 
   // Lock scroll immediately when entering dungeon
@@ -1234,6 +1236,16 @@ async function performBasicAttack(run, monster, damageMultiplier = 1.0) {
     return; // Attack completely missed
   }
 
+  // Check for block chance (equipment effect)
+  if (equipStats.blockChance > 0 && Math.random() * 100 < equipStats.blockChance) {
+    addLog('block', `🛡️ You block ${monster.displayName}'s attack!`);
+    lastRoll.set({ rolls: [], total: 0, type: 'block', critical: false });
+    currentMessage.set(`Blocked!`);
+    await delay(600);
+    combatState.update(s => ({ ...s, enemyAction: null }));
+    return; // Attack completely blocked
+  }
+
   // Monster rolls 2D6 (same as player)
   const rolls = rollD6(2);
   const total = rolls.reduce((a, b) => a + b, 0);
@@ -1282,6 +1294,36 @@ async function performBasicAttack(run, monster, damageMultiplier = 1.0) {
   }
 
   run.playerHp = Math.max(0, run.playerHp - damage);
+
+  // Check for Second Wind (survive lethal hit with 1 HP, once per run)
+  if (run.playerHp <= 0 && equipStats.secondWind && !run.secondWindUsed) {
+    run.playerHp = 1;
+    run.secondWindUsed = true;
+    addLog('special', `🌬️ Second Wind! You survive with 1 HP!`);
+    await delay(400);
+  }
+
+  // Apply thorns damage if player has thorns and took damage
+  if (damage > 0 && equipStats.thorns > 0 && run.playerHp > 0) {
+    const thornsDamage = equipStats.thorns;
+    monster.currentHp = Math.max(0, monster.currentHp - thornsDamage);
+    addLog('special', `🌵 Thorns reflect ${thornsDamage} damage back to ${monster.displayName}!`);
+    combatState.update(s => ({ ...s, lastDamageToEnemy: thornsDamage }));
+    await delay(400);
+    combatState.update(s => ({ ...s, lastDamageToEnemy: null }));
+
+    // Check if thorns killed the monster
+    if (monster.currentHp <= 0) {
+      addLog('kill', `${monster.displayName} was killed by thorns damage!`);
+      const room = run.floor.rooms[run.floor.currentRoom];
+      combatState.update(s => ({ ...s, monsterDefeated: true }));
+      await delay(800);
+      await monsterDefeated(run, room, monster);
+      combatState.update(s => ({ ...s, isAnimating: false, monsterDefeated: false, enemyAction: null }));
+      return;
+    }
+  }
+
   currentRun.set(run);
 
   await delay(500);
