@@ -1,6 +1,6 @@
 import { writable, get } from 'svelte/store';
 import { supabase } from '../supabase/client.js';
-import { playerData } from './player.js';
+import { playerData, statBonuses } from './player.js';
 import { db } from '../db/index.js';
 
 // ============ Guild Boss Battle State ============
@@ -273,9 +273,11 @@ export async function playerAttack() {
 
   await delay(500);
 
-  // Calculate damage
+  // Calculate damage - include Power stat bonus
+  const stats = get(statBonuses) || {};
+  const powerBonus = Math.floor(stats.baseDamage || 0);
   const baseDamage = 5 + rollTotal;
-  const bonusDamage = combat.bonusDamage + combat.tempBuffs.bonusDamage;
+  const bonusDamage = combat.bonusDamage + combat.tempBuffs.bonusDamage + powerBonus;
   const critMultiplier = isCrit ? 1.5 + (combat.critBonus / 100) : 1;
 
   const totalDamage = Math.floor((baseDamage + bonusDamage) * critMultiplier);
@@ -364,8 +366,10 @@ export async function castSpell(spell) {
 
   await delay(800);
 
-  // Calculate spell damage with bonus
-  const bonusDamage = combat.tempBuffs.bonusDamage;
+  // Calculate spell damage with bonus (include Power stat)
+  const stats = get(statBonuses) || {};
+  const powerBonus = Math.floor(stats.baseDamage || 0);
+  const bonusDamage = combat.tempBuffs.bonusDamage + powerBonus;
   const totalDamage = spell.damage + Math.floor(bonusDamage * 0.5);
 
   currentMessage.set(`${spell.name} deals ${totalDamage} damage!`);
