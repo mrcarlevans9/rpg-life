@@ -37,7 +37,7 @@
     getTotalPotions
   } from '../lib/stores/dungeon.js';
   import { DUNGEON_UPGRADES } from '../lib/db/index.js';
-  import { playerData } from '../lib/stores/player.js';
+  import { playerData, statBonuses } from '../lib/stores/player.js';
   import EquipmentInventory from '../components/game/EquipmentInventory.svelte';
 import { pendingLootData, equippedItems, equipmentData, equippedStats } from '../lib/stores/equipment.js';
   import { SLOT_TYPES, RARITIES } from '../lib/db/index.js';
@@ -82,10 +82,11 @@ import { pendingLootData, equippedItems, equipmentData, equippedStats } from '..
   // Derived: total potions available in current run (0 outside dungeon)
   $: runPotions = $currentRun ? getTotalPotions($currentRun) : 0;
 
-  // Derived: total damage bonus for display in combat toast
+  // Derived: total damage bonus for display in combat toast (includes Power stat)
   $: totalDamageBonus = ($currentRun?.bonusDamage || 0) +
                         ($currentRun?.tempBuffs?.bonusDamage || 0) +
-                        ($equippedStats?.damage || 0);
+                        ($equippedStats?.damage || 0) +
+                        Math.floor($statBonuses?.baseDamage || 0);
 
   // Derived: total defense bonus for display
   $: totalDefenseBonus = ($currentRun?.defenseBonus || 0) +
