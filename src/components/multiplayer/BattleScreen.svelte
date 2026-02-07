@@ -4,6 +4,7 @@
   import { recordBattle } from '../../lib/services/pvpService.js';
   import { addXP } from '../../lib/services/xpService.js';
   import { db } from '../../lib/db/index.js';
+  import { pushPlayerUpdate } from '../../lib/supabase/sync.js';
   import ProgressBar from '../common/ProgressBar.svelte';
 
   export let mySnapshot;
@@ -70,7 +71,9 @@
       if (result.goldReward > 0) {
         const player = await db.player.get(1);
         if (player) {
-          await db.player.update(1, { gold: (player.gold || 0) + result.goldReward });
+          const newGold = (player.gold || 0) + result.goldReward;
+          await db.player.update(1, { gold: newGold });
+          pushPlayerUpdate({ gold: newGold });
         }
       }
     } else if (!result.isDraw) {

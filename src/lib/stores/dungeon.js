@@ -603,7 +603,9 @@ export async function collectRewards() {
   }
 
   // Calculate new stats
-  const newGold = (player?.gold || 0) + run.goldCollected;
+  // Use run.bankGold (remaining bank gold after merchant purchases) instead of
+  // player.gold (which still has the pre-run value, not accounting for in-run spending)
+  const newGold = (run.bankGold != null ? run.bankGold : (player?.gold || 0)) + run.goldCollected;
   const newHighestFloor = Math.max(player?.highestFloor || 0, run.currentFloor);
   const newTotalKills = (player?.totalKills || 0) + run.monstersKilled;
 

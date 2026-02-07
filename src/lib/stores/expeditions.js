@@ -7,6 +7,7 @@ import { settingsData } from './settings.js';
 import { get } from 'svelte/store';
 import { awardPotions } from './dungeon.js';
 import { MERCHANT_ITEMS } from '../db/index.js';
+import { pushPlayerUpdate } from '../supabase/sync.js';
 
 // Create a store from a Dexie liveQuery
 function createLiveQueryStore(queryFn, defaultValue = null) {
@@ -240,12 +241,12 @@ async function awardExpeditionItems(items) {
 async function awardExpeditionGold(amount) {
   if (amount <= 0) return;
 
-  const dungeon = await db.dungeon.get(1);
-  if (!dungeon) return;
+  const player = await db.player.get(1);
+  if (!player) return;
 
-  await db.dungeon.update(1, {
-    gold: (dungeon.gold || 0) + amount
-  });
+  const newGold = (player.gold || 0) + amount;
+  await db.player.update(1, { gold: newGold });
+  pushPlayerUpdate({ gold: newGold });
 }
 
 // End the expedition and log it
