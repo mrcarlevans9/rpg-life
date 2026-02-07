@@ -2,6 +2,7 @@ import { writable, get } from 'svelte/store';
 import { supabase } from '../supabase/client.js';
 import { playerData, statBonuses } from './player.js';
 import { db } from '../db/index.js';
+import { pushPlayerUpdate } from '../supabase/sync.js';
 
 // ============ Guild Boss Battle State ============
 
@@ -158,6 +159,7 @@ export async function purchaseShopItem(item) {
   // Deduct gold
   const newGold = player.gold - item.price;
   await db.player.update(1, { gold: newGold });
+  pushPlayerUpdate({ gold: newGold });
 
   // Apply effect
   if (item.effect.type === 'potion') {
